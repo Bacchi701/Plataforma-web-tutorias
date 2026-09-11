@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Registro | Tutorías Duoc UC</title>
+
+    <meta
+        name="description"
+        content="Crea tu cuenta en la plataforma de tutorías entre estudiantes Duoc UC."
+    >
+
+    <link rel="stylesheet" href="css/styles.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
+    <style>
+
+
+        body {
+            min-height: 100vh;
+            background: #f5f7fa;
+        }
+
+
+        .register-page {
+            min-height: calc(100vh - 78px);
+
+            display: grid;
+
+            grid-template-columns: .9fr 1.1fr;
+        }
+
+
+     
+
+        .register-info {
+            position: relative;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #003057 0%,
+                    #001f3c 100%
+                );
+
+            color: white;
+
+            display: flex;
+
+            align-items: center;
+
+            padding: 70px;
+
+            overflow: hidden;
+        }
+
+
+        .register-info::before {
+            content: "";
+
+            position: absolute;
+
+            width: 430px;
+            height: 430px;
+
+            border-radius: 50%;
+
+            background: #FDBD2D;
+
+            opacity: .12;
+
+            right: -170px;
+            top: -150px;
+        }
+
+
+        .register-info::after {
+            content: "";
+
+            position: absolute;
+
+            width: 300px;
+            height: 300px;
+
+            border-radius: 50%;
+
+            border: 55px solid rgba(255,255,255,.05);
+
+            left: -130px;
+            bottom: -130px;
+        }
+
+
+        .register-info-content {
+            position: relative;
+
+            z-index: 2;
+
+            max-width: 520px;
+        }
+
+
+        .register-info-badge {
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            color: #FDBD2D;
+
+            background: rgba(253,189,45,.12);
+
+            border: 1px solid rgba(253,189,45,.25);
+
+            padding: 8px 14px;
+
+            border-radius: 30px;
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            margin-bottom: 25px;
+        }
+
+
+        .register-info h1 {
+            font-size: clamp(40px, 5vw, 60px);
+
+            line-height: 1.07;
+
+            letter-spacing: -2px;
+
+            margin-bottom: 22px;
+        }
+
+
+        .register-info h1 span {
+            color: #FDBD2D;
+        }
+
+
+        .register-info-description {
+            font-size: 17px;
+
+            line-height: 1.7;
+
+            color: rgba(255,255,255,.72);
+
+            margin-bottom: 35px;
+        }
+
+
+        .register-features {
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 17px;
+        }
+
+
+        .register-feature {
+            display: flex;
+
+            align-items: center;
+
+            gap: 14px;
+        }
+
+
+        .feature-icon {
+            width: 43px;
+            height: 43px;
+
+            flex-shrink: 0;
+
+            border-radius: 10px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            background: rgba(255,255,255,.08);
+
+            color: #FDBD2D;
+        }
+
+
+        .register-feature strong {
+            display: block;
+
+            font-size: 14px;
+        }
+
+
+        .register-feature span {
+            font-size: 12px;
+
+            color: rgba(255,255,255,.55);
+        }
+
+
+
+
+        .register-form-section {
+            background: white;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: flex-start;
+
+            padding: 55px 35px 75px;
+        }
+
+
+        .register-wrapper {
+            width: 100%;
+
+            max-width: 650px;
+        }
+
+
+        .register-back {
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            color: #6B7280;
+
+            font-size: 13px;
+
+            font-weight: 600;
+
+            margin-bottom: 30px;
+        }
+
+
+        .register-back:hover {
+            color: #003057;
+        }
+
+
+        .register-title {
+            margin-bottom: 28px;
+        }
+
+
+        .register-title > span {
+            color: #307FE2;
+
+            font-size: 12px;
+
+            font-weight: 800;
+
+            letter-spacing: 1.8px;
+        }
+
+
+        .register-title h2 {
+            font-size: 34px;
+
+            color: #003057;
+
+            margin: 7px 0 8px;
+
+            line-height: 1.2;
+        }
+
+
+        .register-title p {
+            color: #6B7280;
+
+            font-size: 14px;
+        }
+
+
+
+
+        .form-row {
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, 1fr);
+
+            gap: 18px;
+        }
+
+
+        .form-group {
+            margin-bottom: 19px;
+        }
+
+
+        .form-label {
+            display: block;
+
+            color: #374151;
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            margin-bottom: 7px;
+        }
+
+
+        .input-container {
+            position: relative;
+        }
+
+
+        .input-container > i {
+            position: absolute;
+
+            left: 15px;
+
+            top: 50%;
+
+            transform: translateY(-50%);
+
+            color: #9CA3AF;
+
+            font-size: 14px;
+
+            pointer-events: none;
+        }
+
+
+        .input-container input,
+        .input-container select {
+            width: 100%;
+
+            height: 51px;
+
+            border: 1px solid #DCE1E7;
+
+            border-radius: 10px;
+
+            background: #FAFBFC;
+
+            outline: none;
+
+            padding: 0 42px;
+
+            color: #111827;
+
+            font-size: 14px;
+
+            transition: .2s;
+        }
+
+
+        .input-container select {
+            appearance: none;
+
+            cursor: pointer;
+
+            padding-right: 35px;
+        }
+
+
+        .input-container input:focus,
+        .input-container select:focus {
+            border-color: #307FE2;
+
+            background: white;
+
+            box-shadow:
+                0 0 0 3px rgba(48,127,226,.1);
+        }
+
+
+        .select-arrow {
+            position: absolute;
+
+            right: 15px !important;
+            left: auto !important;
+
+            pointer-events: none;
+        }
+
+
+
+        /* 
+           PASSWORD
+       */
+
+        .password-toggle {
+            position: absolute;
+
+            right: 13px;
+
+            top: 50%;
+
+            transform: translateY(-50%);
+
+            border: none;
+
+            background: transparent;
+
+            color: #7B8491;
+
+            padding: 5px;
+        }
+
+
+        .password-toggle:hover {
+            color: #003057;
+        }
+
+
+        .password-help {
+            display: block;
+
+            margin-top: 6px;
+
+            color: #9CA3AF;
+
+            font-size: 11px;
+        }
+
+
+
+
+
+        .account-type-title {
+            color: #003057;
+
+            font-size: 16px;
+
+            margin-bottom: 12px;
+        }
+
+
+        .account-types {
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, 1fr);
+
+            gap: 14px;
+
+            margin-bottom: 24px;
+        }
+
+
+        .account-option {
+            position: relative;
+        }
+
+
+        .account-option input {
+            position: absolute;
+
+            opacity: 0;
+
+            pointer-events: none;
+        }
+
+
+        .account-option label {
+            display: flex;
+
+            align-items: center;
+
+            gap: 13px;
+
+            min-height: 88px;
+
+            padding: 16px;
+
+            border: 1px solid #DCE1E7;
+
+            border-radius: 12px;
+
+            cursor: pointer;
+
+            transition: .2s;
+
+            background: white;
+        }
+
+
+        .account-option input:checked + label {
+            border: 2px solid #003057;
+
+            background: #F3F8FC;
+        }
+
+
+        .account-option-icon {
+            width: 45px;
+            height: 45px;
+
+            flex-shrink: 0;
+
+            border-radius: 10px;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            background: rgba(253,189,45,.18);
+
+            color: #003057;
+
+            font-size: 18px;
+        }
+
+
+        .account-option strong {
+            display: block;
+
+            color: #003057;
+
+            font-size: 14px;
+
+            margin-bottom: 2px;
+        }
+
+
+        .account-option span {
+            display: block;
+
+            color: #6B7280;
+
+            font-size: 11px;
+
+            line-height: 1.4;
+        }
+
+
+
+
+
+        .terms {
+            display: flex;
+
+            align-items: flex-start;
+
+            gap: 9px;
+
+            color: #6B7280;
+
+            font-size: 12px;
+
+            line-height: 1.5;
+
+            margin: 4px 0 22px;
+        }
+
+
+        .terms input {
+            margin-top: 3px;
+
+            accent-color: #003057;
+        }
+
+
+        .terms a {
+            color: #307FE2;
+
+            font-weight: 700;
+        }
+
+
+
+
+        .register-button {
+            width: 100%;
+
+            border: none;
+
+            border-radius: 10px;
+
+            background: #003057;
+
+            color: white;
+
+            height: 53px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            gap: 10px;
+
+            font-size: 14px;
+
+            font-weight: 800;
+
+            transition: .2s;
+        }
+
+
+        .register-button:hover {
+            background: #001f3c;
+
+            transform: translateY(-1px);
+
+            box-shadow:
+                0 10px 22px rgba(0,48,87,.16);
+        }
+
+
+
+
+
+        .register-message {
+            display: none;
+
+            margin-bottom: 20px;
+
+            padding: 12px 14px;
+
+            border-radius: 9px;
+
+            font-size: 12px;
+
+            font-weight: 600;
+        }
+
+
+        .register-message.error {
+            display: block;
+
+            background: #FEF2F2;
+
+            border: 1px solid #FECACA;
+
+            color: #B91C1C;
+        }
+
+
+        .register-message.success {
+            display: block;
+
+            background: #F0FDF4;
+
+            border: 1px solid #BBF7D0;
+
+            color: #15803D;
+        }
+
+
+
+        /*
+           LOGIN
+        */
+
+        .already-account {
+            text-align: center;
+
+            margin-top: 25px;
+
+            color: #6B7280;
+
+            font-size: 13px;
+        }
+
+
+        .already-account a {
+            color: #003057;
+
+            font-weight: 800;
+
+            margin-left: 4px;
+        }
+
+
+
+
+        @media(max-width: 950px) {
+
+            .register-page {
+                grid-template-columns: 1fr;
+            }
+
+
+            .register-info {
+                min-height: auto;
+
+                padding: 50px 8%;
+            }
+
+
+            .register-features {
+                display: none;
+            }
+
+        }
+
+
+        @media(max-width: 600px) {
+
+            .register-info {
+                padding: 40px 22px;
+            }
+
+
+            .register-info h1 {
+                font-size: 37px;
+            }
+
+
+            .register-form-section {
+                padding: 40px 20px 60px;
+            }
+
+
+            .register-title h2 {
+                font-size: 29px;
+            }
+
+
+            .form-row {
+                grid-template-columns: 1fr;
+
+                gap: 0;
+            }
+
+
+            .account-types {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+
+
+<header class="header">
+
+    <div class="container navbar">
+
+        <a href="index.html" class="brand">
+
+            <div class="brand-icon">
+                D
+            </div>
+
+            <div class="brand-text">
+
+                <strong>
+                    Duoc UC
+                </strong>
+
+                <span>
+                    Tutorías
+                </span>
+
+            </div>
+
+        </a>
+
+
+        <nav class="nav-menu">
+
+            <a href="index.html">
+                Inicio
+            </a>
+
+            <a href="index.html#tutores">
+                Tutores
+            </a>
+
+            <a href="asignaturas.html">
+                Asignaturas
+            </a>
+
+            <a href="index.html#como-funciona">
+                ¿Cómo funciona?
+            </a>
+
+        </nav>
+
+
+        <div class="nav-actions">
+
+            <span
+                style="
+                    font-size:13px;
+                    color:#6B7280;
+                    font-weight:600;
+                "
+            >
+                ¿Ya tienes cuenta?
+            </span>
+
+
+            <a
+                href="login.html"
+                class="btn-primary"
+            >
+                Iniciar sesión
+            </a>
+
+        </div>
+
+
+        <button class="mobile-menu">
+
+            <i class="fa-solid fa-bars"></i>
+
+        </button>
+
+    </div>
+
+</header>
+
+
+
+<!-- 
+     REGISTRO
+ -->
+
+<main class="register-page">
+
+
+    <section class="register-info">
+
+        <div class="register-info-content">
+
+
+            <div class="register-info-badge">
+
+                <i class="fa-solid fa-graduation-cap"></i>
+
+                Comunidad Duoc UC
+
+            </div>
+
+
+            <h1>
+
+                Únete a una comunidad que
+
+                <span>
+                    aprende colaborando.
+                </span>
+
+            </h1>
+
+
+            <p class="register-info-description">
+
+                Crea tu cuenta y comienza a buscar apoyo académico,
+                reservar tutorías o compartir tus conocimientos
+                ayudando a otros estudiantes.
+
+            </p>
+
+
+
+            <div class="register-features">
+
+
+                <div class="register-feature">
+
+                    <div class="feature-icon">
+
+                        <i class="fa-solid fa-magnifying-glass"></i>
+
+                    </div>
+
+                    <div>
+
+                        <strong>
+                            Encuentra tutores
+                        </strong>
+
+                        <span>
+                            Busca por asignatura, disponibilidad y evaluación.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="register-feature">
+
+                    <div class="feature-icon">
+
+                        <i class="fa-solid fa-calendar-check"></i>
+
+                    </div>
+
+                    <div>
+
+                        <strong>
+                            Reserva fácilmente
+                        </strong>
+
+                        <span>
+                            Selecciona el horario que mejor te acomode.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="register-feature">
+
+                    <div class="feature-icon">
+
+                        <i class="fa-solid fa-handshake"></i>
+
+                    </div>
+
+                    <div>
+
+                        <strong>
+                            Comparte tus conocimientos
+                        </strong>
+
+                        <span>
+                            También puedes convertirte en tutor.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+ 
+
+    <section class="register-form-section">
+
+        <div class="register-wrapper">
+
+
+            <a
+                href="index.html"
+                class="register-back"
+            >
+
+                <i class="fa-solid fa-arrow-left"></i>
+
+                Volver al inicio
+
+            </a>
+
+
+
+            <div class="register-title">
+
+                <span>
+                    CREA TU CUENTA
+                </span>
+
+                <h2>
+                    Comienza en Tutorías Duoc UC
+                </h2>
+
+                <p>
+                    Completa tus datos para crear tu perfil de estudiante.
+                </p>
+
+            </div>
+
+
+
+            <div
+                id="registerMessage"
+                class="register-message"
+            ></div>
+
+
+
+            <form id="registerForm">
+
+
+
+                <div class="form-row">
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="nombre"
+                            class="form-label"
+                        >
+                            Nombre
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-regular fa-user"></i>
+
+                            <input
+                                type="text"
+                                id="nombre"
+                                name="nombre"
+                                placeholder="Ej: Roberto"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="apellido"
+                            class="form-label"
+                        >
+                            Apellido
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-regular fa-user"></i>
+
+                            <input
+                                type="text"
+                                id="apellido"
+                                name="apellido"
+                                placeholder="Ej: González"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+
+
+
+                <div class="form-row">
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="email"
+                            class="form-label"
+                        >
+                            Correo electrónico
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-regular fa-envelope"></i>
+
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                placeholder="nombre@duocuc.cl"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="rut"
+                            class="form-label"
+                        >
+                            RUT
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-regular fa-id-card"></i>
+
+                            <input
+                                type="text"
+                                id="rut"
+                                name="rut"
+                                placeholder="12.345.678-9"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+
+
+
+                <div class="form-row">
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="carrera"
+                            class="form-label"
+                        >
+                            Carrera
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-solid fa-graduation-cap"></i>
+
+                            <select
+                                id="carrera"
+                                name="carrera"
+                                required
+                            >
+
+                                <option value="">
+                                    Selecciona tu carrera
+                                </option>
+
+                                <option>
+                                    Ingeniería en Informática
+                                </option>
+
+                                <option>
+                                    Analista Programador Computacional
+                                </option>
+
+                                <option>
+                                    Ingeniería en Administración
+                                </option>
+
+                                <option>
+                                    Contabilidad General
+                                </option>
+
+                                <option>
+                                    Diseño Gráfico
+                                </option>
+
+                                <option>
+                                    Construcción Civil
+                                </option>
+
+                                <option>
+                                    Ingeniería en Electricidad
+                                </option>
+
+                                <option>
+                                    Ingeniería en Mecánica Automotriz
+                                </option>
+
+                                <option>
+                                    Gastronomía
+                                </option>
+
+                                <option>
+                                    Turismo
+                                </option>
+
+                                <option>
+                                    Otra
+                                </option>
+
+                            </select>
+
+                            <i
+                                class="fa-solid fa-chevron-down select-arrow"
+                            ></i>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="sede"
+                            class="form-label"
+                        >
+                            Sede
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-solid fa-location-dot"></i>
+
+                            <select
+                                id="sede"
+                                name="sede"
+                                required
+                            >
+
+                                <option value="">
+                                    Selecciona tu sede
+                                </option>
+
+                                <option>
+                                    Alameda
+                                </option>
+
+                                <option>
+                                    Antonio Varas
+                                </option>
+
+                                <option>
+                                    Maipú
+                                </option>
+
+                                <option>
+                                    Plaza Oeste
+                                </option>
+
+                                <option>
+                                    Plaza Norte
+                                </option>
+
+                                <option>
+                                    San Bernardo
+                                </option>
+
+                                <option>
+                                    Puente Alto
+                                </option>
+
+                                <option>
+                                    Viña del Mar
+                                </option>
+
+                                <option>
+                                    Valparaíso
+                                </option>
+
+                                <option>
+                                    Concepción
+                                </option>
+
+                                <option>
+                                    San Joaquín
+                                </option>
+
+                            </select>
+
+                            <i
+                                class="fa-solid fa-chevron-down select-arrow"
+                            ></i>
+
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+
+
+
+
+                <div class="form-group">
+
+                    <label
+                        for="semestre"
+                        class="form-label"
+                    >
+                        Semestre actual
+                    </label>
+
+
+                    <div class="input-container">
+
+                        <i class="fa-solid fa-book-open"></i>
+
+                        <select
+                            id="semestre"
+                            name="semestre"
+                            required
+                        >
+
+                            <option value="">
+                                Selecciona tu semestre
+                            </option>
+
+                            <option value="1">
+                                1° semestre
+                            </option>
+
+                            <option value="2">
+                                2° semestre
+                            </option>
+
+                            <option value="3">
+                                3° semestre
+                            </option>
+
+                            <option value="4">
+                                4° semestre
+                            </option>
+
+                            <option value="5">
+                                5° semestre
+                            </option>
+
+                            <option value="6">
+                                6° semestre
+                            </option>
+
+                            <option value="7">
+                                7° semestre
+                            </option>
+
+                            <option value="8">
+                                8° semestre
+                            </option>
+
+                        </select>
+
+
+                        <i
+                            class="fa-solid fa-chevron-down select-arrow"
+                        ></i>
+
+                    </div>
+
+                </div>
+
+
+
+
+                <div class="form-row">
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="password"
+                            class="form-label"
+                        >
+                            Contraseña
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-solid fa-lock"></i>
+
+                            <input
+                                type="password"
+                                id="password"
+                                placeholder="Crea una contraseña"
+                                required
+                            >
+
+
+                            <button
+                                type="button"
+                                class="password-toggle"
+                                onclick="togglePassword(
+                                    'password',
+                                    'passwordIcon'
+                                )"
+                            >
+
+                                <i
+                                    id="passwordIcon"
+                                    class="fa-regular fa-eye"
+                                ></i>
+
+                            </button>
+
+                        </div>
+
+
+                        <span class="password-help">
+                            Mínimo 8 caracteres.
+                        </span>
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label
+                            for="confirmPassword"
+                            class="form-label"
+                        >
+                            Confirmar contraseña
+                        </label>
+
+
+                        <div class="input-container">
+
+                            <i class="fa-solid fa-lock"></i>
+
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                placeholder="Repite tu contraseña"
+                                required
+                            >
+
+
+                            <button
+                                type="button"
+                                class="password-toggle"
+                                onclick="togglePassword(
+                                    'confirmPassword',
+                                    'confirmPasswordIcon'
+                                )"
+                            >
+
+                                <i
+                                    id="confirmPasswordIcon"
+                                    class="fa-regular fa-eye"
+                                ></i>
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+
+
+    
+
+                <h3 class="account-type-title">
+                    ¿Cómo quieres comenzar?
+                </h3>
+
+
+                <div class="account-types">
+
+
+                    <div class="account-option">
+
+                        <input
+                            type="radio"
+                            id="student"
+                            name="accountType"
+                            value="estudiante"
+                            checked
+                        >
+
+
+                        <label for="student">
+
+                            <div class="account-option-icon">
+
+                                <i class="fa-solid fa-user-graduate"></i>
+
+                            </div>
+
+
+                            <div>
+
+                                <strong>
+                                    Buscar tutorías
+                                </strong>
+
+                                <span>
+                                    Quiero recibir ayuda en mis asignaturas.
+                                </span>
+
+                            </div>
+
+                        </label>
+
+                    </div>
+
+
+
+                    <div class="account-option">
+
+                        <input
+                            type="radio"
+                            id="tutor"
+                            name="accountType"
+                            value="tutor"
+                        >
+
+
+                        <label for="tutor">
+
+                            <div class="account-option-icon">
+
+                                <i class="fa-solid fa-chalkboard-user"></i>
+
+                            </div>
+
+
+                            <div>
+
+                                <strong>
+                                    Quiero ser tutor
+                                </strong>
+
+                                <span>
+                                    Quiero enseñar y ayudar a otros estudiantes.
+                                </span>
+
+                            </div>
+
+                        </label>
+
+                    </div>
+
+
+                </div>
+
+
+
+            
+
+                <label class="terms">
+
+                    <input
+                        type="checkbox"
+                        id="terms"
+                        required
+                    >
+
+                    <span>
+
+                        Acepto los
+
+                        <a href="terminos.html" target="_blank">
+                            términos y condiciones
+                        </a>
+
+                        y la
+
+                        <a href="privacidad.html" target="_blank">
+                            política de privacidad
+                        </a>
+
+                        de la plataforma.
+
+                    </span>
+
+                </label>    
+
+
+
+            
+
+                <button
+                    type="submit"
+                    class="register-button"
+                >
+
+                    Crear mi cuenta
+
+                    <i class="fa-solid fa-arrow-right"></i>
+
+                </button>
+
+
+            </form>
+
+
+
+            <div class="already-account">
+
+                ¿Ya tienes una cuenta?
+
+                <a href="login.html">
+                    Iniciar sesión
+                </a>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+
+<script>
+
+
+   
+
+    function togglePassword(
+        inputId,
+        iconId
+    ) {
+
+        const input =
+            document.getElementById(inputId);
+
+
+        const icon =
+            document.getElementById(iconId);
+
+
+        if (input.type === "password") {
+
+            input.type = "text";
+
+            icon.className =
+                "fa-regular fa-eye-slash";
+
+        } else {
+
+            input.type = "password";
+
+            icon.className =
+                "fa-regular fa-eye";
+
+        }
+
+    }
+
+
+
+  
+
+    const registerForm =
+        document.getElementById("registerForm");
+
+
+    const registerMessage =
+        document.getElementById("registerMessage");
+
+
+
+    registerForm.addEventListener(
+        "submit",
+        function(event) {
+
+            event.preventDefault();
+
+
+            const nombre =
+                document
+                    .getElementById("nombre")
+                    .value
+                    .trim();
+
+
+            const apellido =
+                document
+                    .getElementById("apellido")
+                    .value
+                    .trim();
+
+
+            const email =
+                document
+                    .getElementById("email")
+                    .value
+                    .trim();
+
+
+            const password =
+                document
+                    .getElementById("password")
+                    .value;
+
+
+            const confirmPassword =
+                document
+                    .getElementById("confirmPassword")
+                    .value;
+
+
+            registerMessage.className =
+                "register-message";
+
+
+            registerMessage.textContent = "";
+
+
+
+            /* CONTRASEÑA */
+
+            if (password.length < 8) {
+
+                showError(
+                    "La contraseña debe contener al menos 8 caracteres."
+                );
+
+                return;
+
+            }
+
+
+
+            /* PASSWORD DIFERENTE */
+
+            if (password !== confirmPassword) {
+
+                showError(
+                    "Las contraseñas no coinciden."
+                );
+
+                return;
+
+            }
+
+
+
+            /* VALIDACIÓN EMAIL */
+
+            if (!email.includes("@")) {
+
+                showError(
+                    "Debes ingresar un correo electrónico válido."
+                );
+
+                return;
+
+            }
+
+
+
+            /*
+                BACKEND FUTURO
+                
+
+                Más adelante esto será algo como:
+
+                fetch(
+                    "/api/usuarios/registro",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            nombre,
+                            apellido,
+                            email,
+                            password
+                        })
+                    }
+                );
+            */
+
+
+
+            registerMessage.classList.add(
+                "success"
+            );
+
+
+            registerMessage.textContent =
+                `Cuenta creada correctamente. Bienvenido, ${nombre}. Redirigiendo...`;
+
+
+
+            setTimeout(
+                () => {
+
+                    window.location.href =
+                        "login.html";
+
+                },
+                1500
+            );
+
+        }
+    );
+
+
+
+    function showError(message) {
+
+        registerMessage.classList.add(
+            "error"
+        );
+
+
+        registerMessage.textContent =
+            message;
+
+
+        registerMessage.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+        });
+
+    }
+
+
+</script>
+
+
+</body>
+
+</html>

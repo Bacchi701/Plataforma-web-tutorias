@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Tutorías Duoc UC</title>
+
+    <meta
+        name="description"
+        content="Plataforma de tutorías entre estudiantes Duoc UC."
+    >
+
+    <link rel="stylesheet" href="css/styles.css">
+
+    <!-- Iconos -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+</head>
+
+<body>
+
+
+<header class="header">
+
+    <div class="container navbar">
+
+        <a href="#" class="brand">
+            <div class="brand-icon">
+                D
+            </div>
+
+            <div class="brand-text">
+                <strong>Duoc UC</strong>
+                <span>Tutorías</span>
+            </div>
+        </a>
+
+
+        <nav class="nav-menu">
+
+            <a href="#inicio" class="active">
+                Inicio
+            </a>
+
+            <a href="#tutores">
+                Tutores
+            </a>
+
+            <a href="asignaturas.html">
+                Asignaturas
+            </a>
+
+            <a href="#como-funciona">
+                ¿Cómo funciona?
+            </a>
+
+        </nav>
+
+
+        <div class="nav-actions">
+
+            <a href="login.html" class="btn-login">
+                Iniciar sesión
+            </a>
+
+            <a href="registro.html" class="btn-primary">
+                Registrarme
+            </a>
+
+        </div>
+
+
+        <button class="mobile-menu" id="mobileMenu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+    </div>
+
+</header>
+
+
+
+
+<main>
+
+<section class="hero" id="inicio">
+
+    <div class="container hero-grid">
+
+        <div class="hero-content">
+
+            <div class="hero-badge">
+                <i class="fa-solid fa-graduation-cap"></i>
+                Comunidad Duoc UC
+            </div>
+
+
+            <h1>
+                Aprende mejor,
+                <span>aprendiendo juntos.</span>
+            </h1>
+
+
+            <p class="hero-description">
+                Encuentra estudiantes tutores de Duoc UC
+                que puedan ayudarte con las asignaturas
+                que más necesitas.
+            </p>
+
+
+            <div class="search-card">
+
+                <div class="search-input">
+
+                    <i class="fa-solid fa-magnifying-glass"></i>
+
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="¿Qué asignatura necesitas reforzar?"
+                    >
+
+                </div>
+
+                <button
+                    class="btn-search"
+                    onclick="buscarTutor()"
+                >
+                    Buscar tutor
+                </button>
+
+            </div>
+
+
+            <div class="popular-searches">
+
+                <span>Más buscadas:</span>
+
+                <button>Programación</button>
+                <button>Matemáticas</button>
+                <button>Base de Datos</button>
+                <button>Inglés</button>
+
+            </div>
+
+        </div>
+
+
+        
+
+        <div class="hero-visual">
+
+            <div class="visual-circle circle-one"></div>
+            <div class="visual-circle circle-two"></div>
+
+
+            <div class="tutor-card main-card">
+
+                <div class="online-status">
+                    <span></span>
+                    Disponible
+                </div>
+
+
+                <div class="profile-image">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+
+
+                <h3>Damaris Iriarte</h3>
+
+                <p>
+                    Ingeniería en Informática
+                </p>
+
+
+                <div class="rating">
+                    <i class="fa-solid fa-star"></i>
+                    <strong>4.9</strong>
+                    <span>(32 reseñas)</span>
+                </div>
+
+
+                <div class="skills">
+
+                    <span>Java</span>
+                    <span>Python</span>
+                    <span>SQL</span>
+
+                </div>
+
+
+                <button class="btn-profile">
+                    Ver perfil
+                </button>
+
+            </div>
+
+
+            <div class="floating-card students">
+
+                <div class="floating-icon yellow">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+
+                <div>
+                    <strong>+250</strong>
+                    <span>Estudiantes</span>
+                </div>
+
+            </div>
+
+
+            <div class="floating-card sessions">
+
+                <div class="floating-icon blue">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+
+                <div>
+                    <strong>+500</strong>
+                    <span>Tutorías realizadas</span>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+
+<section class="stats">
+
+    <div class="container stats-grid">
+
+        <div class="stat">
+
+            <div class="stat-icon">
+                <i class="fa-solid fa-user-graduate"></i>
+            </div>
+
+            <div>
+                <strong>120+</strong>
+                <span>Tutores disponibles</span>
+            </div>
+
+        </div>
+
+
+        <div class="stat">
+
+            <div class="stat-icon">
+                <i class="fa-solid fa-book-open"></i>
+            </div>
+
+            <div>
+                <strong>45+</strong>
+                <span>Asignaturas</span>
+            </div>
+
+        </div>
+
+
+        <div class="stat">
+
+            <div class="stat-icon">
+                <i class="fa-solid fa-calendar-check"></i>
+            </div>
+
+            <div>
+                <strong>500+</strong>
+                <span>Tutorías realizadas</span>
+            </div>
+
+        </div>
+
+
+        <div class="stat">
+
+            <div class="stat-icon">
+                <i class="fa-solid fa-star"></i>
+            </div>
+
+            <div>
+                <strong>4.8/5</strong>
+                <span>Calificación promedio</span>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+
+<section class="section" id="como-funciona">
+
+    <div class="container">
+
+        <div class="section-header">
+
+            <span class="section-label">
+                SIMPLE Y RÁPIDO
+            </span>
+
+            <h2>
+                Encuentra ayuda en pocos pasos
+            </h2>
+
+            <p>
+                Conecta con otros estudiantes y agenda
+                una tutoría según tu disponibilidad.
+            </p>
+
+        </div>
+
+
+        <div class="steps-grid">
+
+
+            <div class="step-card">
+
+                <div class="step-number">
+                    01
+                </div>
+
+                <div class="step-icon">
+
+                    <i class="fa-solid fa-magnifying-glass"></i>
+
+                </div>
+
+                <h3>
+                    Busca una asignatura
+                </h3>
+
+                <p>
+                    Indica la materia en la que necesitas
+                    apoyo y revisa los tutores disponibles.
+                </p>
+
+            </div>
+
+
+         
+
+            <div class="step-card">
+
+                <div class="step-number">
+                    02
+                </div>
+
+                <div class="step-icon">
+
+                    <i class="fa-solid fa-user-check"></i>
+
+                </div>
+
+                <h3>
+                    Elige tu tutor
+                </h3>
+
+                <p>
+                    Compara perfiles, experiencia,
+                    disponibilidad, precio y evaluaciones.
+                </p>
+
+            </div>
+
+
+          
+
+            <div class="step-card">
+
+                <div class="step-number">
+                    03
+                </div>
+
+                <div class="step-icon">
+
+                    <i class="fa-solid fa-calendar-days"></i>
+
+                </div>
+
+                <h3>
+                    Reserva una hora
+                </h3>
+
+                <p>
+                    Selecciona el horario disponible
+                    que mejor se adapte a tus necesidades.
+                </p>
+
+            </div>
+
+
+          
+
+            <div class="step-card">
+
+                <div class="step-number">
+                    04
+                </div>
+
+                <div class="step-icon">
+
+                    <i class="fa-solid fa-comments"></i>
+
+                </div>
+
+                <h3>
+                    Aprende
+                </h3>
+
+                <p>
+                    Contacta al tutor, realiza tu sesión
+                    y luego califica la experiencia.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+
+<section class="section tutors-section" id="tutores">
+
+    <div class="container">
+
+        <div class="section-title-row">
+
+            <div>
+
+                <span class="section-label">
+                    COMUNIDAD
+                </span>
+
+                <h2>
+                    Tutores destacados
+                </h2>
+
+            </div>
+
+            <a href="#" class="view-all">
+                Ver todos
+
+                <i class="fa-solid fa-arrow-right"></i>
+            </a>
+
+        </div>
+
+
+        <div class="tutors-grid">
+
+
+
+            <article class="tutor-list-card">
+
+                <div class="tutor-header">
+
+                    <div class="avatar">
+                        MG
+                    </div>
+
+                    <div class="availability">
+                        Disponible
+                    </div>
+
+                </div>
+
+
+                <h3>Damaris Iriarte</h3>
+
+                <p class="career">
+                    Ingeniería en Informática
+                </p>
+
+
+                <div class="rating">
+
+                    <i class="fa-solid fa-star"></i>
+
+                    <strong>4.9</strong>
+
+                    <span>
+                        (32 reseñas)
+                    </span>
+
+                </div>
+
+
+                <div class="skills">
+
+                    <span>Java</span>
+                    <span>Python</span>
+                    <span>SQL</span>
+
+                </div>
+
+
+                <div class="tutor-footer">
+
+                    <div>
+                        <span>Desde</span>
+
+                        <strong>
+                            $5.000/h
+                        </strong>
+                    </div>
+
+                    <button>
+                        Ver perfil
+                    </button>
+
+                </div>
+
+            </article>
+
+
+       
+
+            <article class="tutor-list-card">
+
+                <div class="tutor-header">
+
+                    <div class="avatar">
+                        JP
+                    </div>
+
+                    <div class="availability">
+                        Disponible
+                    </div>
+
+                </div>
+
+
+                <h3>
+                    Eliot
+                </h3>
+
+                <p class="career">
+                    Ingeniería en Administración
+                </p>
+
+
+                <div class="rating">
+
+                    <i class="fa-solid fa-star"></i>
+
+                    <strong>4.8</strong>
+
+                    <span>(18 reseñas)</span>
+
+                </div>
+
+
+                <div class="skills">
+
+                    <span>Matemáticas</span>
+                    <span>Excel</span>
+
+                </div>
+
+
+                <div class="tutor-footer">
+
+                    <div>
+
+                        <span>Desde</span>
+
+                        <strong>
+                            $4.000/h
+                        </strong>
+
+                    </div>
+
+                    <button>
+                        Ver perfil
+                    </button>
+
+                </div>
+
+            </article>
+
+
+            
+
+            <article class="tutor-list-card">
+
+                <div class="tutor-header">
+
+                    <div class="avatar">
+                        CF
+                    </div>
+
+                    <div class="availability">
+                        Disponible
+                    </div>
+
+                </div>
+
+
+                <h3>
+                    Tahia Basulto
+                </h3>
+
+                <p class="career">
+                    Diseño Gráfico
+                </p>
+
+
+                <div class="rating">
+
+                    <i class="fa-solid fa-star"></i>
+
+                    <strong>5.0</strong>
+
+                    <span>
+                        (27 reseñas)
+                    </span>
+
+                </div>
+
+
+                <div class="skills">
+
+                    <span>Photoshop</span>
+                    <span>Illustrator</span>
+
+                </div>
+
+
+                <div class="tutor-footer">
+
+                    <div>
+
+                        <span>Desde</span>
+
+                        <strong>
+                            $5.500/h
+                        </strong>
+
+                    </div>
+
+                    <button>
+                        Ver perfil
+                    </button>
+
+                </div>
+
+            </article>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+
+<section class="section subjects-section" id="asignaturas">
+
+    <div class="container">
+
+        <div class="section-header">
+
+            <span class="section-label">
+                EXPLORA
+            </span>
+
+            <h2>
+                Asignaturas populares
+            </h2>
+
+        </div>
+
+
+        <div class="subjects-grid">
+
+
+            <div class="subject">
+
+                <i class="fa-solid fa-code"></i>
+
+                <div>
+                    <strong>Programación</strong>
+                    <span>28 tutores</span>
+                </div>
+
+            </div>
+
+
+            <div class="subject">
+
+                <i class="fa-solid fa-calculator"></i>
+
+                <div>
+                    <strong>Matemáticas</strong>
+                    <span>22 tutores</span>
+                </div>
+
+            </div>
+
+
+            <div class="subject">
+
+                <i class="fa-solid fa-database"></i>
+
+                <div>
+                    <strong>Base de Datos</strong>
+                    <span>17 tutores</span>
+                </div>
+
+            </div>
+
+
+            <div class="subject">
+
+                <i class="fa-solid fa-language"></i>
+
+                <div>
+                    <strong>Inglés</strong>
+                    <span>15 tutores</span>
+                </div>
+
+            </div>
+
+
+            <div class="subject">
+
+                <i class="fa-solid fa-chart-line"></i>
+
+                <div>
+                    <strong>Contabilidad</strong>
+                    <span>13 tutores</span>
+                </div>
+
+            </div>
+
+
+            <div class="subject">
+
+                <i class="fa-solid fa-pen-ruler"></i>
+
+                <div>
+                    <strong>Diseño</strong>
+                    <span>12 tutores</span>
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<section class="cta">
+
+    <div class="container cta-content">
+
+        <div>
+
+            <span class="cta-small">
+                ¿DOMINAS UNA ASIGNATURA?
+            </span>
+
+            <h2>
+                Comparte lo que sabes.
+            </h2>
+
+            <p>
+                Conviértete en tutor, ayuda a otros
+                estudiantes y genera ingresos mientras estudias.
+            </p>
+
+        </div>
+
+
+            <a href="registro.html" class="btn-tutor">
+                <span class="btn-tutor-icon">
+                    <i class="fa-solid fa-chalkboard-user"></i>
+                </span>
+
+                <span>Quiero ser tutor</span>
+
+                <i class="fa-solid fa-arrow-right btn-tutor-arrow"></i>
+            </a>
+
+    </div>
+
+</section>
+
+
+</main>
+
+
+
+<footer>
+
+    <div class="container footer-grid">
+
+        <div>
+
+            <div class="brand footer-brand">
+
+                <div class="brand-icon">
+                    D
+                </div>
+
+                <div class="brand-text">
+
+                    <strong>
+                        Duoc UC
+                    </strong>
+
+                    <span>
+                        Tutorías
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <p class="footer-description">
+                Plataforma colaborativa de tutorías
+                entre estudiantes.
+            </p>
+
+        </div>
+
+
+        <div>
+
+            <h4>Plataforma</h4>
+
+            <a href="#">Buscar tutores</a>
+            <a href="#">Asignaturas</a>
+            <a href="#">Ser tutor</a>
+
+        </div>
+
+
+        <div>
+
+            <h4>Mi cuenta</h4>
+
+            <a href="#">Iniciar sesión</a>
+            <a href="#">Registrarse</a>
+            <a href="#">Mis tutorías</a>
+
+        </div>
+
+
+        <div>
+
+            <h4>Ayuda</h4>
+
+            <a href="#">Preguntas frecuentes</a>
+            <a href="#">Contacto</a>
+            <a href="#">Términos y condiciones</a>
+
+        </div>
+
+    </div>
+
+
+    <div class="container footer-bottom">
+
+        <p>
+            © 2026 Plataforma de Tutorías Duoc UC.
+        </p>
+
+    </div>
+
+</footer>
+
+
+<script src="js/app.js"></script>
+
+</body>
+</html>

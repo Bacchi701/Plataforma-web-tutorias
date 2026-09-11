@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Iniciar sesión | Tutorías Duoc UC</title>
+
+    <meta
+        name="description"
+        content="Inicia sesión en la plataforma de tutorías entre estudiantes Duoc UC."
+    >
+
+    <link rel="stylesheet" href="css/styles.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
+    <style>
+
+        /* =========================================
+           LOGIN PAGE
+        ========================================= */
+
+        body {
+            min-height: 100vh;
+            background: #f5f7fa;
+        }
+
+
+        .login-page {
+            min-height: calc(100vh - 78px);
+
+            display: grid;
+
+            grid-template-columns: 1.05fr .95fr;
+        }
+
+
+        /* =========================================
+           LADO IZQUIERDO
+        ========================================= */
+
+        .login-info {
+            position: relative;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #003057 0%,
+                    #001f3c 100%
+                );
+
+            color: white;
+
+            display: flex;
+
+            align-items: center;
+
+            padding: 80px;
+
+            overflow: hidden;
+        }
+
+
+        .login-info::before {
+            content: "";
+
+            position: absolute;
+
+            width: 430px;
+            height: 430px;
+
+            border-radius: 50%;
+
+            background: #FDBD2D;
+
+            opacity: .12;
+
+            right: -160px;
+            top: -130px;
+        }
+
+
+        .login-info::after {
+            content: "";
+
+            position: absolute;
+
+            width: 280px;
+            height: 280px;
+
+            border-radius: 50%;
+
+            border: 55px solid rgba(255,255,255,.05);
+
+            left: -120px;
+            bottom: -120px;
+        }
+
+
+        .login-info-content {
+            max-width: 580px;
+
+            position: relative;
+
+            z-index: 2;
+        }
+
+
+        .login-info-badge {
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            background: rgba(253,189,45,.13);
+
+            border: 1px solid rgba(253,189,45,.25);
+
+            color: #FDBD2D;
+
+            border-radius: 30px;
+
+            padding: 8px 14px;
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            margin-bottom: 28px;
+        }
+
+
+        .login-info h1 {
+            font-size: clamp(42px, 5vw, 64px);
+
+            line-height: 1.05;
+
+            letter-spacing: -2px;
+
+            margin-bottom: 22px;
+        }
+
+
+        .login-info h1 span {
+            color: #FDBD2D;
+        }
+
+
+        .login-info-description {
+            font-size: 18px;
+
+            line-height: 1.7;
+
+            color: rgba(255,255,255,.72);
+
+            margin-bottom: 40px;
+        }
+
+
+        .login-benefits {
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 18px;
+        }
+
+
+        .login-benefit {
+            display: flex;
+
+            align-items: center;
+
+            gap: 14px;
+        }
+
+
+        .benefit-icon {
+            width: 44px;
+            height: 44px;
+
+            border-radius: 10px;
+
+            background: rgba(255,255,255,.08);
+
+            color: #FDBD2D;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            flex-shrink: 0;
+        }
+
+
+        .login-benefit strong {
+            display: block;
+
+            font-size: 15px;
+
+            margin-bottom: 2px;
+        }
+
+
+        .login-benefit span {
+            font-size: 12px;
+
+            color: rgba(255,255,255,.55);
+        }
+
+
+
+        /* =========================================
+           LADO DERECHO
+        ========================================= */
+
+        .login-form-section {
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            padding: 60px 35px;
+
+            background: white;
+        }
+
+
+        .login-wrapper {
+            width: 100%;
+
+            max-width: 440px;
+        }
+
+
+        .login-back {
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            color: #6B7280;
+
+            font-size: 13px;
+
+            font-weight: 600;
+
+            margin-bottom: 38px;
+
+            transition: .2s;
+        }
+
+
+        .login-back:hover {
+            color: #003057;
+        }
+
+
+        .login-title {
+            margin-bottom: 32px;
+        }
+
+
+        .login-title span {
+            color: #307FE2;
+
+            font-size: 12px;
+
+            font-weight: 800;
+
+            letter-spacing: 1.8px;
+
+            text-transform: uppercase;
+        }
+
+
+        .login-title h2 {
+            color: #003057;
+
+            font-size: 34px;
+
+            line-height: 1.2;
+
+            margin: 8px 0 10px;
+        }
+
+
+        .login-title p {
+            color: #6B7280;
+
+            font-size: 14px;
+        }
+
+
+
+        /* =========================================
+           FORMULARIO
+        ========================================= */
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+
+        .form-label {
+            display: block;
+
+            color: #374151;
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            margin-bottom: 8px;
+        }
+
+
+        .input-container {
+            position: relative;
+        }
+
+
+        .input-container > i {
+            position: absolute;
+
+            left: 16px;
+
+            top: 50%;
+
+            transform: translateY(-50%);
+
+            color: #9CA3AF;
+
+            font-size: 15px;
+
+            pointer-events: none;
+        }
+
+
+        .input-container input {
+            width: 100%;
+
+            height: 52px;
+
+            border: 1px solid #DCE1E7;
+
+            border-radius: 10px;
+
+            padding: 0 46px;
+
+            outline: none;
+
+            background: #FAFBFC;
+
+            font-size: 14px;
+
+            color: #111827;
+
+            transition: .2s;
+        }
+
+
+        .input-container input:focus {
+            background: white;
+
+            border-color: #307FE2;
+
+            box-shadow:
+                0 0 0 3px rgba(48,127,226,.10);
+        }
+
+
+        .input-container input::placeholder {
+            color: #A4AAB3;
+        }
+
+
+        .password-toggle {
+            position: absolute;
+
+            right: 14px;
+
+            top: 50%;
+
+            transform: translateY(-50%);
+
+            border: none;
+
+            background: transparent;
+
+            color: #7B8491;
+
+            font-size: 15px;
+
+            padding: 6px;
+        }
+
+
+        .password-toggle:hover {
+            color: #003057;
+        }
+
+
+
+        /* =========================================
+           OPCIONES
+        ========================================= */
+
+        .login-options {
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 15px;
+
+            margin: 5px 0 25px;
+        }
+
+
+        .remember {
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            color: #6B7280;
+
+            font-size: 12px;
+        }
+
+
+        .remember input {
+            accent-color: #003057;
+        }
+
+
+        .forgot-password {
+            color: #307FE2;
+
+            font-size: 12px;
+
+            font-weight: 700;
+        }
+
+
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+
+
+
+        /* =========================================
+           BOTÓN
+        ========================================= */
+
+        .login-button {
+            width: 100%;
+
+            border: none;
+
+            background: #003057;
+
+            color: white;
+
+            padding: 15px 20px;
+
+            border-radius: 10px;
+
+            font-size: 14px;
+
+            font-weight: 800;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            gap: 10px;
+
+            transition: .2s;
+        }
+
+
+        .login-button:hover {
+            background: #001f3c;
+
+            transform: translateY(-1px);
+
+            box-shadow:
+                0 10px 22px rgba(0,48,87,.16);
+        }
+
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+
+
+        /* =========================================
+           SEPARADOR
+        ========================================= */
+
+        .login-separator {
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+
+            margin: 28px 0;
+        }
+
+
+        .login-separator::before,
+        .login-separator::after {
+            content: "";
+
+            flex: 1;
+
+            height: 1px;
+
+            background: #E5E7EB;
+        }
+
+
+        .login-separator span {
+            color: #9CA3AF;
+
+            font-size: 11px;
+
+            white-space: nowrap;
+        }
+
+
+
+        /* =========================================
+           CUENTA DUOC
+        ========================================= */
+
+        .duoc-login-button {
+            width: 100%;
+
+            background: white;
+
+            border: 1px solid #DCE1E7;
+
+            color: #003057;
+
+            border-radius: 10px;
+
+            padding: 13px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            gap: 10px;
+
+            font-weight: 700;
+
+            transition: .2s;
+        }
+
+
+        .duoc-login-button:hover {
+            border-color: #003057;
+
+            background: #F8FAFC;
+        }
+
+
+        .duoc-login-icon {
+            width: 27px;
+            height: 27px;
+
+            background: #FDBD2D;
+
+            color: #003057;
+
+            border-radius: 5px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-weight: 900;
+
+            font-size: 14px;
+        }
+
+
+
+        /* =========================================
+           REGISTRO
+        ========================================= */
+
+        .register-text {
+            text-align: center;
+
+            margin-top: 28px;
+
+            color: #6B7280;
+
+            font-size: 13px;
+        }
+
+
+        .register-text a {
+            color: #003057;
+
+            font-weight: 800;
+
+            margin-left: 4px;
+        }
+
+
+        .register-text a:hover {
+            text-decoration: underline;
+        }
+
+
+
+        /* =========================================
+           MENSAJE ERROR
+        ========================================= */
+
+        .login-message {
+            display: none;
+
+            border-radius: 8px;
+
+            padding: 11px 13px;
+
+            margin-bottom: 18px;
+
+            font-size: 12px;
+
+            font-weight: 600;
+        }
+
+
+        .login-message.error {
+            display: block;
+
+            background: #FEF2F2;
+
+            border: 1px solid #FECACA;
+
+            color: #B91C1C;
+        }
+
+
+        .login-message.success {
+            display: block;
+
+            background: #F0FDF4;
+
+            border: 1px solid #BBF7D0;
+
+            color: #15803D;
+        }
+
+
+
+        /* =========================================
+           RESPONSIVE
+        ========================================= */
+
+        @media(max-width: 900px) {
+
+            .login-page {
+                grid-template-columns: 1fr;
+            }
+
+
+            .login-info {
+                min-height: auto;
+
+                padding: 55px 8%;
+            }
+
+
+            .login-info h1 {
+                font-size: 42px;
+            }
+
+
+            .login-benefits {
+                display: none;
+            }
+
+
+            .login-form-section {
+                padding: 55px 25px;
+            }
+
+        }
+
+
+        @media(max-width: 500px) {
+
+            .login-info {
+                padding: 45px 25px;
+            }
+
+
+            .login-info h1 {
+                font-size: 36px;
+            }
+
+
+            .login-info-description {
+                font-size: 15px;
+
+                margin-bottom: 0;
+            }
+
+
+            .login-form-section {
+                padding: 40px 20px;
+            }
+
+
+            .login-title h2 {
+                font-size: 29px;
+            }
+
+
+            .login-options {
+                align-items: flex-start;
+
+                flex-direction: column;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =========================================
+     HEADER
+========================================= -->
+
+<header class="header">
+
+    <div class="container navbar">
+
+        <a href="index.html" class="brand">
+
+            <div class="brand-icon">
+                D
+            </div>
+
+            <div class="brand-text">
+
+                <strong>Duoc UC</strong>
+
+                <span>Tutorías</span>
+
+            </div>
+
+        </a>
+
+
+        <nav class="nav-menu">
+
+            <a href="index.html">
+                Inicio
+            </a>
+
+            <a href="index.html#tutores">
+                Tutores
+            </a>
+
+            <a href="asignaturas.html">
+                Asignaturas
+            </a>
+
+            <a href="index.html#como-funciona">
+                ¿Cómo funciona?
+            </a>
+
+        </nav>
+
+
+        <div class="nav-actions">
+
+            <span
+                style="
+                    font-size:13px;
+                    color:#6B7280;
+                    font-weight:600;
+                "
+            >
+                ¿Aún no tienes cuenta?
+            </span>
+
+            <a
+                href="registro.html"
+                class="btn-primary"
+            >
+                Registrarme
+            </a>
+
+        </div>
+
+
+        <button class="mobile-menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+    </div>
+
+</header>
+
+
+
+<!-- =========================================
+     LOGIN
+========================================= -->
+
+<main class="login-page">
+
+
+    <!-- LADO IZQUIERDO -->
+
+    <section class="login-info">
+
+        <div class="login-info-content">
+
+            <div class="login-info-badge">
+
+                <i class="fa-solid fa-graduation-cap"></i>
+
+                Comunidad de estudiantes Duoc UC
+
+            </div>
+
+
+            <h1>
+
+                Aprende,
+                comparte y
+
+                <span>
+                    crece junto a otros.
+                </span>
+
+            </h1>
+
+
+            <p class="login-info-description">
+
+                Accede a tu cuenta para gestionar tus tutorías,
+                contactar estudiantes, revisar tus reservas
+                y continuar aprendiendo junto a la comunidad.
+
+            </p>
+
+
+
+            <div class="login-benefits">
+
+
+                <div class="login-benefit">
+
+                    <div class="benefit-icon">
+
+                        <i class="fa-solid fa-calendar-check"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong>
+                            Gestiona tus tutorías
+                        </strong>
+
+                        <span>
+                            Revisa tus próximas sesiones y tu historial.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="login-benefit">
+
+                    <div class="benefit-icon">
+
+                        <i class="fa-solid fa-comments"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong>
+                            Comunícate con tus tutores
+                        </strong>
+
+                        <span>
+                            Mantén tus conversaciones organizadas.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="login-benefit">
+
+                    <div class="benefit-icon">
+
+                        <i class="fa-solid fa-star"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong>
+                            Construye tu reputación
+                        </strong>
+
+                        <span>
+                            Recibe reseñas y mejora tu perfil como tutor.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =========================================
+         FORMULARIO
+    ========================================= -->
+
+    <section class="login-form-section">
+
+        <div class="login-wrapper">
+
+
+            <a
+                href="index.html"
+                class="login-back"
+            >
+
+                <i class="fa-solid fa-arrow-left"></i>
+
+                Volver al inicio
+
+            </a>
+
+
+
+            <div class="login-title">
+
+                <span>
+                    Bienvenido
+                </span>
+
+                <h2>
+                    Inicia sesión
+                </h2>
+
+                <p>
+                    Ingresa tus datos para acceder a tu cuenta.
+                </p>
+
+            </div>
+
+
+
+            <div
+                class="login-message"
+                id="loginMessage"
+            ></div>
+
+
+
+            <form
+                id="loginForm"
+                autocomplete="on"
+            >
+
+
+                <!-- EMAIL -->
+
+                <div class="form-group">
+
+                    <label
+                        for="email"
+                        class="form-label"
+                    >
+                        Correo electrónico
+                    </label>
+
+
+                    <div class="input-container">
+
+                        <i class="fa-regular fa-envelope"></i>
+
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            placeholder="nombre@duocuc.cl"
+                            autocomplete="email"
+                            required
+                        >
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- PASSWORD -->
+
+                <div class="form-group">
+
+                    <label
+                        for="password"
+                        class="form-label"
+                    >
+                        Contraseña
+                    </label>
+
+
+                    <div class="input-container">
+
+                        <i class="fa-solid fa-lock"></i>
+
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Ingresa tu contraseña"
+                            autocomplete="current-password"
+                            required
+                        >
+
+
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            id="passwordToggle"
+                            aria-label="Mostrar contraseña"
+                        >
+
+                            <i
+                                class="fa-regular fa-eye"
+                                id="passwordIcon"
+                            ></i>
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- OPCIONES -->
+
+                <div class="login-options">
+
+                    <label class="remember">
+
+                        <input
+                            type="checkbox"
+                            id="remember"
+                        >
+
+                        Recordarme
+
+                    </label>
+
+
+                    <a
+                        href="#"
+                        class="forgot-password"
+                    >
+                        ¿Olvidaste tu contraseña?
+                    </a>
+
+                </div>
+
+
+
+                <!-- LOGIN -->
+
+                <button
+                    type="submit"
+                    class="login-button"
+                >
+
+                    Iniciar sesión
+
+                    <i class="fa-solid fa-arrow-right"></i>
+
+                </button>
+
+
+            </form>
+
+
+
+            <!-- SEPARADOR -->
+
+            <div class="login-separator">
+
+                <span>
+                    O CONTINÚA CON
+                </span>
+
+            </div>
+
+
+
+            <!-- LOGIN INSTITUCIONAL -->
+
+            <button
+                type="button"
+                class="duoc-login-button"
+                id="duocLogin"
+            >
+
+                <div class="duoc-login-icon">
+                    D
+                </div>
+
+                Cuenta institucional Duoc UC
+
+            </button>
+
+
+
+            <!-- REGISTRO -->
+
+            <div class="register-text">
+
+                ¿No tienes una cuenta?
+
+                <a href="registro.html">
+                    Crear cuenta
+                </a>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+
+<!-- =========================================
+     JAVASCRIPT
+========================================= -->
+
+<script>
+
+
+    /* =========================================
+       MOSTRAR / OCULTAR CONTRASEÑA
+    ========================================= */
+
+    const passwordInput =
+        document.getElementById("password");
+
+
+    const passwordToggle =
+        document.getElementById("passwordToggle");
+
+
+    const passwordIcon =
+        document.getElementById("passwordIcon");
+
+
+
+    passwordToggle.addEventListener(
+        "click",
+        () => {
+
+            const isPassword =
+                passwordInput.type === "password";
+
+
+            passwordInput.type =
+                isPassword
+                    ? "text"
+                    : "password";
+
+
+            passwordIcon.className =
+                isPassword
+                    ? "fa-regular fa-eye-slash"
+                    : "fa-regular fa-eye";
+
+        }
+    );
+
+
+
+    /* =========================================
+       LOGIN DE PRUEBA
+    ========================================= */
+
+    const loginForm =
+        document.getElementById("loginForm");
+
+
+    const loginMessage =
+        document.getElementById("loginMessage");
+
+
+
+    loginForm.addEventListener(
+        "submit",
+        function(event) {
+
+            event.preventDefault();
+
+
+            const email =
+                document
+                    .getElementById("email")
+                    .value
+                    .trim();
+
+
+            const password =
+                passwordInput.value.trim();
+
+
+
+            loginMessage.className =
+                "login-message";
+
+
+            loginMessage.textContent = "";
+
+
+
+            if (!email || !password) {
+
+                loginMessage.classList.add(
+                    "error"
+                );
+
+
+                loginMessage.textContent =
+                    "Debes ingresar tu correo y contraseña.";
+
+
+                return;
+
+            }
+
+
+
+            if (password.length < 6) {
+
+                loginMessage.classList.add(
+                    "error"
+                );
+
+
+                loginMessage.textContent =
+                    "La contraseña debe tener al menos 6 caracteres.";
+
+
+                return;
+
+            }
+
+
+
+            /*
+                ESTO ES SOLO TEMPORAL.
+
+                Más adelante aquí realizaremos
+                una petición al backend:
+
+                fetch("/api/login", {...})
+            */
+
+
+            loginMessage.classList.add(
+                "success"
+            );
+
+
+            loginMessage.textContent =
+                "Inicio de sesión correcto. Redirigiendo...";
+
+
+
+            setTimeout(
+                () => {
+
+                    window.location.href =
+                        "index.html";
+
+                },
+                1200
+            );
+
+        }
+    );
+
+
+
+    /* =========================================
+       CUENTA INSTITUCIONAL
+    ========================================= */
+
+    document
+        .getElementById("duocLogin")
+        .addEventListener(
+            "click",
+            () => {
+
+                alert(
+                    "La autenticación institucional se conectará más adelante."
+                );
+
+            }
+        );
+
+
+</script>
+
+
+</body>
+
+</html>
