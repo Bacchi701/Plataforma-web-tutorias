@@ -1,5 +1,41 @@
-node_modules/
+# ---------- Secretos y entorno ----------
 .env
+.env.local
+.env.*.local
+*.pem
+!keys/jwt_public.pem
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
+
+# ---------- Node ----------
+node_modules/
+dist/
+.vite/
+
+# ---------- Editor ----------
+# Se ignora .vscode completo salvo la configuracion que los tres comparten.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# ---------- Sistema operativo ----------
 .DS_Store
 __MACOSX/
+Thumbs.db
+
+# ---------- Registros y volcados ----------
 *.log
+*.sql.bak
+volcados/
