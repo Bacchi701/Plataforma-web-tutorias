@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Estado del sistema</title>
+        <style>
+            body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #f4f6f9; color: #141a24; }
+            h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+            p  { color: #5b6678; margin: 0 0 1.5rem; }
+            ul { list-style: none; padding: 0; max-width: 34rem; }
+            li { display: flex; align-items: center; gap: .75rem; background: #fff; border: 1px solid #dbe1ea; border-radius: 6px; padding: .75rem 1rem; margin-bottom: .5rem; }
+            .luz { width: .6rem; height: .6rem; border-radius: 50%; background: #b9c2d0; }
+            .luz.ok    { background: #1a7a4f; }
+            .luz.error { background: #b32d24; }
+            .nombre { font-weight: 600; }
+            .detalle { margin-left: auto; font-family: ui-monospace, monospace; font-size: .8rem; color: #5b6678; }
+        </style>
+    </head>
+    <body>
+        <h1>Plataforma de Tutorias entre Estudiantes</h1>
+        <p>Estado de los cuatro servicios a traves del gateway.</p>
+        <ul id="lista"></ul>
+
+        <script>
+            const servicios = ["identity", "catalog", "tutoring", "payments"];
+            const lista = document.getElementById("lista");
+
+            for (const nombre of servicios) {
+                const fila = document.createElement("li");
+                fila.innerHTML =
+                    '<span class="luz"></span>' +
+                    '<span class="nombre">' + nombre + '</span>' +
+                    '<span class="detalle">consultando...</span>';
+                lista.appendChild(fila);
+
+                fetch("/api/" + nombre + "/v1/estado")
+                    .then(function (r) { return r.json().then(function (d) { return [r.ok, d]; }); })
+                    .then(function (par) { fila.querySelector(".luz").classList.add(par[0] ? "ok" : "error"); fila.querySelector(".detalle").textContent = "base: " + par[1].base_de_datos + " / v" + par[1].version;})
+                    .catch(function () { fila.querySelector(".luz").classList.add("error"); fila.querySelector(".detalle").textContent = "sin respuesta";});
+            }
+        </script>
+    </body>
+</html>
