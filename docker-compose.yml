@@ -1,0 +1,193 @@
+name: plataforma-tutorias
+
+# ---------------------------------------------------------------
+# Plataforma de Tutorias entre Estudiantes - HU-01
+#
+# Nueve contenedores: el gateway, cuatro servicios y cuatro bases.
+# Mailpit y el programador de tareas entran con HU-02 y HU-37
+# ---------------------------------------------------------------
+
+# Las cuatro bases son identicas salvo el nombre, el usuario y la clave, asi que se define una vez y se reutiliza con "<<"
+x-base-comun: &base-comun
+  image: postgres:16
+  restart: unless-stopped
+  networks: [interna]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+    interval: 5s
+    timeout: 5s
+    retries: 12
+
+services:
+
+  # ---------- Gateway ----------
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: tut_gateway
+    restart: unless-stopped
+    ports:
+      - "${PUERTO_GATEWAY:-8080}:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/html:/usr/share/nginx/html:ro
+    networks: [borde, interna]
+    depends_on:
+      identity: { condition: service_healthy }
+      catalog:  { condition: service_healthy }
+      tutoring: { condition: service_healthy }
+      payments: { condition: service_healthy }
+
+  # ---------- Identidad ----------
+  identity:
+    build: ./services/identity
+    container_name: tut_identity
+    restart: unless-stopped
+    networks: [interna]
+    environment:
+      NOMBRE_SERVICIO: identity
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      POSTGRES_HOST: identity_db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${IDENTITY_DB_NAME}
+      POSTGRES_USER: ${IDENTITY_DB_USER}
+      POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD}
+    depends_on:
+      identity_db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/api/identity/v1/estado"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  identity_db:
+    <<: *base-comun
+    container_name: tut_identity_db
+    environment:
+      POSTGRES_DB: ${IDENTITY_DB_NAME}
+      POSTGRES_USER: ${IDENTITY_DB_USER}
+      POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD}
+    volumes:
+      - datos_identity:/var/lib/postgresql/data
+
+  # ---------- Catalogo academico ----------
+  catalog:
+    build: ./services/catalog
+    container_name: tut_catalog
+    restart: unless-stopped
+    networks: [interna]
+    environment:
+      NOMBRE_SERVICIO: catalog
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      POSTGRES_HOST: catalog_db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${CATALOG_DB_NAME}
+      POSTGRES_USER: ${CATALOG_DB_USER}
+      POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD}
+    depends_on:
+      catalog_db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/api/catalog/v1/estado"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  catalog_db:
+    <<: *base-comun
+    container_name: tut_catalog_db
+    environment:
+      POSTGRES_DB: ${CATALOG_DB_NAME}
+      POSTGRES_USER: ${CATALOG_DB_USER}
+      POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD}
+    volumes:
+      - datos_catalog:/var/lib/postgresql/data
+
+  # ---------- Tutorias ----------
+  tutoring:
+    build: ./services/tutoring
+    container_name: tut_tutoring
+    restart: unless-stopped
+    networks: [interna]
+    environment:
+      NOMBRE_SERVICIO: tutoring
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      POSTGRES_HOST: tutoring_db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${TUTORING_DB_NAME}
+      POSTGRES_USER: ${TUTORING_DB_USER}
+      POSTGRES_PASSWORD: ${TUTORING_DB_PASSWORD}
+    depends_on:
+      tutoring_db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/api/tutoring/v1/estado"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  tutoring_db:
+    <<: *base-comun
+    container_name: tut_tutoring_db
+    environment:
+      POSTGRES_DB: ${TUTORING_DB_NAME}
+      POSTGRES_USER: ${TUTORING_DB_USER}
+      POSTGRES_PASSWORD: ${TUTORING_DB_PASSWORD}
+    volumes:
+      - datos_tutoring:/var/lib/postgresql/data
+
+  # ---------- Pagos ----------
+  payments:
+    build: ./services/payments
+    container_name: tut_payments
+    restart: unless-stopped
+    networks: [interna]
+    environment:
+      NOMBRE_SERVICIO: payments
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      POSTGRES_HOST: payment_db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${PAYMENT_DB_NAME}
+      POSTGRES_USER: ${PAYMENT_DB_USER}
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD}
+    depends_on:
+      payment_db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/api/payments/v1/estado"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  payment_db:
+    <<: *base-comun
+    container_name: tut_payment_db
+    environment:
+      POSTGRES_DB: ${PAYMENT_DB_NAME}
+      POSTGRES_USER: ${PAYMENT_DB_USER}
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD}
+    volumes:
+      - datos_payment:/var/lib/postgresql/data
+
+networks:
+  # Solo el gateway esta en las dos.
+  # "internal: true" significa que los servicios y las bases no tienen salida a internet ni entrada desde fuera.
+  borde:
+    driver: bridge
+  interna:
+    driver: bridge
+    internal: true
+
+volumes:
+  datos_identity:
+  datos_catalog:
+  datos_tutoring:
+  datos_payment:

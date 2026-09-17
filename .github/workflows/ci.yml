@@ -1,0 +1,139 @@
+name: Integracion continua
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+
+  # ---------- 1. Revisores de estilo ----------
+  estilo:
+    name: estilo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - name: ruff
+        run: ruff check services
+      - name: black
+        run: black --check services
+      - name: ESLint y Prettier
+        # El frontend llega con HU-06. Hasta entonces este paso se salta
+        # solo y el trabajo igual queda en verde.
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: frontend
+        run: |
+          npm ci
+          npx eslint .
+          npx prettier --check .
+
+  # ---------- 2. Pruebas de los cuatro servicios, en paralelo ----------
+  pruebas-backend:
+    name: pruebas-backend
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        servicio: [identity, catalog, tutoring, payments]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: pruebas
+          POSTGRES_USER: pruebas
+          POSTGRES_PASSWORD: pruebas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install -r services/${{ matrix.servicio }}/requirements.txt
+          pip install -r requirements-dev.txt
+      # La cobertura se publica pero todavia no bloquea. La puerta del 60 %
+      # se activa al cierre del sprint 2 en Identidad y del sprint 4 en
+      # Tutorias: antes de eso no existen las pruebas que la sostienen.
+      - name: pytest con cobertura
+        working-directory: services/${{ matrix.servicio }}
+        env:
+          NOMBRE_SERVICIO: ${{ matrix.servicio }}
+          DJANGO_SECRET_KEY: clave-de-pruebas
+          DJANGO_DEBUG: "0"
+          DJANGO_ALLOWED_HOSTS: "*"
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: "5432"
+          POSTGRES_DB: pruebas
+          POSTGRES_USER: pruebas
+          POSTGRES_PASSWORD: pruebas
+        run: pytest --cov=. --cov-report=term-missing
+
+  # ---------- 3. Pruebas del frontend ----------
+  pruebas-frontend:
+    name: pruebas-frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: revisar
+        run: echo "existe=${{ hashFiles('frontend/package.json') != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.revisar.outputs.existe == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - if: steps.revisar.outputs.existe == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npx vitest run
+          npm run build
+      - if: steps.revisar.outputs.existe != 'true'
+        run: echo "Sin frontend todavia. La base de React llega con HU-06."
+
+  # ---------- 4. El trabajo que demuestra el RNF-05 ----------
+  levantar:
+    name: levantar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar variables de entorno
+        run: cp .env.example .env
+
+      - name: Levantar el sistema completo
+        run: docker compose up -d --build
+
+      - name: Consultar el estado de los cuatro servicios por el gateway
+        run: |
+          for servicio in identity catalog tutoring payments; do
+            echo "--- $servicio"
+            codigo=000
+            for intento in $(seq 1 30); do
+              codigo=$(curl -s -o /dev/null -w "%{http_code}" \
+                "http://localhost:8080/api/$servicio/v1/estado" || echo 000)
+              [ "$codigo" = "200" ] && break
+              sleep 5
+            done
+            if [ "$codigo" != "200" ]; then
+              echo "::error::$servicio respondio $codigo en vez de 200"
+              exit 1
+            fi
+            echo "    $servicio responde 200"
+          done
+
+      - name: Registros de los contenedores
+        if: always()
+        run: docker compose logs --no-color
+
+      - name: Apagar
+        if: always()
+        run: docker compose down -v
