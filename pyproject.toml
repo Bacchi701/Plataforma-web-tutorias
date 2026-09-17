@@ -1,0 +1,13 @@
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = [".venv", "migrations"]
+
+[tool.ruff.lint]
+# E y F: errores y avisos basicos. I: orden de las importaciones.
+# UP: sintaxis que ya quedo antigua. B: errores logicos frecuentes.
+select = ["E", "F", "I", "UP", "B"]
