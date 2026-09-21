@@ -1,0 +1,21 @@
+* text=auto eol=lf
+
+# Estos ademas no funcionan si llevan el retorno de carro de Windows.
+*.sh        text eol=lf
+*.py        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.conf      text eol=lf
+*.toml      text eol=lf
+*.ini       text eol=lf
+Dockerfile  text eol=lf
+
+# Binarios
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
