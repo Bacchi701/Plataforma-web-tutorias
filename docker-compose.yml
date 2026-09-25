@@ -1,10 +1,11 @@
 name: plataforma-tutorias
 
 # ---------------------------------------------------------------
-# Plataforma de Tutorias entre Estudiantes - HU-01
+# Plataforma de Tutorias entre Estudiantes
 #
-# Nueve contenedores: el gateway, cuatro servicios y cuatro bases.
-# Mailpit y el programador de tareas entran con HU-02 y HU-37
+# Diez contenedores: el gateway, cuatro servicios, cuatro bases (HU-01)
+# y la bandeja de correo de desarrollo (HU-02).
+# El programador de tareas entra con HU-37; el frontend, con HU-06.
 # ---------------------------------------------------------------
 
 # Las cuatro bases son identicas salvo el nombre, el usuario y la clave, asi que se define una vez y se reutiliza con "<<"
@@ -53,6 +54,15 @@ services:
       POSTGRES_DB: ${IDENTITY_DB_NAME}
       POSTGRES_USER: ${IDENTITY_DB_USER}
       POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      # Identidad es el unico servicio que envia correos (AD-11).
+      # A proposito no tiene depends_on de mailpit: si la bandeja falla, el sistema igual tiene que levantar.
+      # Por defecto todo va a Mailpit. Estas variables se llenan en el .env local solo para el envio real que pide el supuesto S-02 del Pilar 5.
+      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+      EMAIL_PORT: ${EMAIL_PORT:-1025}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-0}
+      CORREO_REMITENTE: "${CORREO_REMITENTE:-Plataforma de Tutorías <no-responder@tutorias.test>}"
     depends_on:
       identity_db: { condition: service_healthy }
     healthcheck:
@@ -177,9 +187,20 @@ services:
     volumes:
       - datos_payment:/var/lib/postgresql/data
 
+  # ---------- Correo de desarrollo (HU-02, AD-11) ----------
+  # Recibe todo lo que envia Identidad y lo muestra en una bandeja web.
+  # No reenvia nada a internet: ningun correo llega a una persona real.
+  mailpit:
+    image: axllent/mailpit:v1.31.2
+    container_name: tut_mailpit
+    restart: unless-stopped
+    networks: [borde, interna]
+    ports:
+      - "127.0.0.1:${PUERTO_BANDEJA:-8025}:8025"
+    environment:
+      MP_ALLOWED_HOSTS: localhost
+
 networks:
-  # Solo el gateway esta en las dos.
-  # "internal: true" significa que los servicios y las bases no tienen salida a internet ni entrada desde fuera.
   borde:
     driver: bridge
   interna:

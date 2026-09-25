@@ -51,6 +51,28 @@ Ningun servicio ni base de datos publica un puerto al equipo: el puerto 8080
 del gateway es la unica puerta de entrada, y esa es justamente la condicion
 del criterio de aceptacion CA8.
 
+## Bandeja de correo de desarrollo
+
+Todo correo que envia Identidad cae en Mailpit y se ve en
+<http://localhost:8025>. Nada sale a internet: ningun correo llega a una
+persona real. Para mandar uno de prueba:
+
+```bash
+docker compose exec identity python manage.py enviar_correo_prueba
+```
+
+La bandeja publica un segundo puerto, solo para tu computador (127.0.0.1).
+Es una herramienta de desarrollo y no parte del sistema evaluado (Pilar 2,
+seccion 10). Se vacia cada vez que se reinicia su contenedor.
+
+Mailpit no entrega a casillas reales. Para el envio real que exige el supuesto
+S-02 del Pilar 5 —un correo de verificacion que llegue a una casilla
+@duocuc.cl— se llenan en el `.env` de un solo equipo las variables
+`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
+`EMAIL_USE_TLS` y `CORREO_REMITENTE`, con una cuenta SMTP gratuita. Vacias,
+que es como vienen en `.env.example`, todo sigue cayendo en Mailpit. Esas
+claves nunca se suben al repositorio.
+
 ## Comandos del dia a dia
 
 ```bash
@@ -76,14 +98,19 @@ scripts/             carga del catalogo y sincronizacion de copias
 
 ## Que todavia no esta
 
-Los cuatro servicios responden unicamente su endpoint de estado. El correo
-de desarrollo y el programador de tareas llegan con HU-02 y HU-37, el
-frontend en React con HU-06, y el registro de usuarios con HU-04.
+Los cuatro servicios responden unicamente su endpoint de estado, e Identidad
+ya puede enviar correos a la bandeja de desarrollo. El programador de tareas
+llega con HU-37, el frontend en React con HU-06, y el registro de usuarios
+con HU-04.
 
 ## Problemas frecuentes
 
 **`bind: address already in use` en el puerto 8080.** Otro programa lo esta
 ocupando. Cambia `PUERTO_GATEWAY` en tu `.env` a 8090 y vuelve a levantar.
+
+**`port is already allocated` o `bind` en el puerto 8025.** Lo mismo con la
+bandeja de correo: cambia `PUERTO_BANDEJA` en tu `.env` a 8026 y vuelve a
+levantar. La bandeja queda en <http://localhost:8026>.
 
 **`exec ./entrada.sh: no such file or directory`.** El archivo quedo con
 finales de linea de Windows. Comprueba que `.gitattributes` esta en la raiz,
