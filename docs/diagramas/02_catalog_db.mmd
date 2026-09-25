@@ -1,0 +1,72 @@
+%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 2 de 5
+%% catalog_db — Servicio de Catálogo académico · 7 tablas
+%% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% La asignatura es transversal entre carreras; malla_asignatura es la que le da un
+%% semestre dentro de un plan de estudios, y eso es lo que hace verificable RN-01.
+%% sede e importacion_catalogo no tienen relación dentro de esta base: se consumen desde fuera.
+erDiagram
+    carrera {
+        uuid id PK "cruza a identity_db y a tutoring_db"
+        varchar codigo UK "20 · clave natural del CSV de carga"
+        varchar nombre "150 · se copia a usuario_ref.carrera_nombre"
+        varchar escuela "120 · etiqueta · ninguna consulta del MVP filtra por ella"
+        boolean activa "DEFAULT true · borrado lógico"
+        timestamptz creada_en "DEFAULT now"
+    }
+
+    malla {
+        bigserial id PK "interna · no cruza fronteras"
+        uuid carrera_id FK "ON DELETE CASCADE"
+        varchar version "20 · año del plan de estudios · único por carrera"
+        date vigente_desde "NOT NULL"
+        date vigente_hasta "NULL significa malla vigente · una sola por carrera"
+        timestamptz creada_en "DEFAULT now"
+    }
+
+    asignatura {
+        uuid id PK "cruza a tutoring_db.asignatura_ref"
+        varchar sigla UK "15 · transversal entre carreras · clave natural del CSV"
+        varchar nombre "150 · índice GIN trigram para la búsqueda · RNF-02"
+        smallint creditos "NULL · CHECK entre 1 y 30"
+        boolean activa "DEFAULT true"
+        timestamptz creada_en "DEFAULT now"
+    }
+
+    malla_asignatura {
+        bigserial id PK "interna"
+        bigint malla_id FK "ON DELETE CASCADE"
+        uuid asignatura_id FK "ON DELETE RESTRICT · único junto a malla_id"
+        smallint semestre "CHECK entre 1 y 12 · se compara con usuario.nivel en RN-01"
+    }
+
+    prerrequisito {
+        bigserial id PK "estructura preparada · sin uso funcional en el MVP"
+        bigint malla_asignatura_id FK "ON DELETE CASCADE"
+        bigint requiere_id FK "ON DELETE CASCADE · CHECK distinto del anterior"
+    }
+
+    sede {
+        uuid id PK "cruza a identity_db y a tutoring_db · nueva en A-07"
+        varchar codigo UK "20"
+        varchar nombre "120 · se copia a usuario_ref.sede_nombre"
+        varchar region "80 · NULL"
+        boolean activa "DEFAULT true"
+    }
+
+    importacion_catalogo {
+        bigserial id PK "trazabilidad de la carga · RF-04 y RF-16"
+        varchar archivo "200 · nombre del CSV procesado"
+        varchar tipo "20 · CARRERAS, ASIGNATURAS o MALLA"
+        integer filas_leidas "DEFAULT 0"
+        integer filas_creadas "DEFAULT 0"
+        integer filas_omitidas "DEFAULT 0"
+        jsonb errores "NULL · detalle por fila rechazada"
+        uuid ejecutada_por "NULL · referencia lógica al usuario administrador"
+        timestamptz ejecutada_en "DEFAULT now"
+    }
+
+    carrera ||--o{ malla : "tiene versiones de"
+    malla ||--o{ malla_asignatura : "ordena por semestre"
+    asignatura ||--o{ malla_asignatura : "aparece en"
+    malla_asignatura ||--o{ prerrequisito : "exige"
+    malla_asignatura ||--o{ prerrequisito : "es exigida por"
