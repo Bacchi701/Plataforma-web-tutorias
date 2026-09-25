@@ -55,9 +55,14 @@ services:
       POSTGRES_USER: ${IDENTITY_DB_USER}
       POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD}
       # Identidad es el unico servicio que envia correos (AD-11).
-      # no tiene depends_on de mailpit: si la bandeja falla, el sistema igual tiene que levantar.
-      EMAIL_HOST: mailpit
-      EMAIL_PORT: 1025
+      # A proposito no tiene depends_on de mailpit: si la bandeja falla, el sistema igual tiene que levantar.
+      # Por defecto todo va a Mailpit. Estas variables se llenan en el .env local solo para el envio real que pide el supuesto S-02 del Pilar 5.
+      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+      EMAIL_PORT: ${EMAIL_PORT:-1025}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-0}
+      CORREO_REMITENTE: "${CORREO_REMITENTE:-Plataforma de Tutorías <no-responder@tutorias.test>}"
     depends_on:
       identity_db: { condition: service_healthy }
     healthcheck:
