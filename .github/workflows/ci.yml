@@ -130,6 +130,18 @@ jobs:
             echo "    $servicio responde 200"
           done
 
+      # HU-02: Identidad envia un correo y la bandeja de Mailpit lo muestra.
+      - name: Comprobar que la bandeja recibe los correos de Identidad
+        run: |
+          for intento in $(seq 1 15); do
+            curl -fs http://localhost:8025/readyz > /dev/null && break
+            sleep 2
+          done
+          docker compose exec -T identity \
+            python manage.py enviar_correo_prueba --para ci@duocuc.cl
+          curl -fs http://localhost:8025/api/v1/messages \
+            | jq -e 'any(.messages[].To[]; .Address == "ci@duocuc.cl")'
+
       - name: Registros de los contenedores
         if: always()
         run: docker compose logs --no-color
