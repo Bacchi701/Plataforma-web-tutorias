@@ -7,13 +7,17 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "clave-de-desarrollo")
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
+# Sin django.contrib.auth ni contenttypes: el usuario es propio (cuentas) y
+# asi identity_db queda solo con las tablas del anexo A mas django_migrations.
 INSTALLED_APPS = [
-    "django.contrib.contenttypes",
-    "django.contrib.auth",
     "rest_framework",
     "salud",
     "correo",
+    "cuentas",
 ]
+
+# Debe existir desde la primera migracion de cuentas (T-025).
+AUTH_USER_MODEL = "cuentas.Usuario"
 
 MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
@@ -39,6 +43,9 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    # Sin django.contrib.auth no existe AnonymousUser: una peticion sin
+    # token queda con request.user = None.
+    "UNAUTHENTICATED_USER": None,
 }
 
 LANGUAGE_CODE = "es-cl"
