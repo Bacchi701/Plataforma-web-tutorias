@@ -7,13 +7,17 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "clave-de-desarrollo")
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
+# Sin django.contrib.auth ni contenttypes: el usuario es propio (cuentas) y
+# asi identity_db queda solo con las tablas del anexo A mas django_migrations.
 INSTALLED_APPS = [
-    "django.contrib.contenttypes",
-    "django.contrib.auth",
     "rest_framework",
     "salud",
     "correo",
+    "cuentas",
 ]
+
+# Debe existir desde la primera migracion de cuentas (T-025).
+AUTH_USER_MODEL = "cuentas.Usuario"
 
 MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
@@ -39,6 +43,11 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    # Sin django.contrib.auth no existe AnonymousUser: una peticion sin
+    # token queda con request.user = None.
+    "UNAUTHENTICATED_USER": None,
+    # Formato de error unico: codigo, mensaje y detalles (Pilar 2, seccion 11).
+    "EXCEPTION_HANDLER": "configuracion.errores.formato_uniforme",
 }
 
 LANGUAGE_CODE = "es-cl"
@@ -68,3 +77,24 @@ EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.environ.get(
     "CORREO_REMITENTE", "Plataforma de Tutorías <no-responder@tutorias.test>"
 )
+
+# ---------- Registro y verificacion del correo (HU-04) ----------
+# El enlace del correo apunta a la pagina del frontend que llama a la API.
+URL_FRONTEND = os.environ.get("URL_FRONTEND", "http://localhost:8080/app")
+VERIFICACION_HORAS = 24
+
+# ---------- Sesion: tokens RS256 y renovacion (HU-05, AD-06) ----------
+# La privada se monta solo en Identidad y no se versiona; la publica se
+# versiona en keys/ y la reciben los cuatro servicios (Pilar 2, seccion 10).
+JWT_CLAVE_PRIVADA = os.environ.get(
+    "JWT_CLAVE_PRIVADA", str(BASE_DIR / "keys" / "jwt_private.pem")
+)
+JWT_CLAVE_PUBLICA = os.environ.get(
+    "JWT_CLAVE_PUBLICA", str(BASE_DIR / "keys" / "jwt_public.pem")
+)
+JWT_EMISOR = "identity"
+JWT_MINUTOS_ACCESO = 30
+REFRESH_DIAS = 7
+# Secure en la cookie de renovacion. localhost cuenta como origen seguro para
+# el navegador, asi que funciona tambien con http://localhost:8080.
+COOKIE_REFRESH_SEGURA = os.environ.get("COOKIE_REFRESH_SEGURA", "1") == "1"
