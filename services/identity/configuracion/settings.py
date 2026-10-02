@@ -46,6 +46,8 @@ REST_FRAMEWORK = {
     # Sin django.contrib.auth no existe AnonymousUser: una peticion sin
     # token queda con request.user = None.
     "UNAUTHENTICATED_USER": None,
+    # Formato de error unico: codigo, mensaje y detalles (Pilar 2, seccion 11).
+    "EXCEPTION_HANDLER": "configuracion.errores.formato_uniforme",
 }
 
 LANGUAGE_CODE = "es-cl"
@@ -75,3 +77,8 @@ EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.environ.get(
     "CORREO_REMITENTE", "Plataforma de Tutorías <no-responder@tutorias.test>"
 )
+
+# ---------- Registro y verificacion del correo (HU-04) ----------
+# El enlace del correo apunta a la pagina del frontend que llama a la API.
+URL_FRONTEND = os.environ.get("URL_FRONTEND", "http://localhost:8080/app")
+VERIFICACION_HORAS = 24
