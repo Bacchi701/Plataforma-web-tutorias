@@ -9,7 +9,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Iniciar sesión | Tutorías Duoc UC</title>
+    <title>Verificar correo | Tutorías Duoc UC</title>
 
     <meta
         name="description"
@@ -997,128 +997,33 @@
             <div class="login-title">
 
                 <span>
-                    Bienvenido
+                    Verificación
                 </span>
 
                 <h2>
-                    Inicia sesión
+                    Tu correo institucional
                 </h2>
 
                 <p>
-                    Ingresa tus datos para acceder a tu cuenta.
+                    Estamos revisando el enlace que te llegó por correo.
                 </p>
 
             </div>
 
-
-
             <div
-                class="login-message"
-                id="loginMessage"
-            ></div>
-
-
-
-            <form
-                id="loginForm"
-                autocomplete="on"
+                class="login-message success"
+                id="verifyMessage"
             >
+                Verificando...
+            </div>
 
+            <a href="login.html" class="login-button" id="goLogin">
 
-                <!-- EMAIL -->
+                Ir a iniciar sesión
 
-                <div class="form-group">
+                <i class="fa-solid fa-arrow-right"></i>
 
-                    <label
-                        for="email"
-                        class="form-label"
-                    >
-                        Correo electrónico
-                    </label>
-
-
-                    <div class="input-container">
-
-                        <i class="fa-regular fa-envelope"></i>
-
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            placeholder="nombre@duocuc.cl"
-                            autocomplete="email"
-                            required
-                        >
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- PASSWORD -->
-
-                <div class="form-group">
-
-                    <label
-                        for="password"
-                        class="form-label"
-                    >
-                        Contraseña
-                    </label>
-
-
-                    <div class="input-container">
-
-                        <i class="fa-solid fa-lock"></i>
-
-                        <input
-                            type="password"
-                            id="password"
-                            name="password"
-                            placeholder="Ingresa tu contraseña"
-                            autocomplete="current-password"
-                            required
-                        >
-
-
-                        <button
-                            type="button"
-                            class="password-toggle"
-                            id="passwordToggle"
-                            aria-label="Mostrar contraseña"
-                        >
-
-                            <i
-                                class="fa-regular fa-eye"
-                                id="passwordIcon"
-                            ></i>
-
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- LOGIN -->
-
-                <button
-                    type="submit"
-                    class="login-button"
-                >
-
-                    Iniciar sesión
-
-                    <i class="fa-solid fa-arrow-right"></i>
-
-                </button>
-
-
-            </form>
-
-
+            </a>
 
             <!-- REGISTRO -->
 
@@ -1147,7 +1052,7 @@
 ========================================= -->
 
 <script src="js/sesion.js"></script>
-<script src="js/login.js"></script>
+<script src="js/verificar.js"></script>
 
 
 </body>
