@@ -82,3 +82,19 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 # El enlace del correo apunta a la pagina del frontend que llama a la API.
 URL_FRONTEND = os.environ.get("URL_FRONTEND", "http://localhost:8080/app")
 VERIFICACION_HORAS = 24
+
+# ---------- Sesion: tokens RS256 y renovacion (HU-05, AD-06) ----------
+# La privada se monta solo en Identidad y no se versiona; la publica se
+# versiona en keys/ y la reciben los cuatro servicios (Pilar 2, seccion 10).
+JWT_CLAVE_PRIVADA = os.environ.get(
+    "JWT_CLAVE_PRIVADA", str(BASE_DIR / "keys" / "jwt_private.pem")
+)
+JWT_CLAVE_PUBLICA = os.environ.get(
+    "JWT_CLAVE_PUBLICA", str(BASE_DIR / "keys" / "jwt_public.pem")
+)
+JWT_EMISOR = "identity"
+JWT_MINUTOS_ACCESO = 30
+REFRESH_DIAS = 7
+# Secure en la cookie de renovacion. localhost cuenta como origen seguro para
+# el navegador, asi que funciona tambien con http://localhost:8080.
+COOKIE_REFRESH_SEGURA = os.environ.get("COOKIE_REFRESH_SEGURA", "1") == "1"
