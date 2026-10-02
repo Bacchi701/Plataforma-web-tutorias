@@ -1,0 +1,30 @@
+# Solo para mirar las bases con DBeaver o psql desde Windows. No es parte del
+# sistema: Pilar 2 dice que ninguna base es alcanzable desde fuera, y por eso
+# este archivo no se carga solo. Se usa a mano:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dbeaver.yml up -d
+#
+# Cada base queda en 127.0.0.1 (nunca hacia la red) y se suma a la red borde,
+# porque Docker no publica los puertos de un contenedor que solo esta en una
+# red interna (lo comprobo HU-02).
+#
+#   identity_db  -> localhost:5433   usuario identity   clave identity_dev
+#   catalog_db   -> localhost:5434   usuario catalog    clave catalog_dev
+#   tutoring_db  -> localhost:5435   usuario tutoring   clave tutoring_dev
+#   payment_db   -> localhost:5436   usuario payment    clave payment_dev
+#
+# (claves de .env.example; si cambiaste tu .env, usa las tuyas)
+
+services:
+  identity_db:
+    networks: [interna, borde]
+    ports: ["127.0.0.1:5433:5432"]
+  catalog_db:
+    networks: [interna, borde]
+    ports: ["127.0.0.1:5434:5432"]
+  tutoring_db:
+    networks: [interna, borde]
+    ports: ["127.0.0.1:5435:5432"]
+  payment_db:
+    networks: [interna, borde]
+    ports: ["127.0.0.1:5436:5432"]
