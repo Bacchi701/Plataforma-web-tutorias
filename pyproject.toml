@@ -1,6 +1,8 @@
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+# Igual que ruff: las migraciones las genera Django y no se reformatean.
+extend-exclude = "/migrations/"
 
 [tool.ruff]
 line-length = 88
