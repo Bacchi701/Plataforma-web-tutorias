@@ -45,6 +45,8 @@ REST_FRAMEWORK = {
     # Sin django.contrib.auth no existe AnonymousUser: una peticion sin
     # token queda con request.user = None.
     "UNAUTHENTICATED_USER": None,
+    # Formato de error unico: codigo, mensaje y detalles (Pilar 2, seccion 11).
+    "EXCEPTION_HANDLER": "configuracion.errores.formato_uniforme",
 }
 
 LANGUAGE_CODE = "es-cl"
