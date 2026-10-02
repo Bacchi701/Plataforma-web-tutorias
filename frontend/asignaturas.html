@@ -69,7 +69,7 @@
 
                 <div>
                     <select id="filter-area" class="subjects-search-select" onchange="cargarAsignaturas()">
-                        <option value="">Todas las Áreas</option>
+                        <option value="">Todas las carreras</option>
                     </select>
                 </div>
 
@@ -89,14 +89,14 @@
             <span id="subjectCounter">Cargando asignaturas...</span>
         </div>
 
-        <!-- GRIDA DE CARDS DESDE MYSQL -->
+        <!-- Tarjetas que llena js/asignaturas.js con la API de Catálogo (HU-12) -->
         <div class="subjects-list" id="subjectsList"></div>
 
         <!-- MENSAJE DE SIN RESULTADOS -->
         <div class="no-results" id="noResults" style="display: none;">
             <i class="fa-solid fa-magnifying-glass"></i>
             <h3>No encontramos asignaturas</h3>
-            <p>Prueba buscando con otro nombre o selecciona otra categoría.</p>
+            <p>Prueba con otro nombre o sigla, o elige otra carrera.</p>
         </div>
     </div>
 </section>
@@ -146,6 +146,7 @@
     </div>
 </footer>
 
+<script src="js/sesion.js"></script>
 <script src="js/asignaturas.js"></script>
 </body>
 </html>
