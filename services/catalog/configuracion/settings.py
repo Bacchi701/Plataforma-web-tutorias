@@ -7,11 +7,15 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "clave-de-desarrollo")
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
+# Sin django.contrib.auth ni contenttypes: Catalogo no guarda usuarios, y asi
+# catalog_db queda solo con las tablas del anexo A mas django_migrations.
+# django.contrib.postgres no crea tablas; hace falta para usar OpClass en el
+# indice trigram de asignatura.
 INSTALLED_APPS = [
-    "django.contrib.contenttypes",
-    "django.contrib.auth",
+    "django.contrib.postgres",
     "rest_framework",
     "salud",
+    "catalogo",
 ]
 
 MIDDLEWARE = [
@@ -38,6 +42,9 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    # Sin django.contrib.auth no existe AnonymousUser: una peticion sin
+    # token queda con request.user = None.
+    "UNAUTHENTICATED_USER": None,
 }
 
 LANGUAGE_CODE = "es-cl"
