@@ -27,19 +27,21 @@ function configurarBuscador() {
     }
 }
 
-// 1. Cargar selector de Áreas desde la BD
+// 1. Cargar selector de Áreas (escuelas) desde la BD
 async function cargarAreas() {
     try {
-        const res = await fetch('/api/areas');
-        const areas = await res.json();
+        const res = await fetch('/api/catalog/v1/carreras');
+        const carreras = await res.json();
         const selectArea = document.getElementById('filter-area');
 
         if (selectArea) {
             selectArea.innerHTML = '<option value="">Todas las Áreas</option>';
-            areas.forEach(area => {
+            // Extraer escuelas únicas de las carreras
+            const escuelas = [...new Set(carreras.map(c => c.escuela))].sort();
+            escuelas.forEach(escuela => {
                 const option = document.createElement('option');
-                option.value = area;
-                option.textContent = area;
+                option.value = escuela;
+                option.textContent = escuela;
                 selectArea.appendChild(option);
             });
         }
@@ -57,15 +59,14 @@ async function cargarAsignaturas() {
     const searchInput = document.getElementById('subjectSearch');
     const areaSelect = document.getElementById('filter-area');
 
-    const nombre = searchInput ? searchInput.value.trim() : '';
+    const texto = searchInput ? searchInput.value.trim() : '';
     const area = areaSelect ? areaSelect.value : '';
 
     const params = new URLSearchParams();
-    if (nombre) params.append('nombre', nombre);
-    if (area) params.append('area', area);
+    if (texto) params.append('buscar', texto);
 
     try {
-        const response = await fetch(`/api/asignaturas?${params.toString()}`);
+        const response = await fetch(`/api/catalog/v1/asignaturas?${params.toString()}`);
         const asignaturas = await response.json();
 
         // Actualizar el contador
@@ -85,26 +86,26 @@ async function cargarAsignaturas() {
 
         // Renderizar las Cards en la Grilla
         contenedor.innerHTML = asignaturas.map(asig => {
-            const idSubject = asig.id_asignatura || asig.id || '';
+            const idSubject = asig.id || '';
             
             return `
-                <article class="subject-card" data-area="${asig.area || ''}">
+                <article class="subject-card">
                     <div>
                         <div class="subject-card-header">
                             <div class="subject-icon">
                                 <i class="fa-solid fa-book"></i>
                             </div>
-                            <span class="subject-code">${asig.codigo || 'ASIG'}</span>
+                            <span class="subject-code">${asig.sigla || 'ASIG'}</span>
                         </div>
 
                         <h3>${asig.nombre}</h3>
-                        <p class="subject-area">${asig.carrera || asig.area || 'Escuela Duoc UC'}</p>
+                        <p class="subject-area">${asig.creditos ? asig.creditos + ' créditos' : 'Duoc UC'}</p>
                     </div>
 
                     <div class="subject-card-footer">
                         <span class="tutor-count">
                             <i class="fa-solid fa-user-graduate"></i>
-                            ${asig.tutores_count || 0} tutores
+                            Ver disponibilidad
                         </span>
                         <button class="view-tutors" onclick="verTutores('${idSubject}')">
                             Ver tutores →
