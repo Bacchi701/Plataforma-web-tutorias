@@ -103,12 +103,18 @@ def buscar_asignaturas(request):
     area = request.query_params.get("area", "").strip()
 
     try:
-        pagina = max(1, int(request.query_params.get("pagina") or request.query_params.get("page") or 1))
+        raw_pagina = request.query_params.get("pagina") or request.query_params.get(
+            "page"
+        )
+        pagina = max(1, int(raw_pagina or 1))
     except (ValueError, TypeError):
         pagina = 1
 
     try:
-        limite = max(1, min(200, int(request.query_params.get("limite") or request.query_params.get("limit") or MAXIMO_RESULTADOS)))
+        raw_limite = request.query_params.get("limite") or request.query_params.get(
+            "limit"
+        )
+        limite = max(1, min(200, int(raw_limite or MAXIMO_RESULTADOS)))
     except (ValueError, TypeError):
         limite = MAXIMO_RESULTADOS
 
@@ -135,7 +141,11 @@ def buscar_asignaturas(request):
         "X-Per-Page": str(limite),
     }
 
-    if request.query_params.get("paginado") == "1" or request.query_params.get("formato") == "paginado":
+    es_paginado = (
+        request.query_params.get("paginado") == "1"
+        or request.query_params.get("formato") == "paginado"
+    )
+    if es_paginado:
         return Response(
             {
                 "total": total,
@@ -162,7 +172,6 @@ def listar_areas(request):
         .order_by("area")
     )
     return Response(list(areas))
-
 
 
 @api_view(["GET"])

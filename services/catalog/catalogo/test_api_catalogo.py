@@ -100,4 +100,3 @@ def test_areas_lista_las_disponibles(client, carrera):
     respuesta = client.get(f"{BASE}/areas")
     assert respuesta.status_code == 200
     assert "Informática" in respuesta.json()
-
