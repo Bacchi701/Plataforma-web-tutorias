@@ -86,6 +86,7 @@ class Asignatura(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sigla = models.CharField(max_length=15)
     nombre = models.CharField(max_length=150)
+    area = models.CharField(max_length=100, null=True, blank=True)
     creditos = models.SmallIntegerField(null=True, blank=True)
     activa = models.BooleanField(default=True)
     creada_en = models.DateTimeField(default=timezone.now)

@@ -1299,3 +1299,64 @@ footer a:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================================
+   PAGINACIÓN
+========================================= */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--white);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: #edf2f7;
+    border-color: var(--duoc-blue-light);
+    color: var(--duoc-blue);
+}
+
+.pagination-btn.active {
+    background: var(--duoc-blue);
+    color: var(--white);
+    border-color: var(--duoc-blue);
+    font-weight: 700;
+    cursor: default;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pagination-ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 40px;
+    color: var(--text-light);
+    font-size: 14px;
+}
+

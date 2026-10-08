@@ -11,5 +11,7 @@ urlpatterns = [
         name="carrera-asignaturas",
     ),
     path("asignaturas", vistas.buscar_asignaturas, name="asignaturas"),
+    path("areas", vistas.listar_areas, name="areas"),
     path("sedes", vistas.listar_sedes, name="sedes"),
 ]
+

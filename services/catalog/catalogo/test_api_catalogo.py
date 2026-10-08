@@ -81,3 +81,23 @@ def test_sedes_lista_las_activas(client, carrera):
     sedes = client.get(f"{BASE}/sedes").json()
 
     assert [s["nombre"] for s in sedes] == ["San Joaquín"]
+
+
+@pytest.mark.django_db
+def test_busqueda_soporta_paginacion(client, carrera):
+    respuesta = client.get(f"{BASE}/asignaturas", {"paginado": "1", "limite": "1"})
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert cuerpo["total"] == 3
+    assert cuerpo["limite"] == 1
+    assert cuerpo["total_paginas"] == 3
+    assert len(cuerpo["resultados"]) == 1
+
+
+@pytest.mark.django_db
+def test_areas_lista_las_disponibles(client, carrera):
+    Asignatura.objects.filter(sigla="PRO1101").update(area="Informática")
+    respuesta = client.get(f"{BASE}/areas")
+    assert respuesta.status_code == 200
+    assert "Informática" in respuesta.json()
+
