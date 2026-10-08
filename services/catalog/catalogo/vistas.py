@@ -34,7 +34,6 @@ def asignatura_json(asignatura):
     }
 
 
-
 def carrera_activa(carrera_id):
     carrera = Carrera.objects.filter(id=carrera_id, activa=True).first()
     if carrera is None:
