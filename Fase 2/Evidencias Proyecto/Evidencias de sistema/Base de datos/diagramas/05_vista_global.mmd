@@ -1,0 +1,103 @@
+%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 5 de 5
+%% Vista global: solo las entidades que participan de una frontera entre servicios.
+%% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% Modelo IMPLEMENTADO el 30-09-2026 (migraciones de la semana 8). Difiere del anexo A
+%% en lo que dejo la revision de 3FN: ver la presentacion de normalizacion.
+%% Línea continua = clave foránea real dentro de una misma base.
+%% Línea punteada = referencia lógica entre servicios: ninguna base la garantiza.
+%% El prefijo del nombre indica la base: identidad_, catalogo_, tutorias_, pagos_.
+erDiagram
+    identidad_usuario {
+        uuid id PK "fuente de verdad de la identidad"
+        varchar email UK "solo existe aquí · RNF-07"
+        uuid carrera_id "referencia lógica"
+        uuid sede_id "referencia lógica"
+        smallint nivel "insumo de RN-01 · no se copia · el programador lo lee (A-13)"
+        boolean activo "insumo de RN-08"
+    }
+
+    identidad_aviso_correo {
+        bigserial id PK "único emisor de correos del sistema · AD-11"
+        varchar plantilla "40"
+    }
+
+    catalogo_carrera {
+        uuid id PK "dato de referencia"
+        varchar nombre "150"
+    }
+
+    catalogo_sede {
+        uuid id PK "dato de referencia"
+        varchar nombre "120"
+    }
+
+    catalogo_malla {
+        bigserial id PK "versión del plan de estudios"
+    }
+
+    catalogo_asignatura {
+        uuid id PK "transversal entre carreras"
+        varchar sigla UK "15"
+    }
+
+    catalogo_malla_asignatura {
+        bigserial id PK "ubica la asignatura en un semestre"
+        smallint semestre "lo que hace verificable RN-01"
+    }
+
+    tutorias_usuario_ref {
+        uuid usuario_id PK "copia de lectura"
+        boolean activo "sincronizado por el programador · A-01 · hasta 5 min de desfase"
+        numeric reputacion_promedio "dato propio de Tutorías"
+    }
+
+    tutorias_asignatura_ref {
+        uuid asignatura_id PK "copia de lectura"
+        varchar sigla "15"
+    }
+
+    tutorias_perfil_tutor {
+        uuid id PK "una fila por asignatura declarada"
+        numeric tarifa "la fija el tutor · puede ser 0 · RN-05"
+    }
+
+    tutorias_bloque_disponibilidad {
+        uuid id PK "dos instantes en UTC"
+        varchar estado "LIBRE, OCUPADO o ELIMINADO"
+    }
+
+    tutorias_reserva {
+        uuid id PK "cruza a Pagos"
+        varchar estado "máquina de estados de siete valores"
+        varchar estado_pago "copia de lectura · puede ser NULL"
+    }
+
+    tutorias_evaluacion {
+        uuid id PK "una por reserva"
+        smallint calificacion "1 a 5"
+    }
+
+    pagos_pago {
+        uuid id PK "un pago por reserva"
+        uuid reserva_id UK "referencia lógica"
+        varchar estado "fuente de verdad del pago"
+    }
+
+    identidad_usuario ||--o{ identidad_aviso_correo : "FK real en identity_db"
+    catalogo_carrera ||--o{ catalogo_malla : "FK real en catalog_db"
+    catalogo_malla ||--o{ catalogo_malla_asignatura : "FK real en catalog_db"
+    catalogo_asignatura ||--o{ catalogo_malla_asignatura : "FK real en catalog_db"
+    tutorias_usuario_ref ||--o{ tutorias_perfil_tutor : "FK real en tutoring_db"
+    tutorias_asignatura_ref ||--o{ tutorias_perfil_tutor : "FK real en tutoring_db"
+    tutorias_usuario_ref ||--o{ tutorias_bloque_disponibilidad : "FK real en tutoring_db"
+    tutorias_bloque_disponibilidad ||--o{ tutorias_reserva : "FK real en tutoring_db"
+    tutorias_usuario_ref ||--o{ tutorias_reserva : "FK real · solicitante (el tutor llega por el bloque)"
+    tutorias_reserva ||--o| tutorias_evaluacion : "FK real en tutoring_db"
+
+    identidad_usuario ||..o| tutorias_usuario_ref : "llamada 2 · nace al primer contacto con Tutorías"
+    catalogo_asignatura ||..o| tutorias_asignatura_ref : "llamada 1 · copia sigla y nombre"
+    catalogo_malla_asignatura }o..o{ tutorias_perfil_tutor : "llamada 1 · valida RN-01 al declarar"
+    identidad_usuario }o..o| catalogo_carrera : "carrera_id · sin integridad referencial"
+    identidad_usuario }o..o| catalogo_sede : "sede_id · sin integridad referencial"
+    tutorias_reserva ||..o| pagos_pago : "llamadas 3 y 4 · sin integridad referencial"
+    tutorias_reserva }o..o{ identidad_aviso_correo : "llamada 2 · Tutorías pide el correo"
