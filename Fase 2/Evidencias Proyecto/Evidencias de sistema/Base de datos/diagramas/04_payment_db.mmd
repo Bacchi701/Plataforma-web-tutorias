@@ -1,0 +1,31 @@
+%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 4 de 5
+%% payment_db — Servicio de Pagos · 2 tablas
+%% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% Modelo IMPLEMENTADO el 30-09-2026 (migraciones de la semana 8). Difiere del anexo A
+%% en lo que dejo la revision de 3FN: ver la presentacion de normalizacion.
+%% Pagos no conoce usuarios ni asignaturas: solo reservas y montos.
+%% Si el componente se retira, estas dos tablas desaparecen y reserva.estado_pago queda en nulo.
+erDiagram
+    pago {
+        uuid id PK "gen_random_uuid"
+        uuid reserva_id UK "referencia lógica a tutoring_db.reserva · un pago por reserva"
+        numeric monto "8 enteros en pesos · CHECK mayor que cero · sin tarifa no hay pago"
+        varchar estado "12 · DEFAULT PENDIENTE · PAGADO, FALLIDO o REEMBOLSADO · RN-05"
+        varchar proveedor "30 · DEFAULT SIMULADO · punto de integración real · RF-18"
+        varchar referencia_externa "100 · NULL · única junto a proveedor"
+        timestamptz notificado_en "NULL · Tutorías ya confirmó el aviso · permite reintentar"
+        timestamptz creado_en "DEFAULT now"
+        timestamptz actualizado_en "DEFAULT now"
+    }
+
+    intento_pago {
+        bigserial id PK "historial de reintentos · RN-05 y CA9 · nueva en A-10"
+        uuid pago_id FK "ON DELETE CASCADE"
+        varchar tipo "10 · DEFAULT COBRO · COBRO o REEMBOLSO"
+        varchar resultado "10 · EXITOSO o FALLIDO"
+        varchar mensaje "200 · NULL · motivo del rechazo simulado"
+        varchar referencia_externa "100 · NULL"
+        timestamptz creado_en "DEFAULT now"
+    }
+
+    pago ||--o{ intento_pago : "registra"
