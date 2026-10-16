@@ -63,6 +63,13 @@ services:
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-0}
       CORREO_REMITENTE: "${CORREO_REMITENTE:-Plataforma de Tutorías <no-responder@tutorias.test>}"
+      # Enlace de verificacion del correo y cookie de renovacion (HU-04, HU-05).
+      URL_FRONTEND: ${URL_FRONTEND:-http://localhost:8080/app}
+      COOKIE_REFRESH_SEGURA: ${COOKIE_REFRESH_SEGURA:-1}
+    # Claves de firma de los tokens (Pilar 2, seccion 10): la privada se monta
+    # solo aqui y no se versiona; se genera con manage.py generar_claves_jwt.
+    volumes:
+      - ./keys:/app/keys:ro
     depends_on:
       identity_db: { condition: service_healthy }
     healthcheck:
