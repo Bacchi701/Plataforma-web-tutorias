@@ -1,0 +1,663 @@
+openapi: 3.0.3
+
+info:
+  title: Identidad · Plataforma de Tutorías entre Estudiantes
+  version: 1.0.0
+  description: |
+    Contrato de la API pública de Identidad (HU-03; Pilar 2, sección 4.1).
+
+    - Describe lo que hacen los PR #5 (HU-04) y #11 (HU-05) al 21-10-2026.
+    - Todas las rutas pasan por el gateway y llevan el prefijo y la versión del
+      servicio: `/api/identity/v1/`.
+    - Las rutas `/internal` no son parte de este contrato: el gateway no las
+      enruta y desde fuera responden 404.
+    - Queda congelado al aprobarse el PR de HU-03. Un cambio durante el sprint
+      se acuerda entre los tres antes de implementarse (acuerdo A4) y se anota
+      en «Cambios», al final de esta descripción.
+
+    **Formato de error (Pilar 2, sección 11).** Toda respuesta de error de los
+    endpoints de Cuenta y Sesión trae `codigo`, `mensaje` y `detalles` (ver el
+    esquema `Error`). No lo traen el 503 de `/estado`, que responde con su
+    propio esquema, ni lo que el gateway corta antes de llegar a Identidad: el
+    límite de intentos de `/login` y las rutas `/internal`.
+
+    **Sesión (Pilar 2, sección 5; AD-06).**
+    - El token de acceso es un JWT firmado con RS256 que dura 30 minutos. Lleva
+      `sub` (id del usuario), `es_admin`, `iat`, `exp` e `iss` = `identity`.
+      No lleva el correo (RNF-07).
+    - La renovación es un texto aleatorio que viaja en la cookie
+      `refresh_token`: httpOnly, SameSite=Strict, Path=/api/identity/v1/ y
+      7 días. Con `COOKIE_REFRESH_SEGURA=1`, el valor por defecto, lleva además
+      Secure. El JavaScript de las páginas no la puede leer.
+    - En la base se guarda solo el sha256 de la renovación y del enlace de
+      verificación.
+
+    **Cambios**
+    - 1.0.0 (21-10-2026): primera versión.
+
+servers:
+  - url: http://localhost:8080
+    description: Gateway del sistema levantado con Docker Compose. La API se llama siempre a través de él.
+
+tags:
+  - name: Cuenta
+    description: Registro y verificación del correo (HU-04).
+  - name: Sesión
+    description: Inicio, renovación y cierre de sesión (HU-05).
+  - name: Estado
+    description: Estado del servicio y de su base (HU-01).
+
+paths:
+
+  /api/identity/v1/registro:
+    post:
+      tags: [Cuenta]
+      operationId: registrar
+      summary: Crear una cuenta con el correo institucional
+      description: |
+        Crea la cuenta sin verificar y envía por correo un enlace de
+        verificación que vence en 24 horas y sirve una sola vez (HU-04,
+        criterios 1 y 2).
+
+        - Pide solo nombre, apellido, correo institucional y contraseña
+          (HU-03, criterio 2): sin RUT, sin tipo de cuenta y sin carrera,
+          nivel ni sede, que se completan en el perfil (HU-10). Si llegan otros
+          campos, se ignoran.
+        - El correo se guarda en minúsculas y no se puede repetir, aunque
+          cambien las mayúsculas.
+        - Si la bandeja de correo no responde, la cuenta igual queda creada:
+          `correo_enviado` vuelve en `false` y el aviso queda como FALLIDO en
+          `aviso_correo`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registro'
+            example:
+              nombre: Ana
+              apellido: Demo
+              email: ana.demo@duocuc.cl
+              password: clave-segura-1
+      responses:
+        '201':
+          description: Cuenta creada sin verificar. El enlace llega a la bandeja (Mailpit, en desarrollo).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistroCreado'
+              example:
+                id: 6f1c2a4e-8b1d-4c3e-9a7f-2d5b8e0c1a34
+                email: ana.demo@duocuc.cl
+                correo_enviado: true
+        '400':
+          description: |
+            Datos inválidos: `codigo` es `invalid` y `detalles` dice qué campo
+            corregir. También responde así si falta un campo, si el correo no
+            tiene formato de correo o si un campo viene vacío; esos mensajes los
+            pone el validador del framework (Django REST Framework).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                correo_no_institucional:
+                  summary: El correo no termina en @duocuc.cl
+                  value:
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      email:
+                        - Usa tu correo institucional, que termina en @duocuc.cl.
+                correo_repetido:
+                  summary: Ya hay una cuenta con ese correo
+                  value:
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      email:
+                        - Ya existe una cuenta con este correo.
+                clave_corta:
+                  summary: La contraseña tiene menos de 8 caracteres
+                  value:
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      password:
+                        - La contraseña debe tener al menos 8 caracteres.
+
+  /api/identity/v1/verificar-correo:
+    post:
+      tags: [Cuenta]
+      operationId: verificarCorreo
+      summary: Verificar el correo con el token del enlace
+      description: |
+        Marca la cuenta como verificada (HU-04, criterio 3). El token es el
+        parámetro `token` del enlace que llega por correo
+        (`{URL_FRONTEND}/verificar.html?token=...`); la página de verificación
+        lo lee y llama a este endpoint. Sirve una sola vez y vence a las
+        24 horas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificarCorreo'
+            example:
+              token: q3Yz8m1V0bKkO5x2rW9tC4nH7aL6dE1fS0gJ3uP2iQw
+      responses:
+        '200':
+          description: Correo verificado. Ya se puede iniciar sesión.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Tu correo quedó verificado. Ya puedes iniciar sesión.
+        '400':
+          description: |
+            El token falta (`invalid`), no existe (`token_invalido`), ya se usó
+            (`token_usado`) o venció (`token_vencido`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                falta_el_token:
+                  summary: La petición no trae el token
+                  value:
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      token:
+                        - Falta el token del enlace.
+                token_invalido:
+                  summary: El token no existe
+                  value:
+                    codigo: token_invalido
+                    mensaje: El enlace no es válido.
+                    detalles: null
+                token_usado:
+                  summary: El enlace ya se usó
+                  value:
+                    codigo: token_usado
+                    mensaje: Este enlace ya se usó. Si tu cuenta está verificada, inicia sesión.
+                    detalles: null
+                token_vencido:
+                  summary: Pasaron más de 24 horas
+                  value:
+                    codigo: token_vencido
+                    mensaje: El enlace venció. Pide uno nuevo.
+                    detalles: null
+
+  /api/identity/v1/login:
+    post:
+      tags: [Sesión]
+      operationId: iniciarSesion
+      summary: Iniciar sesión
+      description: |
+        Entrega el token de acceso en el cuerpo y la renovación en la cookie
+        `refresh_token` (HU-05, criterios 1, 2 y 5; HU-04, criterio 4).
+
+        - El correo se compara en minúsculas y sin espacios al inicio ni al
+          final.
+        - Se revisa en este orden: credenciales (401), cuenta activa (403) y
+          correo verificado (403). Si la cuenta no existe, el mensaje es el
+          mismo que con una contraseña equivocada.
+        - Límite del gateway: 5 intentos por minuto por IP, con una ráfaga de
+          5 más. Sobre eso, Nginx responde 503 con su propia página, sin el
+          formato de error de la API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+            example:
+              email: ana.demo@duocuc.cl
+              password: clave-segura-1
+      responses:
+        '200':
+          description: Sesión iniciada.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/CookieRenovacion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sesion'
+              example:
+                token_acceso: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ZjFjMmE0ZS04YjFkLTRjM2UtOWE3Zi0yZDViOGUwYzFhMzQiLCJlc19hZG1pbiI6ZmFsc2UsImlhdCI6MTc5MjU5NDgwMCwiZXhwIjoxNzkyNTk2NjAwLCJpc3MiOiJpZGVudGl0eSJ9.firma
+                tipo_token: Bearer
+                expira_en_segundos: 1800
+        '400':
+          description: |
+            Falta el correo o la contraseña, viene vacío o pasa el largo
+            máximo (`invalid`, con el detalle por campo).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Correo o contraseña incorrectos, o la cuenta no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: credenciales_invalidas
+                mensaje: Correo o contraseña incorrectos.
+                detalles: null
+        '403':
+          description: La cuenta está desactivada o el correo no está verificado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                cuenta_desactivada:
+                  summary: Un administrador desactivó la cuenta
+                  value:
+                    codigo: cuenta_desactivada
+                    mensaje: Tu cuenta está desactivada.
+                    detalles: null
+                correo_no_verificado:
+                  summary: Falta abrir el enlace del correo
+                  value:
+                    codigo: correo_no_verificado
+                    mensaje: 'Verifica tu correo antes de iniciar sesión: revisa tu bandeja.'
+                    detalles: null
+        '503':
+          description: |
+            Tiene dos causas:
+            - Identidad no encuentra la clave privada para firmar el token
+              (`claves_no_configuradas`, en JSON). Pasa en un clon nuevo si no
+              se generaron las claves.
+            - La IP pasó el límite de intentos del gateway. Responde Nginx, con
+              su página HTML y sin el formato de error de la API.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: claves_no_configuradas
+                mensaje: 'No existe /app/keys/jwt_private.pem. Genera las claves con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
+                detalles: null
+            text/html:
+              schema:
+                type: string
+              example: '<html><head><title>503 Service Temporarily Unavailable</title></head>...</html>'
+
+  /api/identity/v1/refresh:
+    post:
+      tags: [Sesión]
+      operationId: renovarSesion
+      summary: Renovar el token de acceso con la cookie
+      description: |
+        Entrega un token de acceso nuevo sin volver a escribir la contraseña
+        (HU-05, criterio 3). No lleva cuerpo: usa la cookie `refresh_token`,
+        que el navegador envía solo.
+
+        - La renovación usada queda revocada y se entrega otra en la cookie
+          (rotación): una cookie copiada deja de servir apenas su dueño
+          renueva.
+        - Si la sesión no es válida, la respuesta no borra la cookie: si dos
+          pestañas renuevan a la vez, la que pierde no borra la renovación
+          nueva de la otra.
+      security:
+        - cookieRenovacion: []
+      responses:
+        '200':
+          description: Sesión renovada. La cookie trae una renovación nueva.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/CookieRenovacion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sesion'
+              example:
+                token_acceso: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ZjFjMmE0ZS04YjFkLTRjM2UtOWE3Zi0yZDViOGUwYzFhMzQiLCJlc19hZG1pbiI6ZmFsc2UsImlhdCI6MTc5MjU5NjMwMCwiZXhwIjoxNzkyNTk4MTAwLCJpc3MiOiJpZGVudGl0eSJ9.firma
+                tipo_token: Bearer
+                expira_en_segundos: 1800
+        '401':
+          description: |
+            Falta la cookie, o la renovación no existe, está revocada o
+            vencida, o la cuenta está desactivada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: sesion_invalida
+                mensaje: La sesión no es válida o venció.
+                detalles: null
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
+  /api/identity/v1/logout:
+    post:
+      tags: [Sesión]
+      operationId: cerrarSesion
+      summary: Cerrar sesión
+      description: |
+        Revoca la renovación de esta sesión y borra la cookie (HU-05,
+        criterio 4). No lleva cuerpo ni token de acceso. Responde 204 aunque
+        no venga la cookie o la renovación ya no sirva.
+
+        El token de acceso no se puede revocar: sigue sirviendo hasta que vence
+        (como mucho 30 minutos). Por eso la página lo descarta al cerrar
+        sesión.
+      security:
+        - cookieRenovacion: []
+        - {}
+      responses:
+        '204':
+          description: Sesión cerrada.
+          headers:
+            Set-Cookie:
+              description: Borra la cookie de renovación.
+              schema:
+                type: string
+              example: 'refresh_token=""; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/api/identity/v1/; SameSite=Strict'
+
+  /api/identity/v1/yo:
+    get:
+      tags: [Sesión]
+      operationId: obtenerYo
+      summary: Datos del usuario con sesión
+      description: |
+        Devuelve los datos de la cuenta dueña del token. Aparte de `/registro`,
+        que devuelve el correo recién registrado, es el único endpoint que
+        entrega el correo; el token no lo lleva (RNF-07). `carrera_id`, `nivel`
+        y `sede_id` vienen en `null` hasta que el usuario completa su perfil
+        (HU-10).
+      security:
+        - tokenAcceso: []
+      responses:
+        '200':
+          description: Datos de la cuenta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Yo'
+              example:
+                id: 6f1c2a4e-8b1d-4c3e-9a7f-2d5b8e0c1a34
+                email: ana.demo@duocuc.cl
+                nombre: Ana
+                apellido: Demo
+                carrera_id: null
+                nivel: null
+                sede_id: null
+                es_admin: false
+        '401':
+          description: |
+            Sin token válido. Los códigos posibles son:
+            - `not_authenticated`: no viene la cabecera
+              `Authorization: Bearer …` (el mensaje es el estándar de Django
+              REST Framework);
+            - `authentication_failed`: la cabecera está mal formada;
+            - `token_invalido`: el token está mal formado, o su firma o su
+              emisor no calzan;
+            - `token_vencido`: pasaron los 30 minutos;
+            - `cuenta_inactiva`: la cuenta ya no existe o está desactivada.
+          headers:
+            WWW-Authenticate:
+              description: Siempre `Bearer realm="identity"`.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_invalido:
+                  summary: El token no es válido
+                  value:
+                    codigo: token_invalido
+                    mensaje: El token de acceso no es válido.
+                    detalles: null
+                token_vencido:
+                  summary: El token venció
+                  value:
+                    codigo: token_vencido
+                    mensaje: El token de acceso venció.
+                    detalles: null
+
+  /api/identity/v1/estado:
+    get:
+      tags: [Estado]
+      operationId: estadoIdentidad
+      summary: Estado del servicio y de su base
+      description: |
+        Lo consultan la integración continua (trabajo «levantar») y la
+        verificación de salud del contenedor (HU-01).
+      responses:
+        '200':
+          description: El servicio y su base responden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: identity
+                estado: ok
+                base_de_datos: ok
+                version: 0.1.0
+        '503':
+          description: El servicio arrancó, pero no puede leer su base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: identity
+                estado: degradado
+                base_de_datos: sin conexion
+                version: 0.1.0
+
+components:
+
+  securitySchemes:
+    tokenAcceso:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Cabecera `Authorization: Bearer <token_acceso>`. JWT RS256 de 30 minutos.'
+    cookieRenovacion:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: Cookie httpOnly que entregan /login y /refresh. El navegador la envía sola a /api/identity/v1/.
+
+  headers:
+    CookieRenovacion:
+      description: |
+        Renovación nueva: `refresh_token=<texto aleatorio>`, con expires,
+        HttpOnly, Max-Age=604800 (7 días), Path=/api/identity/v1/,
+        SameSite=Strict y Secure cuando `COOKIE_REFRESH_SEGURA=1`.
+      schema:
+        type: string
+      example: 'refresh_token=Vb3kZ0pQx7...; expires=Wed, 28 Oct 2026 03:00:00 GMT; HttpOnly; Max-Age=604800; Path=/api/identity/v1/; SameSite=Strict; Secure'
+
+  responses:
+    ClavesNoConfiguradas:
+      description: |
+        Identidad no encuentra la clave privada para firmar el token. Pasa en
+        un clon nuevo si no se generaron las claves.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: claves_no_configuradas
+            mensaje: 'No existe /app/keys/jwt_private.pem. Genera las claves con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
+            detalles: null
+
+  schemas:
+
+    Registro:
+      type: object
+      required: [nombre, apellido, email, password]
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Se recortan los espacios al inicio y al final; no puede quedar vacío.
+        apellido:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Se recortan los espacios al inicio y al final; no puede quedar vacío.
+        email:
+          type: string
+          format: email
+          maxLength: 150
+          pattern: '@[dD][uU][oO][cC][uU][cC]\.[cC][lL]$'
+          description: Correo institucional. Debe terminar en @duocuc.cl, sin importar mayúsculas. Se guarda en minúsculas.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+          description: No se recortan los espacios. Se guarda solo su hash (RNF-01).
+
+    RegistroCreado:
+      type: object
+      required: [id, email, correo_enviado]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          description: El correo tal como quedó guardado, en minúsculas.
+        correo_enviado:
+          type: boolean
+          description: false si la bandeja no respondió. La cuenta queda creada igual.
+
+    VerificarCorreo:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: Parámetro token del enlace del correo. Se recortan los espacios.
+
+    Mensaje:
+      type: object
+      required: [mensaje]
+      properties:
+        mensaje:
+          type: string
+
+    Login:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          minLength: 1
+          maxLength: 150
+          description: No puede venir vacío ni solo con espacios.
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 128
+          description: No puede venir vacía. No se recortan los espacios.
+
+    Sesion:
+      type: object
+      required: [token_acceso, tipo_token, expira_en_segundos]
+      properties:
+        token_acceso:
+          type: string
+          description: JWT RS256 con sub, es_admin, iat, exp e iss; sin el correo.
+        tipo_token:
+          type: string
+          enum: [Bearer]
+        expira_en_segundos:
+          type: integer
+          description: Duración del token de acceso. Hoy son 1800 segundos (30 minutos).
+
+    Yo:
+      type: object
+      required: [id, email, nombre, apellido, carrera_id, nivel, sede_id, es_admin]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nombre:
+          type: string
+        apellido:
+          type: string
+        carrera_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la carrera en Catálogo (AD-15, sin FK entre bases).
+        nivel:
+          type: integer
+          minimum: 1
+          maximum: 12
+          nullable: true
+          description: Semestre que cursa.
+        sede_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la sede en Catálogo.
+        es_admin:
+          type: boolean
+
+    Estado:
+      type: object
+      required: [servicio, estado, base_de_datos, version]
+      properties:
+        servicio:
+          type: string
+          example: identity
+        estado:
+          type: string
+          enum: [ok, degradado]
+        base_de_datos:
+          type: string
+          enum: [ok, sin conexion]
+        version:
+          type: string
+
+    Error:
+      type: object
+      description: |
+        Formato único de error de la API (Pilar 2, sección 11).
+
+        - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
+          petición tiene datos inválidos.» y `detalles` = un objeto con una
+          lista de mensajes por campo.
+        - Errores con código propio: `detalles` = null. Son token_invalido,
+          token_usado, token_vencido, credenciales_invalidas,
+          cuenta_desactivada, correo_no_verificado, sesion_invalida,
+          claves_no_configuradas, not_authenticated, authentication_failed y
+          cuenta_inactiva.
+        - Otros códigos los pone el framework: parse_error (JSON mal formado,
+          400), method_not_allowed (405) y unsupported_media_type (415).
+      required: [codigo, mensaje, detalles]
+      properties:
+        codigo:
+          type: string
+        mensaje:
+          type: string
+        detalles:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: array
+            items:
+              type: string
