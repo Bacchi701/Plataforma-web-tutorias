@@ -66,10 +66,10 @@ de semestres anteriores al que cursa.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Lenguajes            | Python 3.12 en el backend; JavaScript, HTML y CSS en el frontend                                                                      |
 | Backend              | Django 5.2 y Django REST Framework 3.16, servidos con Gunicorn                                                                        |
-| Frontend             | React con Vite (llega con HU-06). Hoy existen las maquetas en HTML y CSS que le sirven de base visual                                 |
+| Frontend             | Planificado: React con Vite (HU-06). En evaluación, la alternativa AD-12: páginas en HTML, CSS y JavaScript servidas por el gateway en `/app/` (PR #10), que es lo que usa la demo |
 | Base de datos        | PostgreSQL 16, una base independiente por microservicio                                                                               |
 | API Gateway          | Nginx 1.27                                                                                                                            |
-| Autenticación        | Tokens JWT firmados con RS256 (llega con HU-05)                                                                                       |
+| Autenticación        | Tokens JWT firmados con RS256 (HU-05, PR #11; funciona en la demo)                                                                    |
 | Correo               | Mailpit como servidor de correo de desarrollo                                                                                         |
 | Contenedores         | Docker y Docker Compose: un Dockerfile por servicio y un `docker-compose.yml` que levanta el sistema completo                         |
 | Calidad              | pytest, pytest-django y pytest-cov; ruff y black en Python; ESLint, Prettier y Vitest en el frontend (con HU-06)                      |
@@ -127,6 +127,73 @@ Ningún servicio ni base de datos publica un puerto a tu computador: el puerto
 8080 del gateway es la única puerta de entrada, que es justamente la condición
 del criterio de aceptación CA8.
 
+En `develop` están las historias ya terminadas (ver «Estado del desarrollo»).
+El registro, el inicio de sesión y las páginas del frontend todavía esperan
+revisión en sus Pull Request, y se pueden probar juntos en la rama de la demo.
+
+### Probar la demo (rama `demo/semana-08`)
+
+La rama `demo/semana-08` integra los Pull Request #5 a #12 para la
+demostración: registro con el correo institucional, verificación por correo,
+inicio de sesión y la página de asignaturas con la API de Catálogo. No se
+fusiona: cada historia llega a `develop` por su propio Pull Request.
+
+En Windows (PowerShell), desde la carpeta del repositorio:
+
+```powershell
+git switch demo/semana-08
+Copy-Item .env.example .env -Force
+docker compose build identity
+docker compose run --rm --no-deps -v "${PWD}\keys:/claves" --entrypoint python identity manage.py generar_claves_jwt --carpeta /claves
+docker compose up -d --build --wait
+powershell -ExecutionPolicy Bypass -File .\scripts\cargar_datos_demo.ps1
+```
+
+En macOS o Linux, los mismos pasos en la terminal:
+
+```bash
+git switch demo/semana-08
+cp .env.example .env
+docker compose build identity
+docker compose run --rm --no-deps -v "$(pwd)/keys:/claves" --entrypoint python identity manage.py generar_claves_jwt --carpeta /claves
+docker compose up -d --build --wait
+for par in identity_db:identity.sql catalog_db:catalog.sql tutoring_db:tutoring.sql payment_db:payments.sql; do
+  servicio=${par%%:*}; archivo=${par##*:}
+  docker compose cp "data/seeds/demo/$archivo" "$servicio:/tmp/$archivo"
+  docker compose exec -T "$servicio" sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB -v ON_ERROR_STOP=1 -q -f /tmp/$archivo"
+done
+```
+
+- El cuarto comando genera el par de claves que firma los tokens. La clave
+  privada queda en `keys/` y no se sube al repositorio (la excluye
+  `.gitignore`); la pública cambia, y Git la mostrará modificada: es normal y
+  no hay que subirla.
+- La carga de los datos de ejemplo vacía y vuelve a llenar las cuatro bases.
+  Se puede repetir las veces que haga falta. Todos los datos son ficticios.
+
+Después abre:
+
+| Qué                                   | Dirección                                    |
+| ------------------------------------- | -------------------------------------------- |
+| Estado de los cuatro servicios        | <http://localhost:8080/>                     |
+| Asignaturas y mallas (API de Catálogo) | <http://localhost:8080/app/asignaturas.html> |
+| Registro con correo @duocuc.cl        | <http://localhost:8080/app/registro.html>    |
+| Bandeja de correo (verificación)      | <http://localhost:8025>                      |
+| Inicio de sesión                      | <http://localhost:8080/app/login.html>       |
+
+Cuentas de ejemplo, todas con la clave `Tutorias2026`:
+
+| Cuenta                     | Qué muestra                                         |
+| -------------------------- | --------------------------------------------------- |
+| `valentina.demo@duocuc.cl` | Cuenta verificada: entra y ve «Hola, Valentina».    |
+| `tomas.demo@duocuc.cl`     | Cuenta sin verificar: no puede iniciar sesión.      |
+| `josefa.demo@duocuc.cl`    | Cuenta desactivada: «Tu cuenta está desactivada.»   |
+
+Una cuenta nueva se crea en el registro con cualquier correo que termine en
+`@duocuc.cl`; el enlace de verificación llega a la bandeja de desarrollo, no a
+una casilla real. Para volver a `develop`: `docker compose down` y
+`git switch develop`.
+
 ### Variables de entorno
 
 Todas viven en un solo archivo `.env` en la raíz, que se crea copiando
@@ -139,6 +206,7 @@ Todas viven en un solo archivo `.env` en la raíz, que se crea copiando
 | `IDENTITY_DB_*`, `CATALOG_DB_*`, `TUTORING_DB_*`, `PAYMENT_DB_*` | Nombre, usuario y contraseña de la base de cada servicio.                                           |
 | `PUERTO_BANDEJA`                                                 | Puerto de la bandeja de correo de desarrollo (8025 por defecto).                                    |
 | `EMAIL_*` y `CORREO_REMITENTE`                                   | Vacías por defecto, así todo el correo cae en Mailpit. Solo se llenan para la prueba de envío real. |
+| `URL_FRONTEND`, `COOKIE_REFRESH_SEGURA`                          | Llegan con el registro y la sesión (PR #5 y #11; ya están en la rama de la demo): la página a la que lleva el enlace del correo de verificación y si la cookie de renovación de la sesión va marcada como segura. |
 
 ### Bandeja de correo de desarrollo
 
@@ -184,9 +252,11 @@ equipo lo deja escrito en vez de simular una separación que no se ejerce.
 
 El equipo trabaja con Scrum, adaptado a tres personas.
 
-- **Sprints de dos semanas.** Cinco sprints, del 21 de septiembre al 29 de
-  noviembre de 2026, precedidos por una semana de planificación y una de
-  cimientos.
+- **Sprints de dos semanas.** Cuatro sprints, del 21 de septiembre al 8 de
+  noviembre de 2026 (el último dura una semana), precedidos por una semana de
+  planificación y una de cimientos. El 25 de septiembre el profesor fijó el
+  8 de noviembre como límite del desarrollo, y el plan pasó de cinco sprints a
+  cuatro.
 - **Product Backlog.** El alcance se priorizó con MoSCoW. El bloque Must, que
   es el MVP, se descompuso en 37 historias de usuario (13 de ellas técnicas),
   estimadas en horas (355 h en total) y agrupadas en nueve épicas. Los Should
@@ -196,10 +266,12 @@ El equipo trabaja con Scrum, adaptado a tres personas.
   al docente; y Sprint Planning del sprint siguiente, sobre las horas que cada
   integrante declara. Al abrir cada sprint se congelan los contratos de la API
   que ese sprint va a usar.
-- **Seguimiento.** Dos sincronizaciones por semana (martes, 60 minutos, y
-  viernes, 30 minutos) y un reporte breve por chat los demás días, en lugar de
-  una reunión diaria. Al cierre de cada sprint se comparan las horas
-  planificadas con las trabajadas y con las historias terminadas.
+- **Seguimiento en Jira.** Desde el sprint 2, por pedido del profesor, el
+  backlog, el sprint y el Daily están en Jira (proyecto «Tutorias», clave
+  SCRUM). El Daily es escrito: cada integrante deja un comentario por día hábil
+  en SCRUM-51, con lo que hizo, lo que hará y sus bloqueos. Al cierre de cada
+  sprint se comparan las horas planificadas con las trabajadas y con las
+  historias terminadas.
 - **Definición de Listo (Definition of Done).** Una historia está terminada
   cuando cumple su criterio de aceptación sobre el sistema levantado, tiene
   pruebas automáticas de sus reglas de negocio, la integración continua está
@@ -212,14 +284,14 @@ El equipo trabaja con Scrum, adaptado a tres personas.
 | Planificación | 7 al 13 de septiembre            | Cinco pilares de planificación, repositorio y primeras maquetas                 |
 | Cimientos     | 14 al 20 de septiembre           | El sistema completo se levanta con un comando                                   |
 | Sprint 1      | 21 de septiembre al 4 de octubre | Registro, verificación de correo e inicio de sesión, sobre la base del frontend |
-| Sprint 2      | 5 al 18 de octubre               | Perfil, catálogo cargado, declaración de asignaturas y disponibilidad           |
-| Sprint 3      | 19 de octubre al 1 de noviembre  | Búsqueda de tutores, solicitud, confirmación y avisos por correo                |
-| Sprint 4      | 2 al 15 de noviembre             | Cancelación, pago simulado, evaluaciones y programador de tareas                |
-| Sprint 5      | 16 al 29 de noviembre            | Panel de administración, pruebas de integración y ensayo de la demostración     |
+| Sprint 2      | 5 al 18 de octubre               | Cerrar lo abierto del sprint 1; perfil, catálogo cargado, declaración de asignaturas y disponibilidad |
+| Sprint 3      | 19 de octubre al 1 de noviembre  | Búsqueda de tutores, solicitud, confirmación, avisos, cancelación, pago simulado, evaluaciones y programador de tareas |
+| Sprint 4      | 2 al 8 de noviembre              | Panel de administración, pruebas de extremo a extremo y sistema visual; el desarrollo se congela el 8 de noviembre |
+| Cierre        | 9 al 21 de noviembre             | Informe final y ensayo de la demostración                                       |
 
 **Flujo en Git (GitFlow reducido).** `main` guarda la última versión
-presentable y recibe `develop` al cierre de cada sprint, con su etiqueta (v0.1
-a v0.5). `develop` integra el trabajo del sprint. Cada historia nace de
+presentable y recibe `develop` al cierre de cada sprint, con su etiqueta (v0.1,
+v0.2, v0.3 y v1.0). `develop` integra el trabajo del sprint. Cada historia nace de
 `develop` en una rama corta (por ejemplo, `feat/HU-04-registro-usuario`) y
 vuelve por Pull Request, con la integración continua en verde y la aprobación
 de otro integrante.
@@ -270,8 +342,9 @@ flowchart TB
     programador -.->|"ejecuta el comando"| tutoring
 ```
 
-El diagrama muestra el MVP completo: el frontend en React llega con HU-06 y el
-programador de tareas con HU-37. Las flechas continuas son el tráfico del
+El diagrama muestra el MVP completo: el frontend llega con HU-06 (en React o,
+si se confirma la alternativa AD-12, como páginas servidas por el gateway en
+`/app/`) y el programador de tareas con HU-37. Las flechas continuas son el tráfico del
 cliente, que siempre entra por el gateway, y el acceso de cada servicio a su
 propia base. Las punteadas son llamadas internas por la red privada:
 
@@ -322,6 +395,7 @@ de las cuatro bases están en [`docs/diagramas/`](docs/diagramas/).
 
 ```text
 Fase 1/              evidencias de la Fase 1 del Capstone (grupales e individuales)
+Fase 2/              evidencias de la Fase 2: individuales, grupales y del proyecto
 .github/workflows/   canal de integración continua
 docs/                planificación, diagramas, contratos OpenAPI, decisiones y evidencia
 infra/nginx/         configuración del gateway y página de estado
@@ -340,18 +414,24 @@ y se llenan con las historias que las usan.
 
 ## Estado del desarrollo
 
-Al 25 de septiembre de 2026, en el sprint 1:
+Al 9 de octubre de 2026, en el sprint 2:
 
-- **Listo:** los cimientos (HU-01): el sistema completo se levanta con un
-  comando y los cuatro servicios responden su endpoint de estado a través del
-  gateway. Del sprint 1, Identidad ya envía correos a la bandeja de desarrollo
-  (HU-02).
-- **Lo que sigue en el sprint 1:** contrato OpenAPI de Identidad (HU-03),
-  registro con verificación del correo (HU-04), inicio y cierre de sesión
-  (HU-05), base del frontend en React (HU-06), modelos de Catálogo y de
-  Tutorías (HU-07 y HU-08) y pantallas de registro e inicio de sesión
-  conectadas (HU-09).
-- **Más adelante:** el programador de tareas llega con HU-37, en el sprint 4.
+- **En `develop`:** los cimientos (HU-01), el correo de desarrollo (HU-02) y
+  el modelo de Tutorías (HU-08, Pull Request #7, fusionado el 9 de octubre).
+- **En revisión**, cada historia en su Pull Request y con la integración
+  continua en verde: registro y verificación del correo (HU-04, #5), modelo
+  del catálogo (HU-07, #6), modelo de pagos (HU-23, #8), API de Catálogo
+  (HU-12, #9), páginas del frontend en `/app/` (HU-06, #10), inicio y cierre de
+  sesión (HU-05, #11) y pantallas de registro e inicio de sesión (HU-09, #12).
+- **En la rama `demo/semana-08`** funciona desde el 2 de octubre el objetivo
+  del sprint 1: registro con el correo institucional, verificación e inicio de
+  sesión (ver «Probar la demo»).
+- **Pendiente del sprint 1:** el contrato OpenAPI de Identidad (HU-03) y la
+  versión v0.1 en `main`.
+- **Alcance:** desde el 5 de octubre, de forma provisoria, el panel de
+  administración se limita a consultar y desactivar usuarios (escalón 3 del
+  plan de recorte).
+- **Más adelante:** el programador de tareas llega con HU-37, en el sprint 3.
 
 ## Comandos del día a día
 
@@ -377,6 +457,14 @@ levantar. La bandeja queda en <http://localhost:8026>.
 `docker compose logs identity`. Casi siempre es una variable que falta en el
 `.env`: compara tu archivo con `.env.example`.
 
+**En la demo, el inicio de sesión dice «No existe /app/keys/jwt_private.pem».**
+Faltan las claves de los tokens: corre el cuarto comando de «Probar la demo» y
+después `docker compose up -d --force-recreate identity`.
+
+**En la demo, el inicio de sesión responde 503.** Es el límite del gateway:
+cinco intentos por minuto desde el mismo computador. Espera un minuto y vuelve
+a intentarlo.
+
 **El computador se queda sin memoria.** Con WSL 2, la memoria que puede usar
 Docker se fija en el archivo `%UserProfile%\.wslconfig`: agrega las líneas
 `[wsl2]` y `memory=4GB`, ejecuta `wsl --shutdown` y vuelve a abrir Docker
@@ -393,3 +481,5 @@ usuarios sin permisos cruzados.
 | Diagramas entidad-relación de las cuatro bases                                  | [`docs/diagramas/`](docs/diagramas/)                      |
 | Contratos OpenAPI por servicio                                                  | [`docs/api/`](docs/api/), se agregan al abrir cada sprint |
 | Evidencias de la Fase 1 del Capstone                                            | [`Fase 1/`](Fase%201/)                                    |
+| Evidencias de la Fase 2: Listado de documentos, informe de avance y modelo de datos | [`Fase 2/`](Fase%202/)                                    |
+| Backlog priorizado, sprints y Daily                                             | Jira, proyecto «Tutorias» (clave SCRUM), con acceso por invitación |
