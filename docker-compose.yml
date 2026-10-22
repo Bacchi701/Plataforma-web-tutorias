@@ -140,6 +140,10 @@ services:
       POSTGRES_DB: ${TUTORING_DB_NAME}
       POSTGRES_USER: ${TUTORING_DB_USER}
       POSTGRES_PASSWORD: ${TUTORING_DB_PASSWORD}
+    # Clave publica de los tokens (Pilar 2, seccion 10): Tutorias solo verifica
+    # la firma (HU-17); la privada se monta solo en Identidad.
+    volumes:
+      - ./keys/jwt_public.pem:/app/keys/jwt_public.pem:ro
     depends_on:
       tutoring_db: { condition: service_healthy }
     healthcheck:
