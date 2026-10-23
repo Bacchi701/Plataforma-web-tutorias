@@ -1,0 +1,317 @@
+/* =========================================
+   MI DISPONIBILIDAD (HU-15)
+   Usa las variables y las clases comunes de css/styles.css
+   (container, hidden, btn-primary, subjects-hero).
+========================================= */
+
+.disp-page {
+    background: var(--background);
+    padding-bottom: 80px;
+}
+
+.disp-contenido {
+    padding-top: 32px;
+}
+
+.disp-cargando {
+    color: var(--text-light);
+}
+
+.disp-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 24px;
+    align-items: start;
+}
+
+.disp-columna {
+    display: grid;
+    gap: 24px;
+    min-width: 0;
+}
+
+.disp-tarjeta {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    min-width: 0;
+}
+
+.disp-tarjeta h2 {
+    color: var(--duoc-blue);
+    font-size: 20px;
+    line-height: 1.3;
+}
+
+
+/* Formulario */
+
+.disp-formulario {
+    display: grid;
+    gap: 16px;
+}
+
+.disp-campo {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.disp-campo input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 48px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #F9FAFB;
+    color: var(--dark);
+    /* 16px: con menos, el teléfono agranda la página al escribir */
+    font-size: 16px;
+}
+
+.disp-campo input:focus {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 1px;
+    border-color: var(--duoc-blue-light);
+}
+
+.disp-horas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.disp-ayuda {
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+.disp-acciones,
+.disp-bloque-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.disp-formulario .btn-primary {
+    font-size: 15px;
+}
+
+.disp-formulario .btn-primary:disabled {
+    opacity: .6;
+    cursor: wait;
+    transform: none;
+}
+
+.disp-boton {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--white);
+    color: var(--duoc-blue);
+    font-size: 14px;
+    font-weight: 600;
+    transition: .2s;
+}
+
+.disp-boton:hover {
+    border-color: var(--duoc-blue-light);
+    background: #F4F8FB;
+}
+
+.disp-boton-peligro {
+    color: #B91C1C;
+}
+
+.disp-boton-peligro:hover {
+    border-color: #FECACA;
+    background: #FEF2F2;
+}
+
+
+/* Lista de bloques */
+
+.disp-lista-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px 12px;
+    margin-bottom: 16px;
+}
+
+#contadorBloques {
+    color: var(--text-light);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.disp-lista {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+}
+
+.disp-bloque {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--duoc-blue-light);
+    border-radius: 12px;
+}
+
+.disp-bloque-ocupado {
+    border-left-color: var(--success);
+    background: #F7FBF8;
+}
+
+.disp-bloque-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px 12px;
+}
+
+.disp-bloque-cuando {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.disp-bloque-fecha {
+    display: block;
+    color: var(--dark);
+    font-size: 15px;
+}
+
+/* "jueves, 22 de octubre" pasa a "Jueves, 22 de octubre" */
+.disp-bloque-fecha::first-letter {
+    text-transform: uppercase;
+}
+
+.disp-bloque-horas {
+    color: var(--text);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+
+.disp-estado {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #EEF2F6;
+    color: var(--duoc-blue-light);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.disp-estado-ocupado {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.disp-bloque-pendientes {
+    color: #B45309;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.disp-bloque-nota {
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+.disp-vacio {
+    padding: 24px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    color: var(--text-light);
+    text-align: center;
+}
+
+
+/* Avisos y mensajes */
+
+.disp-aviso {
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    /* Que el encabezado fijo no lo tape al desplazarse hasta el aviso */
+    scroll-margin-top: 96px;
+}
+
+.disp-aviso-error {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #B91C1C;
+}
+
+.disp-aviso-exito {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    color: #15803D;
+}
+
+.disp-mensaje {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    text-align: center;
+}
+
+.disp-mensaje i {
+    color: var(--duoc-blue-light);
+    font-size: 32px;
+}
+
+.disp-mensaje p {
+    max-width: 460px;
+    color: var(--text-light);
+}
+
+#sinSesion {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+
+/* Teléfono: una columna; a 360 px se lee sin desplazamiento horizontal */
+
+@media (max-width: 900px) {
+    .disp-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 420px) {
+    .disp-contenido {
+        padding-top: 24px;
+    }
+
+    .disp-tarjeta {
+        padding: 18px 16px;
+    }
+
+    .disp-horas {
+        gap: 10px;
+    }
+
+    .disp-bloque {
+        padding: 14px 12px;
+    }
+}

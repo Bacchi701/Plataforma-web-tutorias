@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi disponibilidad | Tutorías Duoc UC</title>
+    <meta name="description" content="Publica, edita y elimina los bloques de horario en que puedes hacer tutorías.">
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="css/disponibilidad.css">
+</head>
+
+<body>
+
+<!-- HEADER -->
+<header class="header">
+    <div class="container navbar">
+        <a href="index.html" class="brand">
+            <div class="brand-icon">D</div>
+            <div class="brand-text">
+                <strong>Duoc UC</strong>
+                <span>Tutorías</span>
+            </div>
+        </a>
+
+        <nav class="nav-menu">
+            <a href="index.html">Inicio</a>
+            <a href="index.html#tutores">Tutores</a>
+            <a href="asignaturas.html">Asignaturas</a>
+            <a href="index.html#como-funciona">¿Cómo funciona?</a>
+        </nav>
+
+        <div class="nav-actions">
+            <a href="login.html" class="btn-login">Iniciar sesión</a>
+            <a href="registro.html" class="btn-primary">Registrarme</a>
+        </div>
+
+        <button class="mobile-menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+    </div>
+</header>
+
+<main class="disp-page">
+
+<!-- HERO -->
+<section class="subjects-hero">
+    <div class="container">
+        <div class="subjects-hero-content">
+            <span class="page-label">MI DISPONIBILIDAD</span>
+            <h1>¿Cuándo puedes hacer tutorías?</h1>
+            <p>
+                Publica los bloques de horario en que puedes recibir estudiantes. Mientras estén libres, aparecen en tu perfil de tutor y se pueden solicitar.
+            </p>
+        </div>
+    </div>
+</section>
+
+<section class="disp-contenido">
+    <div class="container">
+
+        <!-- Avisos de éxito o de error (los escribe js/disponibilidad.js) -->
+        <p class="disp-aviso hidden" id="aviso" role="status" aria-live="polite"></p>
+
+        <p class="disp-cargando" id="cargando">Revisando tu sesión...</p>
+
+        <!-- SIN SESIÓN -->
+        <div class="disp-tarjeta disp-mensaje hidden" id="sinSesion">
+            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+            <h2>Inicia sesión para ver tu disponibilidad</h2>
+            <p id="sinSesionTexto">Tus bloques de horario se publican con tu cuenta de tutor.</p>
+            <a href="login.html" class="btn-primary">Iniciar sesión</a>
+        </div>
+
+        <!-- CON SESIÓN -->
+        <div class="disp-grid hidden" id="conSesion">
+
+            <div class="disp-columna">
+                <!-- Se muestra si la API responde 403 no_es_tutor -->
+                <div class="disp-tarjeta disp-mensaje hidden" id="noEsTutor">
+                    <i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i>
+                    <h2>Todavía no eres tutor</h2>
+                    <p>Para publicar tu disponibilidad, primero declara al menos una asignatura que puedas enseñar. Cuando la tengas, vuelve a esta página y publica tus horarios.</p>
+                </div>
+
+                <form class="disp-tarjeta disp-formulario" id="formBloque">
+                    <h2 id="tituloFormulario">Publicar un bloque</h2>
+
+                    <label class="disp-campo" for="fecha">
+                        <span>Fecha</span>
+                        <input type="date" id="fecha" required>
+                    </label>
+
+                    <div class="disp-horas">
+                        <label class="disp-campo" for="horaInicio">
+                            <span>Desde</span>
+                            <input type="time" id="horaInicio" required>
+                        </label>
+                        <label class="disp-campo" for="horaFin">
+                            <span>Hasta</span>
+                            <input type="time" id="horaFin" required>
+                        </label>
+                    </div>
+
+                    <p class="disp-ayuda">Escribe las horas en hora de Chile.</p>
+
+                    <div class="disp-acciones">
+                        <button type="submit" class="btn-primary" id="botonGuardar">Publicar bloque</button>
+                        <button type="button" class="disp-boton hidden" id="botonCancelar">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+
+            <section class="disp-tarjeta" aria-labelledby="tituloLista">
+                <div class="disp-lista-cabecera">
+                    <h2 id="tituloLista">Mis bloques</h2>
+                    <span id="contadorBloques"></span>
+                </div>
+
+                <!-- Bloques que llena js/disponibilidad.js con la API de Tutorías (HU-15) -->
+                <ul class="disp-lista" id="listaBloques"></ul>
+
+                <p class="disp-vacio hidden" id="sinBloques">Todavía no tienes bloques publicados.</p>
+            </section>
+
+        </div>
+    </div>
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+    <div class="container footer-grid">
+        <div>
+            <div class="brand footer-brand">
+                <div class="brand-icon">D</div>
+                <div class="brand-text">
+                    <strong>Duoc UC</strong>
+                    <span>Tutorías</span>
+                </div>
+            </div>
+            <p class="footer-description">
+                Plataforma colaborativa de tutorías entre estudiantes.
+            </p>
+        </div>
+
+        <div>
+            <h4>Plataforma</h4>
+            <a href="index.html#tutores">Buscar tutores</a>
+            <a href="asignaturas.html">Asignaturas</a>
+            <a href="#">Ser tutor</a>
+        </div>
+
+        <div>
+            <h4>Mi cuenta</h4>
+            <a href="login.html">Iniciar sesión</a>
+            <a href="registro.html">Registrarse</a>
+            <a href="#">Mis tutorías</a>
+        </div>
+
+        <div>
+            <h4>Ayuda</h4>
+            <a href="#">Preguntas frecuentes</a>
+            <a href="#">Contacto</a>
+            <a href="terminos.html">Términos y condiciones</a>
+        </div>
+    </div>
+
+    <div class="container footer-bottom">
+        <p>© 2026 Plataforma de Tutorías Duoc UC. Proyecto académico.</p>
+    </div>
+</footer>
+
+<script src="js/sesion.js"></script>
+<script src="js/disponibilidad.js"></script>
+</body>
+</html>
