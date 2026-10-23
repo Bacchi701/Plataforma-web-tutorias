@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi perfil | Tutorías Duoc UC</title>
+    <meta name="description" content="Completa tu perfil con tu carrera, tu sede y el semestre que cursas en la plataforma de tutorías Duoc UC.">
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/perfil.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+
+<body>
+
+<!-- HEADER -->
+<header class="header">
+    <div class="container navbar">
+        <a href="index.html" class="brand">
+            <div class="brand-icon">D</div>
+            <div class="brand-text">
+                <strong>Duoc UC</strong>
+                <span>Tutorías</span>
+            </div>
+        </a>
+
+        <nav class="nav-menu">
+            <a href="index.html">Inicio</a>
+            <a href="index.html#tutores">Tutores</a>
+            <a href="asignaturas.html">Asignaturas</a>
+            <a href="index.html#como-funciona">¿Cómo funciona?</a>
+        </nav>
+
+        <div class="nav-actions">
+            <a href="login.html" class="btn-login">Iniciar sesión</a>
+            <a href="registro.html" class="btn-primary">Registrarme</a>
+        </div>
+
+        <button class="mobile-menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+    </div>
+</header>
+
+<main class="profile-page">
+
+<!-- HERO -->
+<section class="profile-hero">
+    <div class="container">
+        <span class="page-label">MI CUENTA</span>
+        <h1>Mi perfil</h1>
+        <p>
+            Elige tu carrera, tu sede y el semestre que cursas. Con tu perfil completo puedes ofrecer tutorías, y los demás estudiantes saben dónde estudias.
+        </p>
+    </div>
+</section>
+
+<!-- PERFIL: js/perfil.js muestra el formulario o, sin sesión, el enlace para entrar -->
+<section class="container profile-content">
+
+    <p class="profile-card profile-loading" id="profileLoading">Cargando tu perfil...</p>
+
+    <div class="profile-card hidden" id="profileNoSession">
+        <h2>Inicia sesión para ver tu perfil</h2>
+        <p class="profile-text" id="profileNoSessionText">Tu perfil es privado: entra con tu cuenta para verlo y completarlo.</p>
+        <a href="login.html" class="btn-primary">Iniciar sesión</a>
+    </div>
+
+    <form class="profile-card hidden" id="profileForm" novalidate>
+        <p class="profile-status hidden" id="profileStatus"></p>
+
+        <div class="login-message" id="profileMessage" role="status" aria-live="polite"></div>
+
+        <div class="profile-field">
+            <label for="email" class="profile-label">Correo institucional</label>
+            <input type="email" id="email" class="profile-input" readonly aria-describedby="emailHint">
+            <small class="profile-hint" id="emailHint">El correo no se puede cambiar.</small>
+        </div>
+
+        <div class="profile-row">
+            <div class="profile-field">
+                <label for="nombre" class="profile-label">Nombre</label>
+                <input type="text" id="nombre" class="profile-input" maxlength="80" autocomplete="given-name" required>
+            </div>
+
+            <div class="profile-field">
+                <label for="apellido" class="profile-label">Apellido</label>
+                <input type="text" id="apellido" class="profile-input" maxlength="80" autocomplete="family-name" required>
+            </div>
+        </div>
+
+        <div class="profile-field">
+            <label for="carrera" class="profile-label">Carrera</label>
+            <select id="carrera" class="profile-input" required>
+                <option value="">Elige tu carrera</option>
+            </select>
+        </div>
+
+        <div class="profile-row">
+            <div class="profile-field">
+                <label for="sede" class="profile-label">Sede</label>
+                <select id="sede" class="profile-input" required>
+                    <option value="">Elige tu sede</option>
+                </select>
+            </div>
+
+            <div class="profile-field">
+                <label for="nivel" class="profile-label">Nivel (semestre que cursas)</label>
+                <select id="nivel" class="profile-input" required>
+                    <option value="">Elige tu nivel</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="submit" class="profile-button" id="profileSave">
+            Guardar cambios
+            <i class="fa-solid fa-check"></i>
+        </button>
+    </form>
+
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+    <div class="container footer-grid">
+        <div>
+            <div class="brand footer-brand">
+                <div class="brand-icon">D</div>
+                <div class="brand-text">
+                    <strong>Duoc UC</strong>
+                    <span>Tutorías</span>
+                </div>
+            </div>
+            <p class="footer-description">
+                Plataforma colaborativa de tutorías entre estudiantes.
+            </p>
+        </div>
+
+        <div>
+            <h4>Plataforma</h4>
+            <a href="index.html#tutores">Buscar tutores</a>
+            <a href="asignaturas.html">Asignaturas</a>
+            <a href="#">Ser tutor</a>
+        </div>
+
+        <div>
+            <h4>Mi cuenta</h4>
+            <a href="login.html">Iniciar sesión</a>
+            <a href="registro.html">Registrarse</a>
+            <a href="#">Mis tutorías</a>
+        </div>
+
+        <div>
+            <h4>Ayuda</h4>
+            <a href="#">Preguntas frecuentes</a>
+            <a href="#">Contacto</a>
+            <a href="terminos.html">Términos y condiciones</a>
+        </div>
+    </div>
+
+    <div class="container footer-bottom">
+        <p>© 2026 Plataforma de Tutorías Duoc UC. Proyecto académico.</p>
+    </div>
+</footer>
+
+<script src="js/sesion.js"></script>
+<script src="js/perfil.js"></script>
+</body>
+</html>

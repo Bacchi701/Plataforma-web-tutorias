@@ -2,11 +2,12 @@ openapi: 3.0.3
 
 info:
   title: Identidad · Plataforma de Tutorías entre Estudiantes
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Contrato de la API pública de Identidad (HU-03; Pilar 2, sección 4.1).
 
-    - Describe lo que hacen los PR #5 (HU-04) y #11 (HU-05) al 21-10-2026.
+    - Describe lo que hacen los PR #5 (HU-04) y #11 (HU-05) al 21-10-2026 y,
+      desde la versión 1.1.0, el `PATCH /yo` del perfil (HU-10).
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión del
       servicio: `/api/identity/v1/`.
     - Las rutas `/internal` no son parte de este contrato: el gateway no las
@@ -16,10 +17,10 @@ info:
       en «Cambios», al final de esta descripción.
 
     **Formato de error (Pilar 2, sección 11).** Toda respuesta de error de los
-    endpoints de Cuenta y Sesión trae `codigo`, `mensaje` y `detalles` (ver el
-    esquema `Error`). No lo traen el 503 de `/estado`, que responde con su
-    propio esquema, ni lo que el gateway corta antes de llegar a Identidad: el
-    límite de intentos de `/login` y las rutas `/internal`.
+    endpoints de Cuenta, Sesión y Perfil trae `codigo`, `mensaje` y `detalles`
+    (ver el esquema `Error`). No lo traen el 503 de `/estado`, que responde con
+    su propio esquema, ni lo que el gateway corta antes de llegar a Identidad:
+    el límite de intentos de `/login` y las rutas `/internal`.
 
     **Sesión (Pilar 2, sección 5; AD-06).**
     - El token de acceso es un JWT firmado con RS256 que dura 30 minutos. Lleva
@@ -34,6 +35,10 @@ info:
 
     **Cambios**
     - 1.0.0 (21-10-2026): primera versión.
+    - 1.1.0 (22-10-2026): agrega `PATCH /yo` para completar y editar
+      el perfil (HU-10), con el esquema `Perfil`. `GET /yo` muestra también un
+      perfil completo, y su respuesta 401 pasa sin cambios a
+      `components/responses/SinTokenValido`, que usan los dos métodos.
 
 servers:
   - url: http://localhost:8080
@@ -44,6 +49,8 @@ tags:
     description: Registro y verificación del correo (HU-04).
   - name: Sesión
     description: Inicio, renovación y cierre de sesión (HU-05).
+  - name: Perfil
+    description: Nombre, carrera, nivel y sede del usuario con sesión (HU-10).
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -369,9 +376,11 @@ paths:
       description: |
         Devuelve los datos de la cuenta dueña del token. Aparte de `/registro`,
         que devuelve el correo recién registrado, es el único endpoint que
-        entrega el correo; el token no lo lleva (RNF-07). `carrera_id`, `nivel`
-        y `sede_id` vienen en `null` hasta que el usuario completa su perfil
-        (HU-10).
+        entrega el correo (con `GET` y con `PATCH`); el token no lo lleva
+        (RNF-07). `carrera_id`, `nivel` y `sede_id` vienen en `null` hasta que
+        el usuario completa su perfil con `PATCH /yo` (HU-10). Carrera y sede
+        son identificadores de Catálogo: el nombre se toma de
+        `GET /api/catalog/v1/carreras` y `GET /api/catalog/v1/sedes`.
       security:
         - tokenAcceso: []
       responses:
@@ -381,48 +390,152 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Yo'
+              examples:
+                perfil_completo:
+                  summary: Con carrera, nivel y sede (HU-10)
+                  value:
+                    id: 6f1c2a4e-8b1d-4c3e-9a7f-2d5b8e0c1a34
+                    email: ana.demo@duocuc.cl
+                    nombre: Ana
+                    apellido: Demo
+                    carrera_id: 20000000-0000-4000-8000-000000000001
+                    nivel: 4
+                    sede_id: 30000000-0000-4000-8000-000000000011
+                    es_admin: false
+                recien_registrado:
+                  summary: Recién registrado, con el perfil incompleto
+                  value:
+                    id: 6f1c2a4e-8b1d-4c3e-9a7f-2d5b8e0c1a34
+                    email: ana.demo@duocuc.cl
+                    nombre: Ana
+                    apellido: Demo
+                    carrera_id: null
+                    nivel: null
+                    sede_id: null
+                    es_admin: false
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+    patch:
+      tags: [Perfil]
+      operationId: editarPerfil
+      summary: Completar o editar el perfil
+      description: |
+        Guarda el nombre, el apellido, la carrera, la sede y el nivel de la
+        cuenta dueña del token (HU-10, criterios 2, 3 y 5) y responde lo mismo
+        que `GET /yo`, con los datos ya guardados.
+
+        - Acepta cambios parciales: basta con mandar lo que cambia. Pero el
+          perfil tiene que quedar completo: si después del cambio faltaría la
+          carrera, la sede o el nivel, responde 400 y dice cuáles faltan. Por
+          eso, mientras el perfil está incompleto, se mandan los tres juntos.
+        - Carrera, sede y nivel no se pueden vaciar: con `null` o `""`
+          responde 400. Nombre y apellido, si vienen, no pueden quedar vacíos.
+        - Acepta solo los cinco campos del esquema `Perfil`. Cualquier otro,
+          como `email`, `es_admin` o `activo`, se rechaza con 400 (criterio 5).
+        - Si responde 400, no guarda nada de la petición, aunque el resto de
+          los campos venga bien.
+        - Carrera y sede se guardan como identificadores, sin preguntarle a
+          Catálogo si existen (AD-15). La página de perfil ofrece solo las de
+          `GET /api/catalog/v1/carreras` y `GET /api/catalog/v1/sedes`.
+        - Si el usuario ya declaró asignaturas y cambia su carrera o su nivel,
+          el cambio se guarda igual. Las asignaturas que dejan de cumplir RN-01
+          se desactivan en la siguiente sincronización de Tutorías (HU-19,
+          todavía no implementada).
+      security:
+        - tokenAcceso: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Perfil'
+            examples:
+              completar_perfil:
+                summary: Primera vez, con el perfil incompleto
+                value:
+                  nombre: Ana
+                  apellido: Demo
+                  carrera_id: 20000000-0000-4000-8000-000000000001
+                  sede_id: 30000000-0000-4000-8000-000000000011
+                  nivel: 4
+              cambiar_sede_y_nivel:
+                summary: Con el perfil completo, solo lo que cambia
+                value:
+                  sede_id: 30000000-0000-4000-8000-000000000001
+                  nivel: 5
+      responses:
+        '200':
+          description: Perfil guardado. Trae los datos de la cuenta, igual que `GET /yo`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Yo'
               example:
                 id: 6f1c2a4e-8b1d-4c3e-9a7f-2d5b8e0c1a34
                 email: ana.demo@duocuc.cl
                 nombre: Ana
                 apellido: Demo
-                carrera_id: null
-                nivel: null
-                sede_id: null
+                carrera_id: 20000000-0000-4000-8000-000000000001
+                nivel: 4
+                sede_id: 30000000-0000-4000-8000-000000000011
                 es_admin: false
-        '401':
+        '400':
           description: |
-            Sin token válido. Los códigos posibles son:
-            - `not_authenticated`: no viene la cabecera
-              `Authorization: Bearer …` (el mensaje es el estándar de Django
-              REST Framework);
-            - `authentication_failed`: la cabecera está mal formada;
-            - `token_invalido`: el token está mal formado, o su firma o su
-              emisor no calzan;
-            - `token_vencido`: pasaron los 30 minutos;
-            - `cuenta_inactiva`: la cuenta ya no existe o está desactivada.
-          headers:
-            WWW-Authenticate:
-              description: Siempre `Bearer realm="identity"`.
-              schema:
-                type: string
+            Datos inválidos: `codigo` es `invalid` y `detalles` dice qué campo
+            corregir. Pasa si el nivel no es un entero de 1 a 12, si la carrera
+            o la sede no son un uuid, si un campo viene vacío o en `null`, si
+            el perfil quedaría sin carrera, sede o nivel, o si viene un campo
+            que no es del perfil. Con el JSON mal formado responde
+            `parse_error`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               examples:
-                token_invalido:
-                  summary: El token no es válido
+                nivel_fuera_de_rango:
+                  summary: El nivel es 0, 13 o no es un número entero
                   value:
-                    codigo: token_invalido
-                    mensaje: El token de acceso no es válido.
-                    detalles: null
-                token_vencido:
-                  summary: El token venció
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      nivel:
+                        - El nivel debe ser un número entero de 1 a 12.
+                carrera_no_es_uuid:
+                  summary: La carrera no es un uuid
                   value:
-                    codigo: token_vencido
-                    mensaje: El token de acceso venció.
-                    detalles: null
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      carrera_id:
+                        - 'La carrera no es válida: elígela de la lista.'
+                campo_vacio:
+                  summary: La carrera viene en null
+                  value:
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      carrera_id:
+                        - Elige tu carrera.
+                perfil_incompleto:
+                  summary: Perfil sin carrera ni sede, y la petición trae solo el nivel
+                  value:
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      carrera_id:
+                        - Elige tu carrera.
+                      sede_id:
+                        - Elige tu sede.
+                campo_que_no_es_del_perfil:
+                  summary: La petición trae es_admin
+                  value:
+                    codigo: invalid
+                    mensaje: La petición tiene datos inválidos.
+                    detalles:
+                      es_admin:
+                        - Este campo no se puede cambiar desde el perfil.
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
 
   /api/identity/v1/estado:
     get:
@@ -493,6 +606,39 @@ components:
             codigo: claves_no_configuradas
             mensaje: 'No existe /app/keys/jwt_private.pem. Genera las claves con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
             detalles: null
+    SinTokenValido:
+      description: |
+        Sin token válido. Los códigos posibles son:
+        - `not_authenticated`: no viene la cabecera
+          `Authorization: Bearer …` (el mensaje es el estándar de Django
+          REST Framework);
+        - `authentication_failed`: la cabecera está mal formada;
+        - `token_invalido`: el token está mal formado, o su firma o su
+          emisor no calzan;
+        - `token_vencido`: pasaron los 30 minutos;
+        - `cuenta_inactiva`: la cuenta ya no existe o está desactivada.
+      headers:
+        WWW-Authenticate:
+          description: Siempre `Bearer realm="identity"`.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            token_invalido:
+              summary: El token no es válido
+              value:
+                codigo: token_invalido
+                mensaje: El token de acceso no es válido.
+                detalles: null
+            token_vencido:
+              summary: El token venció
+              value:
+                codigo: token_vencido
+                mensaje: El token de acceso venció.
+                detalles: null
 
   schemas:
 
@@ -602,20 +748,52 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: Identificador de la carrera en Catálogo (AD-15, sin FK entre bases).
+          description: Identificador de la carrera en Catálogo (AD-15, sin FK entre bases). null hasta que se completa el perfil.
         nivel:
           type: integer
           minimum: 1
           maximum: 12
           nullable: true
-          description: Semestre que cursa.
+          description: Semestre que cursa. null hasta que se completa el perfil.
         sede_id:
           type: string
           format: uuid
           nullable: true
-          description: Identificador de la sede en Catálogo.
+          description: Identificador de la sede en Catálogo. null hasta que se completa el perfil.
         es_admin:
           type: boolean
+
+    Perfil:
+      type: object
+      additionalProperties: false
+      description: |
+        Lo que `PATCH /yo` deja cambiar (HU-10, criterio 5). Todos los campos
+        son opcionales en la petición, pero el perfil tiene que quedar con
+        carrera, sede y nivel. Cualquier otro campo se rechaza con 400.
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Se recortan los espacios al inicio y al final; no puede quedar vacío.
+        apellido:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Se recortan los espacios al inicio y al final; no puede quedar vacío.
+        carrera_id:
+          type: string
+          format: uuid
+          description: Una carrera de `GET /api/catalog/v1/carreras`. No puede venir vacía ni en null.
+        sede_id:
+          type: string
+          format: uuid
+          description: Una sede de `GET /api/catalog/v1/sedes`. No puede venir vacía ni en null.
+        nivel:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Semestre que cursa, de 1 a 12. No puede venir en null.
 
     Estado:
       type: object
