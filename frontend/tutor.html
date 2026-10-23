@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil del tutor | Tutorías Duoc UC</title>
+    <meta name="description" content="Perfil de un estudiante tutor: asignaturas, tarifas, horarios disponibles y evaluaciones.">
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/tutores.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+
+<body>
+
+<!-- HEADER -->
+<header class="header">
+    <div class="container navbar">
+        <a href="index.html" class="brand">
+            <div class="brand-icon">D</div>
+            <div class="brand-text">
+                <strong>Duoc UC</strong>
+                <span>Tutorías</span>
+            </div>
+        </a>
+
+        <nav class="nav-menu">
+            <a href="index.html">Inicio</a>
+            <a href="tutores.html" class="active">Tutores</a>
+            <a href="asignaturas.html">Asignaturas</a>
+            <a href="index.html#como-funciona">¿Cómo funciona?</a>
+        </nav>
+
+        <div class="nav-actions">
+            <a href="login.html" class="btn-login">Iniciar sesión</a>
+            <a href="registro.html" class="btn-primary">Registrarme</a>
+        </div>
+
+        <button class="mobile-menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+    </div>
+</header>
+
+<main class="subjects-page">
+
+<!-- CABECERA DEL PERFIL -->
+<section class="subjects-hero">
+    <div class="container">
+        <a href="tutores.html" class="perfil-volver" id="enlaceVolver">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver a la búsqueda
+        </a>
+
+        <p class="perfil-cargando" id="cargando" aria-live="polite">Cargando el perfil...</p>
+
+        <!-- La llena js/tutor.js con GET /api/tutoring/v1/tutores/{id} (HU-20) -->
+        <div class="perfil-cabecera hidden" id="cabeceraPerfil">
+            <div class="avatar perfil-avatar" id="iniciales" aria-hidden="true"></div>
+
+            <div class="perfil-datos">
+                <span class="page-label">PERFIL DEL TUTOR</span>
+                <h1 id="nombreTutor"></h1>
+                <p class="perfil-detalle">
+                    <span><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> <span id="carreraTutor"></span></span>
+                    <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i> <span id="sedeTutor"></span></span>
+                </p>
+                <div class="rating perfil-reputacion" id="reputacionTutor"></div>
+            </div>
+
+            <!-- La solicitud llega con HU-21: por ahora el botón queda deshabilitado -->
+            <div class="perfil-accion">
+                <button type="button" class="btn-primary perfil-solicitar" disabled aria-describedby="notaSolicitud">
+                    Solicitar tutoría
+                    <span class="perfil-solicitar-estado">Disponible pronto</span>
+                </button>
+                <p class="perfil-nota" id="notaSolicitud">La solicitud de tutorías llega con la historia HU-21.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="container">
+    <!-- Aviso si el tutor no existe o el servicio no responde (criterio 4) -->
+    <div class="no-results perfil-aviso hidden" id="avisoPerfil" aria-live="polite"></div>
+
+    <div class="perfil-cuerpo hidden" id="cuerpoPerfil">
+        <section class="perfil-seccion" aria-labelledby="tituloAsignaturas">
+            <h2 id="tituloAsignaturas">Asignaturas que tutorea</h2>
+            <ul class="perfil-lista" id="listaAsignaturas"></ul>
+        </section>
+
+        <section class="perfil-seccion" aria-labelledby="tituloBloques">
+            <h2 id="tituloBloques">Horarios disponibles</h2>
+            <p class="perfil-ayuda">En hora de Chile.</p>
+            <ul class="perfil-lista" id="listaBloques"></ul>
+            <p class="perfil-vacio hidden" id="sinBloques">Por ahora no tiene horarios disponibles.</p>
+        </section>
+
+        <section class="perfil-seccion" aria-labelledby="tituloEvaluaciones">
+            <h2 id="tituloEvaluaciones">Evaluaciones</h2>
+            <ul class="perfil-lista" id="listaEvaluaciones"></ul>
+            <p class="perfil-vacio hidden" id="sinEvaluaciones">Todavía no tiene evaluaciones.</p>
+            <p class="perfil-ayuda hidden" id="notaEvaluaciones">Se muestran las 10 más recientes.</p>
+        </section>
+    </div>
+</div>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+    <div class="container footer-grid">
+        <div>
+            <div class="brand footer-brand">
+                <div class="brand-icon">D</div>
+                <div class="brand-text">
+                    <strong>Duoc UC</strong>
+                    <span>Tutorías</span>
+                </div>
+            </div>
+            <p class="footer-description">
+                Plataforma colaborativa de tutorías entre estudiantes.
+            </p>
+        </div>
+
+        <div>
+            <h4>Plataforma</h4>
+            <a href="tutores.html">Buscar tutores</a>
+            <a href="asignaturas.html">Asignaturas</a>
+            <a href="#">Ser tutor</a>
+        </div>
+
+        <div>
+            <h4>Mi cuenta</h4>
+            <a href="login.html">Iniciar sesión</a>
+            <a href="registro.html">Registrarse</a>
+            <a href="#">Mis tutorías</a>
+        </div>
+
+        <div>
+            <h4>Ayuda</h4>
+            <a href="#">Preguntas frecuentes</a>
+            <a href="#">Contacto</a>
+            <a href="terminos.html">Términos y condiciones</a>
+        </div>
+    </div>
+
+    <div class="container footer-bottom">
+        <p>© 2026 Plataforma de Tutorías Duoc UC. Proyecto académico.</p>
+    </div>
+</footer>
+
+<script src="js/sesion.js"></script>
+<script src="js/tutor.js"></script>
+</body>
+</html>
