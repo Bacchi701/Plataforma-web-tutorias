@@ -2,34 +2,42 @@ openapi: 3.0.3
 
 info:
   title: Tutorías · Plataforma de Tutorías entre Estudiantes
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
-    - Describe lo que hace el PR de HU-20 al 21-10-2026: la búsqueda de
-      tutores y el perfil público de cada tutor. Trae también `/estado`, que
-      existe desde HU-01.
+    - Describe lo que hace Tutorías con HU-17, HU-20 y HU-15: la búsqueda de
+      tutores y el perfil público de cada tutor (HU-20), los bloques de
+      disponibilidad del tutor (HU-15) y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
-    - Crece con cada historia que agrega rutas a Tutorías: HU-20 trae la
+    - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
       búsqueda y el perfil, y HU-15 agrega los bloques del tutor.
     - Un cambio a lo ya publicado se acuerda entre los tres antes de
       implementarse (acuerdo A4), como en Identidad. Los cambios y las rutas
       nuevas se anotan en «Cambios», al final de esta descripción.
 
-    **Sin sesión.** Las tres rutas son públicas: no piden token. El token de
-    acceso y sus respuestas 401 llegan a Tutorías con HU-17, y este contrato
-    los agrega cuando HU-15 lo extienda.
+    **Sesión (HU-17).** Tutorías no emite tokens: verifica el token de acceso
+    que firma Identidad, un JWT RS256 (esquema `tokenAcceso`), con la clave
+    pública, el emisor `identity` y las reclamaciones `sub`, `iat`, `exp` e
+    `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. No le
+    pregunta a Identidad: quien hace la petición sale del token.
+    - Las rutas de disponibilidad piden el token: sin él responden 401
+      (`not_authenticated`).
+    - `/estado`, `/tutores` y `/tutores/{usuario_id}` no piden token. Pero si
+      la petición trae uno que no sirve (vencido, inválido o con la cabecera
+      mal formada), responden 401 igual, porque Tutorías revisa el token
+      antes de llegar a la ruta.
+    - Si Tutorías no encuentra la clave pública, toda petición con token
+      responde 503 `claves_no_configuradas` (ver
+      `components/responses/ClavesNoConfiguradas`). Está en las rutas de
+      disponibilidad, que siempre llevan token.
 
-    **Formato de error (Pilar 2, sección 11).** Con HU-17 en develop, toda
-    respuesta de error de la búsqueda y del perfil trae `codigo`, `mensaje`
-    y `detalles` (ver el esquema `Error`, el mismo de Identidad). Mientras
-    HU-17 no esté en develop, Tutorías usa el manejador de errores de Django
-    REST Framework: responde con el mismo estado y el mismo mensaje, pero el
-    cuerpo es solo `{"detail": "<mensaje>"}`, sin `codigo`. No traen el
-    formato el 503 de `/estado`, que responde con su propio esquema, como en
-    Identidad, ni la página 404 que responde Django cuando la ruta no existe
-    (ver `GET /tutores/{usuario_id}`).
+    **Formato de error (Pilar 2, sección 11).** Toda respuesta de error trae
+    `codigo`, `mensaje` y `detalles` (ver el esquema `Error`, el mismo de
+    Identidad). No lo traen el 503 de `/estado`, que responde con su propio
+    esquema, como en Identidad, ni la página 404 que responde Django cuando
+    la ruta no existe (ver `GET /tutores/{usuario_id}`).
 
     **Datos.**
     - Todo sale de tutoring_db, sin llamar a Identidad ni a Catálogo
@@ -40,14 +48,24 @@ info:
       identificador de Catálogo: el nombre se toma de
       `GET /api/catalog/v1/carreras` y `GET /api/catalog/v1/sedes`.
     - Las fechas van en ISO 8601, en UTC y con `Z`, por ejemplo
-      `2026-10-24T21:00:00Z` (con fracción de segundo si la hora guardada la
-      tiene). El navegador las muestra en hora de Chile (`America/Santiago`).
+      `2026-10-24T21:00:00Z`: las de los bloques del tutor, sin fracción de
+      segundo; las de la búsqueda y el perfil, con fracción si la hora
+      guardada la tiene. El navegador las muestra en hora de Chile
+      (`America/Santiago`). Las que recibe la API (`inicio_en` y `fin_en` de
+      un bloque) tienen que traer la zona: `Z` o un desfase, como `-03:00`.
     - Los montos van como número entero de pesos chilenos. Una tarifa 0 es
       una tutoría gratuita (RN-05).
 
     **Cambios**
     - 0.1.0 (21-10-2026): primera versión, con `GET /tutores` y
       `GET /tutores/{usuario_id}` (HU-20), y `GET /estado` (HU-01).
+    - 0.2.0 (23-10-2026): agrega los bloques de disponibilidad del
+      tutor, con sesión (HU-15): `GET` y `POST /disponibilidad`, y `PATCH` y
+      `DELETE /disponibilidad/{bloque_id}`, con el esquema de seguridad
+      `tokenAcceso` (HU-17). A las rutas de la 0.1.0 les agrega el 401 que
+      responden desde HU-17 si la petición trae un token que no sirve
+      (`components/responses/TokenNoValido`), y deja solo el formato único
+      de error, que con HU-17 es el único que sale.
 
 servers:
   - url: http://localhost:8080/api/tutoring/v1
@@ -56,6 +74,8 @@ servers:
 tags:
   - name: Búsqueda
     description: Búsqueda de tutores por asignatura y perfil público de cada tutor (HU-20). Sin sesión.
+  - name: Disponibilidad
+    description: Bloques de disponibilidad del tutor, con sesión (HU-15).
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -81,6 +101,9 @@ paths:
         - No pagina: trae todos los tutores de la asignatura.
         - Una asignatura sin tutores, o que no está en Tutorías, responde 200
           con la lista vacía.
+      security:
+        - tokenAcceso: []
+        - {}
       parameters:
         - name: asignatura
           in: query
@@ -161,9 +184,7 @@ paths:
           description: |
             Falta `asignatura`, viene vacía o solo con espacios
             (`asignatura_requerida`), o no es un uuid (`asignatura_invalida`).
-            En los dos casos `detalles` viene en null. Mientras HU-17 no esté
-            en develop, el cuerpo es `{"detail": "<mensaje>"}`, con el mismo
-            mensaje.
+            En los dos casos `detalles` viene en null.
           content:
             application/json:
               schema:
@@ -181,6 +202,8 @@ paths:
                     codigo: asignatura_invalida
                     mensaje: El identificador de la asignatura no es válido.
                     detalles: null
+        '401':
+          $ref: '#/components/responses/TokenNoValido'
 
   /tutores/{usuario_id}:
     get:
@@ -204,6 +227,9 @@ paths:
           quien evaluó.
         - La reputación es la que guarda `usuario_ref` (RN-06): esta ruta no
           la recalcula.
+      security:
+        - tokenAcceso: []
+        - {}
       parameters:
         - name: usuario_id
           in: path
@@ -302,8 +328,6 @@ paths:
             No hay un tutor activo con ese identificador: el usuario no está
             en Tutorías, su cuenta está desactivada (RN-08) o no tiene
             perfiles activos. Los tres casos responden lo mismo (`not_found`).
-            Mientras HU-17 no esté en develop, el cuerpo es
-            `{"detail": "<mensaje>"}`, con el mismo mensaje.
 
             Si `usuario_id` no es un uuid en minúsculas, la ruta no existe y
             responde Django con su página 404, en HTML y sin el formato de
@@ -324,6 +348,252 @@ paths:
                 ruta_inexistente:
                   summary: GET /tutores/abc con DJANGO_DEBUG=1 (recortada)
                   value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/tutoring/v1/tutores/abc</title>...</html>'
+        '401':
+          $ref: '#/components/responses/TokenNoValido'
+
+  /disponibilidad:
+    get:
+      tags: [Disponibilidad]
+      operationId: verMisBloques
+      summary: Mis bloques de disponibilidad
+      description: |
+        Los bloques del usuario del token que no están ELIMINADOS y todavía no
+        terminan, del más próximo al más lejano, cada uno con cuántas
+        solicitudes pendientes tiene (HU-15). Un bloque que ya empezó y no ha
+        terminado también sale.
+
+        - Pide sesión, pero no ser tutor: quien dejó de serlo ve lo que
+          publicó, para poder eliminarlo. Sin bloques, la lista viene vacía.
+        - Trae solo los bloques del usuario del token. Los bloques libres de
+          otro tutor están en su perfil público, `GET /tutores/{usuario_id}`;
+          por eso esta ruta no lleva el `?tutor=` del Pilar 2 (sección 4.3).
+        - No pagina.
+      security:
+        - tokenAcceso: []
+      responses:
+        '200':
+          description: Los bloques, del más próximo al más lejano. La lista puede venir vacía.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bloque'
+              examples:
+                valentina:
+                  summary: Valentina, con sus dos bloques libres
+                  description: |
+                    Datos de ejemplo de `data/seeds/demo`, cargados el
+                    21-10-2026: sus bloques libres futuros se calculan desde
+                    el día de la carga. Los de septiembre y octubre ya
+                    terminaron y no salen.
+                  value:
+                    - id: 60000000-0000-4000-8000-000000000013
+                      inicio_en: '2026-10-24T21:00:00Z'
+                      fin_en: '2026-10-24T22:00:00Z'
+                      estado: LIBRE
+                      solicitudes_pendientes: 0
+                    - id: 60000000-0000-4000-8000-000000000014
+                      inicio_en: '2026-10-26T22:00:00Z'
+                      fin_en: '2026-10-26T23:30:00Z'
+                      estado: LIBRE
+                      solicitudes_pendientes: 0
+                camila:
+                  summary: Camila, que no es tutora y no tiene bloques
+                  value: []
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+    post:
+      tags: [Disponibilidad]
+      operationId: publicarBloque
+      summary: Publicar un bloque
+      description: |
+        Publica un bloque LIBRE del usuario del token (HU-15, criterios 1
+        y 2).
+
+        - Solo publica un tutor: cuenta activa en Tutorías (`usuario_ref`) y
+          al menos una asignatura activa (perfil). Si no, 403 `no_es_tutor`.
+        - `inicio_en` y `fin_en` van en ISO 8601 con zona y se guardan en UTC.
+          La página manda `toISOString()`, con `Z`.
+        - Se revisa en este orden: ser tutor (403); la fecha de inicio y
+          después la de término (400 `fecha_invalida` o
+          `zona_horaria_requerida`); que el término sea posterior al inicio
+          (400 `fin_antes_de_inicio`); que el inicio sea futuro (400
+          `bloque_en_el_pasado`), y que no se cruce con otro bloque suyo (409
+          `bloque_solapado`, RN-02).
+        - El cruce lo rechaza la base (restricción `ex_bloque_sin_solape`): no
+          cuentan los bloques ELIMINADOS, y uno que empieza justo cuando
+          termina otro no se cruza.
+        - Otros campos del cuerpo se ignoran.
+      security:
+        - tokenAcceso: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevoBloque'
+            examples:
+              como_la_pagina:
+                summary: Mañana de 18:00 a 19:00, hora de Chile, como lo manda la página
+                value:
+                  inicio_en: '2026-10-22T21:00:00.000Z'
+                  fin_en: '2026-10-22T22:00:00.000Z'
+              con_desfase:
+                summary: Lo mismo, con el desfase de Chile en octubre
+                value:
+                  inicio_en: '2026-10-22T18:00:00-03:00'
+                  fin_en: '2026-10-22T19:00:00-03:00'
+      responses:
+        '201':
+          description: Bloque publicado. Queda LIBRE y sale en «Mis bloques» y en el perfil público del tutor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bloque'
+              example:
+                id: 4b7e2c1a-9d3f-4e6b-8a5c-1f2e3d4c5b6a
+                inicio_en: '2026-10-22T21:00:00Z'
+                fin_en: '2026-10-22T22:00:00Z'
+                estado: LIBRE
+                solicitudes_pendientes: 0
+        '400':
+          $ref: '#/components/responses/FechasInvalidas'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/NoEsTutor'
+        '409':
+          description: El bloque se cruza con otro bloque suyo que no está ELIMINADO (RN-02).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                bloque_solapado:
+                  $ref: '#/components/examples/BloqueSolapado'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
+  /disponibilidad/{bloque_id}:
+    patch:
+      tags: [Disponibilidad]
+      operationId: editarBloque
+      summary: Cambiar un bloque libre
+      description: |
+        Cambia el inicio, el término o los dos de un bloque propio (HU-15,
+        criterio 3). Basta con mandar lo que cambia: lo que no viene se
+        conserva.
+
+        Se revisa en este orden:
+        - ser tutor, como al publicar (403 `no_es_tutor`), antes de buscar el
+          bloque;
+        - que el bloque sea suyo y no esté ELIMINADO (404);
+        - que no tenga una tutoría confirmada, realizada o evaluada (409
+          `bloque_con_reserva_confirmada`) ni solicitudes pendientes (409
+          `bloque_con_solicitudes`);
+        - las mismas reglas de fechas y de cruce que al publicar, sobre el
+          bloque ya cambiado (400, y 409 `bloque_solapado`). Por eso un
+          bloque que ya empezó no se puede editar (`bloque_en_el_pasado`).
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/BloqueId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambioDeBloque'
+            examples:
+              las_dos_horas:
+                summary: Pasar el bloque de mañana a las 19:00–20:00, hora de Chile
+                value:
+                  inicio_en: '2026-10-22T22:00:00.000Z'
+                  fin_en: '2026-10-22T23:00:00.000Z'
+              solo_el_termino:
+                summary: Alargarlo hasta las 20:00, hora de Chile, sin cambiar el inicio
+                value:
+                  fin_en: '2026-10-22T23:00:00.000Z'
+      responses:
+        '200':
+          description: Bloque cambiado. Sigue LIBRE y sin solicitudes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bloque'
+              example:
+                id: 4b7e2c1a-9d3f-4e6b-8a5c-1f2e3d4c5b6a
+                inicio_en: '2026-10-22T22:00:00Z'
+                fin_en: '2026-10-22T23:00:00Z'
+                estado: LIBRE
+                solicitudes_pendientes: 0
+        '400':
+          $ref: '#/components/responses/FechasInvalidas'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/NoEsTutor'
+        '404':
+          $ref: '#/components/responses/BloqueNoEncontrado'
+        '409':
+          description: |
+            El bloque tiene una tutoría confirmada, realizada o evaluada
+            (`bloque_con_reserva_confirmada`), tiene solicitudes pendientes
+            (`bloque_con_solicitudes`) o, con las horas nuevas, se cruza con
+            otro bloque suyo (`bloque_solapado`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                bloque_con_reserva_confirmada:
+                  $ref: '#/components/examples/ConReserva'
+                bloque_con_solicitudes:
+                  $ref: '#/components/examples/ConSolicitudes'
+                bloque_solapado:
+                  $ref: '#/components/examples/BloqueSolapado'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+    delete:
+      tags: [Disponibilidad]
+      operationId: eliminarBloque
+      summary: Eliminar un bloque
+      description: |
+        Elimina un bloque propio (HU-15, criterios 3, 4 y 5). No pide ser
+        tutor: quien dejó de serlo puede retirar lo que publicó.
+
+        - Si el bloque nunca tuvo reservas, se borra. Si tuvo alguna, queda
+          ELIMINADO (borrado lógico) y deja de contar para los cruces.
+        - Sus solicitudes pendientes pasan a RECHAZADA, con `cerrada_en`. El
+          aviso por correo a cada estudiante llega con HU-16: hoy no se
+          envía.
+        - Con una tutoría confirmada, realizada o evaluada no se elimina (409
+          `bloque_con_reserva_confirmada`).
+        - Todo pasa en una transacción que bloquea el bloque.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/BloqueId'
+      responses:
+        '204':
+          description: Bloque eliminado. La respuesta no trae cuerpo.
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          $ref: '#/components/responses/BloqueNoEncontrado'
+        '409':
+          description: El bloque tiene una tutoría confirmada, realizada o evaluada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                bloque_con_reserva_confirmada:
+                  $ref: '#/components/examples/ConReserva'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
 
   /estado:
     get:
@@ -338,6 +608,9 @@ paths:
 
         Si la base no responde, no es un error de la API: responde 503 con
         el mismo esquema, con `estado` en `degradado`.
+      security:
+        - tokenAcceso: []
+        - {}
       responses:
         '200':
           description: El servicio y su base responden.
@@ -361,8 +634,231 @@ paths:
                 estado: degradado
                 base_de_datos: sin conexion
                 version: 0.1.0
+        '401':
+          $ref: '#/components/responses/TokenNoValido'
 
 components:
+
+  securitySchemes:
+    tokenAcceso:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Cabecera `Authorization: Bearer <token_acceso>`. Es el token de acceso que firma Identidad, un JWT RS256 de 30 minutos (ver su contrato). Tutorías verifica la firma con la clave pública.'
+
+  headers:
+    DesafioBearer:
+      description: Siempre `Bearer realm="tutoring"`.
+      schema:
+        type: string
+      example: 'Bearer realm="tutoring"'
+
+  parameters:
+    BloqueId:
+      name: bloque_id
+      in: path
+      required: true
+      description: |
+        Identificador del bloque, el `id` que entregan `GET` y
+        `POST /disponibilidad`: un uuid en minúsculas y con guiones. Con otra
+        forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 4b7e2c1a-9d3f-4e6b-8a5c-1f2e3d4c5b6a
+
+  responses:
+    TokenNoValido:
+      description: |
+        La petición trae un token en `Authorization: Bearer …` que no sirve.
+        La ruta no pide token, pero si viene, Tutorías lo revisa antes de
+        llegar a ella (HU-17). Los códigos posibles son:
+        - `token_invalido`: el token está mal formado, su firma o su emisor
+          no calzan, le falta una reclamación obligatoria o su `sub` no es un
+          uuid;
+        - `token_vencido`: el token venció (dura 30 minutos);
+        - `authentication_failed`: la cabecera trae `Bearer` sin el token, o
+          algo más después del token.
+      headers:
+        WWW-Authenticate:
+          $ref: '#/components/headers/DesafioBearer'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            token_invalido:
+              $ref: '#/components/examples/TokenInvalido'
+            token_vencido:
+              $ref: '#/components/examples/TokenVencido'
+            cabecera_mal_formada:
+              $ref: '#/components/examples/CabeceraMalFormada'
+    SinTokenValido:
+      description: |
+        Sin un token válido (HU-17). Los códigos posibles son:
+        - `not_authenticated`: no viene la cabecera
+          `Authorization: Bearer …` (el mensaje es el estándar de Django REST
+          Framework);
+        - `token_invalido`, `token_vencido` y `authentication_failed`, como en
+          `TokenNoValido`.
+      headers:
+        WWW-Authenticate:
+          $ref: '#/components/headers/DesafioBearer'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            token_invalido:
+              $ref: '#/components/examples/TokenInvalido'
+            token_vencido:
+              $ref: '#/components/examples/TokenVencido'
+            cabecera_mal_formada:
+              $ref: '#/components/examples/CabeceraMalFormada'
+    ClavesNoConfiguradas:
+      description: |
+        Tutorías no encuentra la clave pública con que verifica el token
+        (`keys/jwt_public.pem`, que docker-compose.yml monta en `/app/keys`).
+        Pasa en un clon nuevo si no se generaron las claves.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: claves_no_configuradas
+            mensaje: 'No existe el archivo /app/keys/jwt_public.pem. Tutorías verifica los tokens con la clave pública de Identidad, keys/jwt_public.pem, que docker-compose.yml monta en /app/keys. Si faltan las claves, se generan en Identidad con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
+            detalles: null
+    FechasInvalidas:
+      description: |
+        Las fechas del bloque no sirven. Los códigos posibles son:
+        - `fecha_invalida`: `inicio_en` o `fin_en` no es una fecha ISO 8601,
+          o falta al publicar;
+        - `zona_horaria_requerida`: la fecha no trae la zona;
+        - `fin_antes_de_inicio`: el término no es posterior al inicio;
+        - `bloque_en_el_pasado`: el inicio ya pasó (al editar, también si el
+          bloque ya empezó).
+
+        Con `fin_en`, los dos primeros dicen «término» en vez de «inicio».
+        Si el cuerpo no es JSON válido, responde `parse_error`, con el mensaje
+        del framework.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            fecha_invalida:
+              $ref: '#/components/examples/FechaInvalida'
+            zona_horaria_requerida:
+              $ref: '#/components/examples/ZonaHorariaRequerida'
+            fin_antes_de_inicio:
+              $ref: '#/components/examples/FinAntesDeInicio'
+            bloque_en_el_pasado:
+              $ref: '#/components/examples/BloqueEnElPasado'
+    NoEsTutor:
+      description: |
+        El usuario del token no es tutor: su cuenta no está activa en
+        Tutorías o no tiene ninguna asignatura activa. El mensaje pide
+        declarar primero una asignatura.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            no_es_tutor:
+              $ref: '#/components/examples/NoEsTutor'
+    BloqueNoEncontrado:
+      description: |
+        El usuario del token no tiene un bloque con ese identificador: no
+        existe, es de otro usuario o ya está ELIMINADO. Los tres casos
+        responden lo mismo, para no revelar que el bloque existe.
+
+        Si `bloque_id` no es un uuid en minúsculas, la ruta no existe y
+        responde Django con su página 404, en HTML y sin el formato de error
+        de la API, como en `GET /tutores/{usuario_id}`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: not_found
+            mensaje: No tienes un bloque con ese identificador.
+            detalles: null
+        text/html:
+          schema:
+            type: string
+          examples:
+            ruta_inexistente:
+              summary: DELETE /disponibilidad/abc con DJANGO_DEBUG=1 (recortada)
+              value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/tutoring/v1/disponibilidad/abc</title>...</html>'
+
+  examples:
+    TokenInvalido:
+      summary: El token no es válido
+      value:
+        codigo: token_invalido
+        mensaje: El token de acceso no es válido.
+        detalles: null
+    TokenVencido:
+      summary: El token venció
+      value:
+        codigo: token_vencido
+        mensaje: El token de acceso venció.
+        detalles: null
+    CabeceraMalFormada:
+      summary: Authorization trae Bearer sin el token
+      value:
+        codigo: authentication_failed
+        mensaje: La cabecera Authorization está mal formada.
+        detalles: null
+    FechaInvalida:
+      summary: inicio_en no es una fecha ISO 8601, como «mañana a las 18:00»
+      value:
+        codigo: fecha_invalida
+        mensaje: La fecha de inicio tiene que ir en ISO 8601, por ejemplo 2026-12-01T20:00:00-03:00.
+        detalles: null
+    ZonaHorariaRequerida:
+      summary: inicio_en sin zona, como 2026-10-22T18:00:00
+      value:
+        codigo: zona_horaria_requerida
+        mensaje: La fecha de inicio tiene que indicar la zona horaria, por ejemplo 2026-12-01T20:00:00-03:00.
+        detalles: null
+    FinAntesDeInicio:
+      summary: El término no es posterior al inicio
+      value:
+        codigo: fin_antes_de_inicio
+        mensaje: La hora de término tiene que ser posterior a la de inicio.
+        detalles: null
+    BloqueEnElPasado:
+      summary: El inicio ya pasó
+      value:
+        codigo: bloque_en_el_pasado
+        mensaje: 'El bloque empieza en el pasado: elige una fecha y una hora futuras.'
+        detalles: null
+    NoEsTutor:
+      summary: Camila, que no tiene asignaturas declaradas
+      value:
+        codigo: no_es_tutor
+        mensaje: Para publicar bloques de disponibilidad, primero declara al menos una asignatura que puedas enseñar.
+        detalles: null
+    BloqueSolapado:
+      summary: Mañana de 18:30 a 19:30, con el de 18:00 a 19:00 ya publicado
+      value:
+        codigo: bloque_solapado
+        mensaje: El bloque se cruza con otro de tus bloques. Elige otro horario.
+        detalles: null
+    ConReserva:
+      summary: El bloque tiene una tutoría confirmada
+      value:
+        codigo: bloque_con_reserva_confirmada
+        mensaje: 'El bloque tiene una tutoría confirmada: no se puede editar ni eliminar.'
+        detalles: null
+    ConSolicitudes:
+      summary: El bloque tiene solicitudes pendientes
+      value:
+        codigo: bloque_con_solicitudes
+        mensaje: El bloque tiene solicitudes pendientes y no se puede editar. Si lo eliminas, esas solicitudes quedan rechazadas.
+        detalles: null
 
   schemas:
 
@@ -557,6 +1053,58 @@ components:
           type: string
           maxLength: 150
 
+    Bloque:
+      type: object
+      description: Un bloque de disponibilidad del usuario del token (HU-15).
+      required: [id, inicio_en, fin_en, estado, solicitudes_pendientes]
+      properties:
+        id:
+          type: string
+          format: uuid
+        inicio_en:
+          type: string
+          format: date-time
+          description: Inicio, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+        fin_en:
+          type: string
+          format: date-time
+          description: Término, posterior al inicio. En ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+        estado:
+          type: string
+          enum: [LIBRE, OCUPADO]
+          description: OCUPADO si tiene una tutoría confirmada, realizada o evaluada. Los bloques ELIMINADOS no salen.
+        solicitudes_pendientes:
+          type: integer
+          minimum: 0
+          description: Cuántas reservas en estado SOLICITADA tiene el bloque. Al publicar y al editar es 0.
+
+    NuevoBloque:
+      type: object
+      description: Las fechas del bloque nuevo. Otros campos se ignoran.
+      required: [inicio_en, fin_en]
+      properties:
+        inicio_en:
+          type: string
+          format: date-time
+          description: ISO 8601 con la zona, `Z` o un desfase como `-03:00`.
+        fin_en:
+          type: string
+          format: date-time
+          description: ISO 8601 con la zona. Tiene que ser posterior al inicio.
+
+    CambioDeBloque:
+      type: object
+      description: Lo que cambia del bloque; lo que no viene se conserva. Otros campos se ignoran.
+      properties:
+        inicio_en:
+          type: string
+          format: date-time
+          description: ISO 8601 con la zona, `Z` o un desfase como `-03:00`.
+        fin_en:
+          type: string
+          format: date-time
+          description: ISO 8601 con la zona. Tiene que quedar posterior al inicio.
+
     Estado:
       type: object
       description: Estado del servicio y de su base (HU-01).
@@ -580,17 +1128,22 @@ components:
       type: object
       description: |
         Formato único de error de la API (Pilar 2, sección 11), el mismo de
-        Identidad. En Tutorías llega con HU-17; antes, el cuerpo de error es
-        solo `{"detail": "<mensaje>"}`.
+        Identidad.
 
         - Errores con código propio: `detalles` = null. En las rutas de este
-          contrato son asignatura_requerida y asignatura_invalida (400) y
-          not_found (404).
+          contrato son asignatura_requerida, asignatura_invalida,
+          fecha_invalida, zona_horaria_requerida, fin_antes_de_inicio y
+          bloque_en_el_pasado (400); not_authenticated, token_invalido,
+          token_vencido y authentication_failed (401); no_es_tutor (403);
+          not_found (404); bloque_solapado, bloque_con_solicitudes y
+          bloque_con_reserva_confirmada (409), y claves_no_configuradas (503).
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.
-        - Otros códigos los pone el framework, como method_not_allowed (405)
-          si se usa un método que la ruta no acepta.
+        - Otros códigos los pone el framework: parse_error (JSON mal formado,
+          400), method_not_allowed (405) si se usa un método que la ruta no
+          acepta, y unsupported_media_type (415) si el cuerpo no es JSON ni un
+          formulario.
       required: [codigo, mensaje, detalles]
       properties:
         codigo:
