@@ -2,8 +2,10 @@
 
 HU-04: POST /registro y POST /verificar-correo.
 HU-05: POST /login, POST /refresh, POST /logout y GET /yo.
+HU-10: PATCH /yo, el perfil con carrera, nivel y sede.
 """
 
+from collections.abc import Mapping
 from datetime import timedelta
 
 from django.conf import settings
@@ -252,21 +254,118 @@ def logout(request):
     return cerrar_cookie(Response(status=204))
 
 
-@api_view(["GET"])
+# --------------------------------------------------------------- perfil (HU-10)
+
+NO_SE_CAMBIA = "Este campo no se puede cambiar desde el perfil."
+NIVEL_INVALIDO = "El nivel debe ser un número entero de 1 a 12."
+
+# Sin estos tres el perfil no esta completo (HU-10, criterio 3).
+OBLIGATORIOS = {
+    "carrera_id": "Elige tu carrera.",
+    "sede_id": "Elige tu sede.",
+    "nivel": "Elige tu nivel, de 1 a 12.",
+}
+
+
+class PerfilSerializer(serializers.Serializer):
+    """Lo unico que el usuario cambia de su cuenta (HU-10, criterio 5).
+
+    Acepta cambios parciales, pero el perfil tiene que quedar completo:
+    carrera, sede y nivel no se pueden vaciar ni quedar sin elegir. Un campo
+    que no es de esta lista (email, es_admin, activo...) se rechaza con 400.
+    """
+
+    nombre = serializers.CharField(
+        max_length=80,
+        error_messages={"blank": "Escribe tu nombre.", "null": "Escribe tu nombre."},
+    )
+    apellido = serializers.CharField(
+        max_length=80,
+        error_messages={
+            "blank": "Escribe tu apellido.",
+            "null": "Escribe tu apellido.",
+        },
+    )
+    # Identificadores de Catalogo, sin preguntarle si existen (AD-15): la
+    # pantalla solo ofrece las carreras y sedes de GET /carreras y GET /sedes.
+    carrera_id = serializers.UUIDField(
+        error_messages={
+            "null": OBLIGATORIOS["carrera_id"],
+            "invalid": "La carrera no es válida: elígela de la lista.",
+        }
+    )
+    sede_id = serializers.UUIDField(
+        error_messages={
+            "null": OBLIGATORIOS["sede_id"],
+            "invalid": "La sede no es válida: elígela de la lista.",
+        }
+    )
+    # Semestre que cursa. La base exige lo mismo (ck_usuario_nivel).
+    nivel = serializers.IntegerField(
+        min_value=1,
+        max_value=12,
+        error_messages={
+            "null": OBLIGATORIOS["nivel"],
+            "invalid": NIVEL_INVALIDO,
+            "min_value": NIVEL_INVALIDO,
+            "max_value": NIVEL_INVALIDO,
+        },
+    )
+
+    def to_internal_value(self, data):
+        # Antes que los demas campos: un campo ajeno (email, es_admin...)
+        # rechaza toda la peticion, aunque el resto venga bien.
+        if isinstance(data, Mapping):
+            ajenos = sorted(set(data) - set(self.fields))
+            if ajenos:
+                raise serializers.ValidationError(
+                    {campo: [NO_SE_CAMBIA] for campo in ajenos}
+                )
+        return super().to_internal_value(data)
+
+    def validate(self, datos):
+        faltan = {
+            campo: [mensaje]
+            for campo, mensaje in OBLIGATORIOS.items()
+            if datos.get(campo, getattr(self.instance, campo)) is None
+        }
+        if faltan:
+            raise serializers.ValidationError(faltan)
+        return datos
+
+    def update(self, usuario, datos):
+        if datos:
+            for campo, valor in datos.items():
+                setattr(usuario, campo, valor)
+            usuario.save(update_fields=[*datos, "actualizado_en"])
+        return usuario
+
+
+def cuenta_json(usuario):
+    return {
+        "id": str(usuario.id),
+        "email": usuario.email,
+        "nombre": usuario.nombre,
+        "apellido": usuario.apellido,
+        "carrera_id": str(usuario.carrera_id) if usuario.carrera_id else None,
+        "nivel": usuario.nivel,
+        "sede_id": str(usuario.sede_id) if usuario.sede_id else None,
+        "es_admin": usuario.es_admin,
+    }
+
+
+@api_view(["GET", "PATCH"])
 @authentication_classes([TokenDeAcceso])
 @permission_classes([IsAuthenticated])
 def yo(request):
-    """Datos del usuario autenticado. El correo sale solo de aqui (RNF-07)."""
+    """Datos del usuario autenticado. El correo sale solo de aqui (RNF-07).
+
+    PATCH completa o edita el perfil (HU-10) y responde lo mismo que GET, con
+    los datos ya guardados.
+    """
     usuario = request.user
-    return Response(
-        {
-            "id": str(usuario.id),
-            "email": usuario.email,
-            "nombre": usuario.nombre,
-            "apellido": usuario.apellido,
-            "carrera_id": str(usuario.carrera_id) if usuario.carrera_id else None,
-            "nivel": usuario.nivel,
-            "sede_id": str(usuario.sede_id) if usuario.sede_id else None,
-            "es_admin": usuario.es_admin,
-        }
-    )
+    if request.method == "PATCH":
+        perfil = PerfilSerializer(usuario, data=request.data, partial=True)
+        perfil.is_valid(raise_exception=True)
+        usuario = perfil.save()
+    return Response(cuenta_json(usuario))

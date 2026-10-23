@@ -102,6 +102,17 @@ async function mostrarSesionEnEncabezado() {
         return;
     }
 
+    // Paginas de la cuenta, antes del saludo (HU-10). Disponibilidad es de HU-15.
+    const perfil = document.createElement("a");
+    perfil.href = "perfil.html";
+    perfil.className = "btn-login";
+    perfil.textContent = "Mi perfil";
+
+    const disponibilidad = document.createElement("a");
+    disponibilidad.href = "disponibilidad.html";
+    disponibilidad.className = "btn-login";
+    disponibilidad.textContent = "Mi disponibilidad";
+
     const saludo = document.createElement("span");
     saludo.className = "btn-login";
     saludo.textContent = `Hola, ${usuario.nombre}`;
@@ -117,7 +128,7 @@ async function mostrarSesionEnEncabezado() {
         window.location.href = "index.html";
     });
 
-    acciones.replaceChildren(saludo, salir);
+    acciones.replaceChildren(perfil, disponibilidad, saludo, salir);
 }
 
 document.addEventListener("DOMContentLoaded", mostrarSesionEnEncabezado);

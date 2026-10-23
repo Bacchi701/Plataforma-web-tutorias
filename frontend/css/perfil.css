@@ -1,0 +1,208 @@
+/* =========================================
+   PÁGINA MI PERFIL (HU-10)
+   Usa las variables, el encabezado y el pie de styles.css.
+========================================= */
+
+.profile-page {
+    min-height: calc(100vh - 78px);
+    padding-bottom: 80px;
+    background: var(--background);
+}
+
+.profile-hero {
+    background: linear-gradient(130deg, #ffffff 20%, #f4f8fb 100%);
+    padding: 50px 0 70px;
+    border-bottom: 1px solid var(--border);
+}
+
+.profile-hero h1 {
+    font-size: clamp(30px, 4vw, 44px);
+    color: var(--duoc-blue);
+    margin: 10px 0 12px;
+    line-height: 1.15;
+    letter-spacing: -1px;
+}
+
+.profile-hero p {
+    max-width: 640px;
+    color: var(--text-light);
+}
+
+/* La tarjeta se monta sobre el borde del hero, como el buscador de asignaturas. */
+.profile-content {
+    position: relative;
+    margin-top: -40px;
+}
+
+.profile-card {
+    max-width: 680px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 32px;
+}
+
+.profile-card h2 {
+    color: var(--duoc-blue);
+    font-size: 22px;
+    margin-bottom: 8px;
+}
+
+.profile-text {
+    color: var(--text-light);
+    margin-bottom: 20px;
+}
+
+.profile-card .btn-primary {
+    display: inline-block;
+}
+
+.profile-loading {
+    color: var(--text-light);
+}
+
+.profile-loading.profile-error {
+    color: #B91C1C;
+}
+
+
+/* =========================================
+   FORMULARIO
+========================================= */
+
+.profile-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+}
+
+.profile-field {
+    min-width: 0;
+    margin-bottom: 20px;
+}
+
+.profile-label {
+    display: block;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.profile-input {
+    width: 100%;
+    height: 50px;
+    border: 1px solid #DCE1E7;
+    border-radius: 10px;
+    padding: 0 14px;
+    background: #FAFBFC;
+    font-size: 15px;
+    color: var(--dark);
+    outline: none;
+    transition: .2s;
+}
+
+.profile-input:focus {
+    background: var(--white);
+    border-color: var(--duoc-blue-light);
+    box-shadow: 0 0 0 3px rgba(48, 127, 226, .10);
+}
+
+.profile-input[readonly] {
+    background: #F3F4F6;
+    color: var(--text-light);
+    cursor: default;
+}
+
+.profile-hint {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-light);
+    font-size: 12px;
+}
+
+.profile-button {
+    width: 100%;
+    border: none;
+    background: var(--duoc-blue);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: .2s;
+}
+
+.profile-button:hover {
+    background: #001f3c;
+}
+
+.profile-button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+
+/* =========================================
+   AVISOS
+   avisar() de js/sesion.js usa la clase login-message.
+========================================= */
+
+.profile-status {
+    background: rgba(253, 189, 45, .18);
+    color: var(--duoc-blue);
+    border-radius: 8px;
+    padding: 11px 13px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.login-message {
+    display: none;
+    border-radius: 8px;
+    padding: 11px 13px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    font-weight: 600;
+    /* Al llevarlo a la vista, que no quede bajo el encabezado fijo de 78 px. */
+    scroll-margin-top: 96px;
+}
+
+.login-message.error {
+    display: block;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #B91C1C;
+}
+
+.login-message.success {
+    display: block;
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    color: #15803D;
+}
+
+
+/* =========================================
+   TELÉFONO (RNF-03: se lee completo a 360 px)
+========================================= */
+
+@media(max-width: 600px) {
+    .profile-hero {
+        padding: 36px 0 60px;
+    }
+
+    .profile-card {
+        padding: 22px 18px;
+    }
+
+    .profile-row {
+        grid-template-columns: 1fr;
+    }
+}
