@@ -1,0 +1,606 @@
+openapi: 3.0.3
+
+info:
+  title: Tutorías · Plataforma de Tutorías entre Estudiantes
+  version: 0.1.0
+  description: |
+    Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
+
+    - Describe lo que hace el PR de HU-20 al 21-10-2026: la búsqueda de
+      tutores y el perfil público de cada tutor. Trae también `/estado`, que
+      existe desde HU-01.
+    - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
+      del servicio, `/api/tutoring/v1/`, que va en `servers`.
+    - Crece con cada historia que agrega rutas a Tutorías: HU-20 trae la
+      búsqueda y el perfil, y HU-15 agrega los bloques del tutor.
+    - Un cambio a lo ya publicado se acuerda entre los tres antes de
+      implementarse (acuerdo A4), como en Identidad. Los cambios y las rutas
+      nuevas se anotan en «Cambios», al final de esta descripción.
+
+    **Sin sesión.** Las tres rutas son públicas: no piden token. El token de
+    acceso y sus respuestas 401 llegan a Tutorías con HU-17, y este contrato
+    los agrega cuando HU-15 lo extienda.
+
+    **Formato de error (Pilar 2, sección 11).** Con HU-17 en develop, toda
+    respuesta de error de la búsqueda y del perfil trae `codigo`, `mensaje`
+    y `detalles` (ver el esquema `Error`, el mismo de Identidad). Mientras
+    HU-17 no esté en develop, Tutorías usa el manejador de errores de Django
+    REST Framework: responde con el mismo estado y el mismo mensaje, pero el
+    cuerpo es solo `{"detail": "<mensaje>"}`, sin `codigo`. No traen el
+    formato el 503 de `/estado`, que responde con su propio esquema, como en
+    Identidad, ni la página 404 que responde Django cuando la ruta no existe
+    (ver `GET /tutores/{usuario_id}`).
+
+    **Datos.**
+    - Todo sale de tutoring_db, sin llamar a Identidad ni a Catálogo
+      (AD-07): el tutor y la asignatura vienen de las copias de lectura
+      `usuario_ref` y `asignatura_ref`.
+    - Ninguna respuesta trae el correo de nadie (RNF-07).
+    - Los identificadores van como texto. La carrera y la sede van como
+      identificador de Catálogo: el nombre se toma de
+      `GET /api/catalog/v1/carreras` y `GET /api/catalog/v1/sedes`.
+    - Las fechas van en ISO 8601, en UTC y con `Z`, por ejemplo
+      `2026-10-24T21:00:00Z` (con fracción de segundo si la hora guardada la
+      tiene). El navegador las muestra en hora de Chile (`America/Santiago`).
+    - Los montos van como número entero de pesos chilenos. Una tarifa 0 es
+      una tutoría gratuita (RN-05).
+
+    **Cambios**
+    - 0.1.0 (21-10-2026): primera versión, con `GET /tutores` y
+      `GET /tutores/{usuario_id}` (HU-20), y `GET /estado` (HU-01).
+
+servers:
+  - url: http://localhost:8080/api/tutoring/v1
+    description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
+
+tags:
+  - name: Búsqueda
+    description: Búsqueda de tutores por asignatura y perfil público de cada tutor (HU-20). Sin sesión.
+  - name: Estado
+    description: Estado del servicio y de su base (HU-01).
+
+paths:
+
+  /tutores:
+    get:
+      tags: [Búsqueda]
+      operationId: buscarTutores
+      summary: Buscar los tutores de una asignatura
+      description: |
+        Lista los tutores con perfil activo en la asignatura (HU-20,
+        criterios 1 y 2). Es pública: no pide token.
+
+        - No salen el tutor con la cuenta desactivada (`usuario_ref.activo`,
+          RN-08) ni el que tiene desactivado su perfil en esa asignatura
+          (RN-01).
+        - Orden: primero la reputación, de mayor a menor (el promedio y, si
+          empata, la cantidad de evaluaciones); después la tarifa, de menor a
+          mayor; y si todo eso empata, el nombre, el apellido y el
+          identificador del tutor.
+        - Cada tutor trae su tarifa y su descripción en esa asignatura.
+        - No pagina: trae todos los tutores de la asignatura.
+        - Una asignatura sin tutores, o que no está en Tutorías, responde 200
+          con la lista vacía.
+      parameters:
+        - name: asignatura
+          in: query
+          required: true
+          description: |
+            Identificador de la asignatura en Catálogo. Se recortan los
+            espacios al inicio y al final. Se lee con `uuid.UUID` de Python,
+            que también acepta mayúsculas y el uuid sin guiones.
+          schema:
+            type: string
+            format: uuid
+          example: 40000000-0000-4000-8000-000000000006
+      responses:
+        '200':
+          description: Los tutores de la asignatura, en orden. La lista puede venir vacía.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TutorEncontrado'
+              examples:
+                base_de_datos:
+                  summary: Base de Datos (BDD1101), con una tutora
+                  description: Datos de ejemplo de `data/seeds/demo`. Valentina enseña Base de Datos a $5.000 y tiene una evaluación, de 5.
+                  value:
+                    - usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                      carrera_id: 20000000-0000-4000-8000-000000000001
+                      sede_id: 30000000-0000-4000-8000-000000000011
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000006
+                        sigla: BDD1101
+                        nombre: Base de Datos
+                      tarifa: 5000
+                      descripcion: Modelo entidad-relación, normalización y SQL.
+                      reputacion:
+                        promedio: 5.0
+                        total: 1
+                programacion:
+                  summary: Programación de Algoritmos (PRO1101), con dos tutores en orden
+                  description: Mismos datos de ejemplo. Valentina va primero porque tiene mejor reputación (5.0 con una evaluación, contra 0.0 sin evaluaciones).
+                  value:
+                    - usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                      carrera_id: 20000000-0000-4000-8000-000000000001
+                      sede_id: 30000000-0000-4000-8000-000000000011
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000005
+                        sigla: PRO1101
+                        nombre: Programación de Algoritmos
+                      tarifa: 0
+                      descripcion: Te ayudo con algoritmos desde cero, con ejercicios guiados.
+                      reputacion:
+                        promedio: 5.0
+                        total: 1
+                    - usuario_id: 10000000-0000-4000-8000-000000000002
+                      nombre: Matías
+                      apellido: Fuentes
+                      carrera_id: 20000000-0000-4000-8000-000000000002
+                      sede_id: 30000000-0000-4000-8000-000000000004
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000005
+                        sigla: PRO1101
+                        nombre: Programación de Algoritmos
+                      tarifa: 3000
+                      descripcion: Resolución de guías y preparación de pruebas.
+                      reputacion:
+                        promedio: 0.0
+                        total: 0
+                sin_tutores:
+                  summary: Contabilidad Básica (CON1101), sin tutores que mostrar
+                  description: Mismos datos de ejemplo. Su única tutora, Josefa, tiene la cuenta desactivada (RN-08).
+                  value: []
+        '400':
+          description: |
+            Falta `asignatura`, viene vacía o solo con espacios
+            (`asignatura_requerida`), o no es un uuid (`asignatura_invalida`).
+            En los dos casos `detalles` viene en null. Mientras HU-17 no esté
+            en develop, el cuerpo es `{"detail": "<mensaje>"}`, con el mismo
+            mensaje.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                asignatura_requerida:
+                  summary: Sin el parámetro asignatura, o vacío
+                  value:
+                    codigo: asignatura_requerida
+                    mensaje: 'Indica la asignatura con ?asignatura=<identificador>.'
+                    detalles: null
+                asignatura_invalida:
+                  summary: Un valor que no es uuid, como ?asignatura=abc
+                  value:
+                    codigo: asignatura_invalida
+                    mensaje: El identificador de la asignatura no es válido.
+                    detalles: null
+
+  /tutores/{usuario_id}:
+    get:
+      tags: [Búsqueda]
+      operationId: verPerfilDeTutor
+      summary: Perfil público de un tutor
+      description: |
+        Datos públicos del tutor, con su reputación, sus asignaturas, sus
+        próximos bloques libres y sus evaluaciones visibles (HU-20,
+        criterio 3). Es pública: no pide token.
+
+        - `asignaturas`: sus perfiles activos, ordenados por sigla, cada uno
+          con su tarifa y su descripción.
+        - `bloques`: los LIBRES que empiezan después del momento de la
+          consulta, del más próximo al más lejano, hasta 20. No salen los
+          OCUPADOS, los ELIMINADOS ni los que ya empezaron.
+        - `evaluaciones`: las de las reservas sobre bloques del tutor, sin las
+          que retiró el administrador (`retirada_en` nulo, CA7), de la más
+          nueva a la más antigua, hasta 10. Pueden ser de cualquier
+          asignatura, también de una que ya no tutorea. No traen datos de
+          quien evaluó.
+        - La reputación es la que guarda `usuario_ref` (RN-06): esta ruta no
+          la recalcula.
+      parameters:
+        - name: usuario_id
+          in: path
+          required: true
+          description: |
+            Identificador del tutor, el `usuario_id` que entrega la búsqueda:
+            un uuid en minúsculas y con guiones. Con otra forma la ruta no
+            existe (ver la respuesta 404).
+          schema:
+            type: string
+            format: uuid
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          example: 10000000-0000-4000-8000-000000000001
+      responses:
+        '200':
+          description: El perfil público del tutor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerfilPublico'
+              examples:
+                valentina:
+                  summary: Valentina Soto, con dos asignaturas, dos bloques y una evaluación
+                  description: |
+                    Datos de ejemplo de `data/seeds/demo`, cargados el
+                    21-10-2026: sus bloques libres futuros se calculan desde el
+                    día de la carga. Tiene otra evaluación, de 1, que retiró el
+                    administrador y no sale.
+                  value:
+                    usuario_id: 10000000-0000-4000-8000-000000000001
+                    nombre: Valentina
+                    apellido: Soto
+                    carrera_id: 20000000-0000-4000-8000-000000000001
+                    sede_id: 30000000-0000-4000-8000-000000000011
+                    reputacion:
+                      promedio: 5.0
+                      total: 1
+                    asignaturas:
+                      - asignatura_id: 40000000-0000-4000-8000-000000000006
+                        sigla: BDD1101
+                        nombre: Base de Datos
+                        tarifa: 5000
+                        descripcion: Modelo entidad-relación, normalización y SQL.
+                      - asignatura_id: 40000000-0000-4000-8000-000000000005
+                        sigla: PRO1101
+                        nombre: Programación de Algoritmos
+                        tarifa: 0
+                        descripcion: Te ayudo con algoritmos desde cero, con ejercicios guiados.
+                    bloques:
+                      - id: 60000000-0000-4000-8000-000000000013
+                        inicio_en: '2026-10-24T21:00:00Z'
+                        fin_en: '2026-10-24T22:00:00Z'
+                      - id: 60000000-0000-4000-8000-000000000014
+                        inicio_en: '2026-10-26T22:00:00Z'
+                        fin_en: '2026-10-26T23:30:00Z'
+                    evaluaciones:
+                      - calificacion: 5
+                        comentario: Explicó la normalización con ejemplos claros. Muy recomendable.
+                        creada_en: '2026-09-22T13:00:00Z'
+                        asignatura:
+                          sigla: BDD1101
+                          nombre: Base de Datos
+                matias:
+                  summary: Matías Fuentes, todavía sin evaluaciones
+                  description: Mismos datos de ejemplo. Sin evaluaciones, `evaluaciones` viene vacía y la reputación en 0.
+                  value:
+                    usuario_id: 10000000-0000-4000-8000-000000000002
+                    nombre: Matías
+                    apellido: Fuentes
+                    carrera_id: 20000000-0000-4000-8000-000000000002
+                    sede_id: 30000000-0000-4000-8000-000000000004
+                    reputacion:
+                      promedio: 0.0
+                      total: 0
+                    asignaturas:
+                      - asignatura_id: 40000000-0000-4000-8000-000000000005
+                        sigla: PRO1101
+                        nombre: Programación de Algoritmos
+                        tarifa: 3000
+                        descripcion: Resolución de guías y preparación de pruebas.
+                      - asignatura_id: 40000000-0000-4000-8000-000000000008
+                        sigla: WEB2101
+                        nombre: Desarrollo Web
+                        tarifa: 4000
+                        descripcion: HTML, CSS y JavaScript para tus entregas.
+                    bloques:
+                      - id: 60000000-0000-4000-8000-000000000015
+                        inicio_en: '2026-10-25T21:30:00Z'
+                        fin_en: '2026-10-25T22:30:00Z'
+                      - id: 60000000-0000-4000-8000-000000000016
+                        inicio_en: '2026-10-27T13:00:00Z'
+                        fin_en: '2026-10-27T14:00:00Z'
+                    evaluaciones: []
+        '404':
+          description: |
+            No hay un tutor activo con ese identificador: el usuario no está
+            en Tutorías, su cuenta está desactivada (RN-08) o no tiene
+            perfiles activos. Los tres casos responden lo mismo (`not_found`).
+            Mientras HU-17 no esté en develop, el cuerpo es
+            `{"detail": "<mensaje>"}`, con el mismo mensaje.
+
+            Si `usuario_id` no es un uuid en minúsculas, la ruta no existe y
+            responde Django con su página 404, en HTML y sin el formato de
+            error de la API. Con `DJANGO_DEBUG=1`, el valor de `.env.example`,
+            es la página de depuración de Django.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: not_found
+                mensaje: No existe un tutor activo con ese identificador.
+                detalles: null
+            text/html:
+              schema:
+                type: string
+              examples:
+                ruta_inexistente:
+                  summary: GET /tutores/abc con DJANGO_DEBUG=1 (recortada)
+                  value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/tutoring/v1/tutores/abc</title>...</html>'
+
+  /estado:
+    get:
+      tags: [Estado]
+      operationId: estadoTutorias
+      summary: Estado del servicio y de su base
+      description: |
+        Dice si el servicio está arriba y puede leer su base, que prueba con
+        un `SELECT 1` (HU-01). Lo consultan la integración continua (trabajo
+        «levantar», que espera un 200) y la verificación de salud del
+        contenedor en `docker-compose.yml`. Es pública: no pide token.
+
+        Si la base no responde, no es un error de la API: responde 503 con
+        el mismo esquema, con `estado` en `degradado`.
+      responses:
+        '200':
+          description: El servicio y su base responden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: tutoring
+                estado: ok
+                base_de_datos: ok
+                version: 0.1.0
+        '503':
+          description: El servicio arrancó, pero no puede leer su base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: tutoring
+                estado: degradado
+                base_de_datos: sin conexion
+                version: 0.1.0
+
+components:
+
+  schemas:
+
+    TutorEncontrado:
+      type: object
+      description: Un tutor de la búsqueda, con su tarifa y su descripción en la asignatura buscada.
+      required: [usuario_id, nombre, apellido, carrera_id, sede_id, asignatura, tarifa, descripcion, reputacion]
+      properties:
+        usuario_id:
+          type: string
+          format: uuid
+          description: Identificador del usuario en Identidad. Es el que pide `GET /tutores/{usuario_id}`.
+        nombre:
+          type: string
+          maxLength: 80
+        apellido:
+          type: string
+          maxLength: 80
+        carrera_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la carrera en Catálogo. Viene en null si la copia del usuario en Tutorías no la tiene.
+        sede_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la sede en Catálogo. Viene en null si la copia del usuario en Tutorías no la tiene.
+        asignatura:
+          $ref: '#/components/schemas/AsignaturaBuscada'
+        tarifa:
+          type: integer
+          minimum: 0
+          description: Tarifa del tutor en esa asignatura, en pesos chilenos. 0 es una tutoría gratuita (RN-05).
+        descripcion:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Lo que ofrece el tutor en esa asignatura. Puede venir en null.
+        reputacion:
+          $ref: '#/components/schemas/Reputacion'
+
+    AsignaturaBuscada:
+      type: object
+      description: La asignatura de la búsqueda, de la copia de lectura de Catálogo (`asignatura_ref`).
+      required: [asignatura_id, sigla, nombre]
+      properties:
+        asignatura_id:
+          type: string
+          format: uuid
+        sigla:
+          type: string
+          maxLength: 15
+        nombre:
+          type: string
+          maxLength: 150
+
+    Reputacion:
+      type: object
+      description: |
+        Reputación del tutor: el dato que guarda `usuario_ref` (RN-06). La
+        búsqueda y el perfil la leen tal cual, sin recalcularla.
+      required: [promedio, total]
+      properties:
+        promedio:
+          type: number
+          minimum: 0
+          maximum: 5
+          description: Promedio de las calificaciones, de 0 a 5, con dos decimales como máximo. Se guarda como 4.50 y sale como 4.5.
+        total:
+          type: integer
+          minimum: 0
+          description: Cantidad de evaluaciones del promedio.
+
+    PerfilPublico:
+      type: object
+      description: Perfil público de un tutor (HU-20, criterio 3).
+      required: [usuario_id, nombre, apellido, carrera_id, sede_id, reputacion, asignaturas, bloques, evaluaciones]
+      properties:
+        usuario_id:
+          type: string
+          format: uuid
+          description: Identificador del usuario en Identidad.
+        nombre:
+          type: string
+          maxLength: 80
+        apellido:
+          type: string
+          maxLength: 80
+        carrera_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la carrera en Catálogo. Viene en null si la copia del usuario en Tutorías no la tiene.
+        sede_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la sede en Catálogo. Viene en null si la copia del usuario en Tutorías no la tiene.
+        reputacion:
+          $ref: '#/components/schemas/Reputacion'
+        asignaturas:
+          type: array
+          minItems: 1
+          description: Sus perfiles activos, ordenados por sigla. Trae al menos uno; sin perfiles activos la respuesta es 404.
+          items:
+            $ref: '#/components/schemas/AsignaturaDelTutor'
+        bloques:
+          type: array
+          maxItems: 20
+          description: Bloques LIBRES que todavía no empiezan, del más próximo al más lejano. Puede venir vacía.
+          items:
+            $ref: '#/components/schemas/BloqueLibre'
+        evaluaciones:
+          type: array
+          maxItems: 10
+          description: Evaluaciones visibles, de la más nueva a la más antigua. Puede venir vacía.
+          items:
+            $ref: '#/components/schemas/EvaluacionPublica'
+
+    AsignaturaDelTutor:
+      type: object
+      description: Una asignatura que el tutor tiene activa, con su tarifa y su descripción.
+      required: [asignatura_id, sigla, nombre, tarifa, descripcion]
+      properties:
+        asignatura_id:
+          type: string
+          format: uuid
+        sigla:
+          type: string
+          maxLength: 15
+        nombre:
+          type: string
+          maxLength: 150
+        tarifa:
+          type: integer
+          minimum: 0
+          description: En pesos chilenos. 0 es una tutoría gratuita (RN-05).
+        descripcion:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Puede venir en null.
+
+    BloqueLibre:
+      type: object
+      description: Un bloque de disponibilidad LIBRE del tutor.
+      required: [id, inicio_en, fin_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+        inicio_en:
+          type: string
+          format: date-time
+          description: Inicio, en ISO 8601 y en UTC, con `Z`.
+        fin_en:
+          type: string
+          format: date-time
+          description: Término, posterior al inicio. En ISO 8601 y en UTC, con `Z`.
+
+    EvaluacionPublica:
+      type: object
+      description: Una evaluación visible del tutor. No trae datos de quien evaluó.
+      required: [calificacion, comentario, creada_en, asignatura]
+      properties:
+        calificacion:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comentario:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Puede venir en null.
+        creada_en:
+          type: string
+          format: date-time
+          description: Fecha de la evaluación, en ISO 8601 y en UTC, con `Z`.
+        asignatura:
+          $ref: '#/components/schemas/AsignaturaDeLaEvaluacion'
+
+    AsignaturaDeLaEvaluacion:
+      type: object
+      description: La asignatura de la reserva evaluada.
+      required: [sigla, nombre]
+      properties:
+        sigla:
+          type: string
+          maxLength: 15
+        nombre:
+          type: string
+          maxLength: 150
+
+    Estado:
+      type: object
+      description: Estado del servicio y de su base (HU-01).
+      required: [servicio, estado, base_de_datos, version]
+      properties:
+        servicio:
+          type: string
+          description: El valor de la variable de entorno `NOMBRE_SERVICIO`, que en Docker Compose es `tutoring`. Sin la variable, `desconocido`.
+        estado:
+          type: string
+          enum: [ok, degradado]
+          description: ok si la base responde; degradado si no.
+        base_de_datos:
+          type: string
+          enum: [ok, sin conexion]
+        version:
+          type: string
+          description: La versión del servicio que tiene escrita la vista, hoy 0.1.0. No es la versión de este contrato.
+
+    Error:
+      type: object
+      description: |
+        Formato único de error de la API (Pilar 2, sección 11), el mismo de
+        Identidad. En Tutorías llega con HU-17; antes, el cuerpo de error es
+        solo `{"detail": "<mensaje>"}`.
+
+        - Errores con código propio: `detalles` = null. En las rutas de este
+          contrato son asignatura_requerida y asignatura_invalida (400) y
+          not_found (404).
+        - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
+          petición tiene datos inválidos.» y `detalles` = un objeto con una
+          lista de mensajes por campo. Las rutas de este contrato no los dan.
+        - Otros códigos los pone el framework, como method_not_allowed (405)
+          si se usa un método que la ruta no acepta.
+      required: [codigo, mensaje, detalles]
+      properties:
+        codigo:
+          type: string
+        mensaje:
+          type: string
+        detalles:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: array
+            items:
+              type: string
