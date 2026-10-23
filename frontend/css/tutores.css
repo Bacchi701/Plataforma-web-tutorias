@@ -1,0 +1,406 @@
+/* =========================================
+   BUSQUEDA DE TUTORES Y PERFIL DEL TUTOR (HU-18)
+   tutores.html y tutor.html. Se carga despues de styles.css: usa sus
+   variables y sus clases (subjects-*, tutors-grid, tutor-list-card, rating,
+   avatar, no-results, hidden) y agrega solo lo que estas paginas necesitan.
+========================================= */
+
+/* Texto que leen los lectores de pantalla, invisible en la pagina */
+.busqueda-etiqueta {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.busqueda-asignatura:focus-visible,
+.tarjeta-perfil:focus-visible,
+.perfil-volver:focus-visible {
+    outline: 3px solid var(--duoc-blue-light);
+    outline-offset: 2px;
+}
+
+
+/* =========================================
+   BUSQUEDA: ASIGNATURAS Y TUTORES
+========================================= */
+
+.busqueda-seccion {
+    padding-bottom: 40px;
+    /* Al elegir una asignatura la pagina baja hasta los tutores: que el
+       titulo no quede debajo del encabezado fijo, que mide 78 px */
+    scroll-margin-top: 96px;
+}
+
+/* El encabezado de resultados de styles.css, que aqui puede ir en dos lineas */
+.busqueda-encabezado {
+    flex-wrap: wrap;
+    gap: 6px 16px;
+}
+
+.busqueda-encabezado h2 {
+    overflow-wrap: anywhere;
+}
+
+.busqueda-contador {
+    color: var(--text-light);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.busqueda-asignaturas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.busqueda-asignatura {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 100%;
+    padding: 10px 16px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--duoc-blue);
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.busqueda-asignatura:hover {
+    border-color: var(--duoc-yellow);
+    box-shadow: var(--shadow);
+}
+
+/* La asignatura elegida */
+.busqueda-asignatura[aria-pressed="true"] {
+    background: var(--duoc-blue);
+    border-color: var(--duoc-blue);
+    color: var(--white);
+}
+
+.busqueda-nombre {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.busqueda-sigla {
+    flex-shrink: 0;
+    background: #EEF2F6;
+    color: var(--duoc-blue-light);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.busqueda-aviso {
+    margin-top: 10px;
+}
+
+/* Tarjeta de tutor: tutor-list-card de styles.css, con la sede y el enlace */
+.tutor-list-card h3,
+.tutor-list-card .career,
+.tarjeta-sede {
+    overflow-wrap: anywhere;
+}
+
+.tarjeta-sede {
+    color: var(--text-light);
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+
+.tarjeta-sede i {
+    color: var(--duoc-blue-light);
+}
+
+.tutor-list-card .rating {
+    margin-bottom: 18px;
+}
+
+.tutor-list-card .rating .fa-regular {
+    color: var(--text-light);
+}
+
+.tarjeta-perfil {
+    border: 1px solid var(--duoc-blue);
+    color: var(--duoc-blue);
+    background: var(--white);
+    padding: 8px 13px;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: .2s;
+}
+
+.tarjeta-perfil:hover {
+    background: var(--duoc-blue);
+    color: var(--white);
+}
+
+
+/* =========================================
+   PERFIL DEL TUTOR
+========================================= */
+
+.perfil-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    color: var(--duoc-blue-light);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.perfil-cargando {
+    color: var(--text-light);
+}
+
+.perfil-cabecera {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 24px;
+}
+
+.perfil-avatar {
+    width: 88px;
+    height: 88px;
+    font-size: 28px;
+}
+
+.subjects-hero .perfil-datos h1 {
+    margin: 6px 0 8px;
+    overflow-wrap: anywhere;
+}
+
+.perfil-detalle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-bottom: 8px;
+}
+
+.perfil-detalle i {
+    color: var(--duoc-blue-light);
+}
+
+.perfil-reputacion {
+    justify-content: flex-start;
+    font-size: 15px;
+}
+
+.perfil-reputacion .fa-regular {
+    color: var(--text-light);
+}
+
+.perfil-accion {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 260px;
+}
+
+.perfil-solicitar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.3;
+}
+
+/* Deshabilitado hasta HU-21: sin el efecto de styles.css al pasar el mouse */
+.perfil-solicitar:disabled,
+.perfil-solicitar:disabled:hover {
+    background: var(--duoc-blue);
+    opacity: .55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.perfil-solicitar-estado {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Con .subjects-hero delante, para ganarle a ".subjects-hero p" de styles.css */
+.subjects-hero .perfil-nota {
+    color: var(--text-light);
+    font-size: 13px;
+    text-align: center;
+}
+
+.perfil-aviso {
+    margin-top: 32px;
+}
+
+.perfil-cuerpo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    align-items: start;
+    gap: 24px;
+    margin-top: 32px;
+}
+
+.perfil-seccion {
+    min-width: 0;
+    padding: 24px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.perfil-seccion h2 {
+    color: var(--duoc-blue);
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+
+.perfil-ayuda,
+.perfil-vacio {
+    color: var(--text-light);
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.perfil-lista {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.perfil-lista:empty {
+    display: none;
+}
+
+.perfil-lista li {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow-wrap: anywhere;
+}
+
+.perfil-asignatura-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    color: var(--duoc-blue);
+}
+
+.perfil-tarifa {
+    display: block;
+    margin-top: 6px;
+    color: var(--duoc-blue);
+    font-weight: 700;
+}
+
+.perfil-descripcion,
+.perfil-comentario {
+    margin-top: 4px;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.perfil-sin-comentario {
+    color: var(--text-light);
+    font-style: italic;
+}
+
+.perfil-bloque {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.perfil-bloque i {
+    color: var(--duoc-blue-light);
+    font-size: 18px;
+}
+
+.perfil-bloque strong,
+.perfil-bloque span {
+    display: block;
+}
+
+.perfil-bloque span {
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.perfil-evaluacion-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px 12px;
+}
+
+.perfil-estrellas {
+    color: var(--duoc-yellow);
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.perfil-fecha,
+.perfil-evaluacion-asignatura {
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+.perfil-evaluacion-asignatura {
+    display: block;
+    margin-top: 6px;
+}
+
+
+/* =========================================
+   TELEFONO (RNF-03: se ve completa a 360 px, sin desplazamiento horizontal)
+========================================= */
+
+@media (max-width: 768px) {
+    /* styles.css pone la fila del buscador en columna, y ahi su "flex: 1"
+       deja la caja de texto en 19 px de alto: vuelve a sus 50 px */
+    .subjects-search-input {
+        flex: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .busqueda-asignatura {
+        width: 100%;
+    }
+
+    .tutor-footer {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .perfil-cabecera {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: start;
+        gap: 16px;
+    }
+
+    .perfil-accion {
+        width: 100%;
+        max-width: none;
+    }
+
+    .perfil-seccion {
+        padding: 18px;
+    }
+}
