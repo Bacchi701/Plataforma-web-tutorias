@@ -3,6 +3,8 @@
 -- Las cuentas y sus claves viven en identity_db.
 -- Los identificadores son los mismos en las cuatro bases, para que se pueda
 -- seguir una reserva de una base a otra.
+-- Las fechas son fijas, salvo las de los seis bloques LIBRES 013 a 018: se
+-- calculan desde el dia de la carga, para que siempre haya horas futuras.
 -- Se puede ejecutar las veces que haga falta: vacia sus tablas y las llena.
 -- Uso: .\scripts\cargar_datos_demo.ps1  (o los dos comandos del RUNBOOK).
 
@@ -56,6 +58,23 @@ INSERT INTO bloque_disponibilidad (id, usuario_id, inicio_en, fin_en, estado, cr
     ('60000000-0000-4000-8000-000000000010', '10000000-0000-4000-8000-000000000003', '2026-10-09 15:00:00+00', '2026-10-09 16:00:00+00', 'LIBRE', '2026-09-29 12:00:00+00', '2026-09-29 12:00:00+00'),
     ('60000000-0000-4000-8000-000000000011', '10000000-0000-4000-8000-000000000006', '2026-10-06 18:00:00+00', '2026-10-06 19:00:00+00', 'LIBRE', '2026-09-20 12:00:00+00', '2026-09-20 12:00:00+00'),
     ('60000000-0000-4000-8000-000000000012', '10000000-0000-4000-8000-000000000002', '2026-10-06 21:30:00+00', '2026-10-06 22:30:00+00', 'ELIMINADO', '2026-09-27 12:00:00+00', '2026-09-28 09:00:00+00');
+
+-- Bloques LIBRES futuros, para que el perfil publico de cada tutor (HU-20 y
+-- HU-18) muestre disponibilidad. Van de 3 a 6 dias despues del dia de la carga
+-- (date_trunc('day', now(), 'UTC') es ese dia a las 00:00 UTC), asi siguen en
+-- el futuro aunque la demo sea dos dias despues de cargar los datos.
+-- En hora de Chile (UTC-3 en octubre): Valentina, dia +3 de 18:00 a 19:00 y
+-- dia +5 de 19:00 a 20:30; Matias, dia +4 de 18:30 a 19:30 y dia +6 de 10:00
+-- a 11:00; Fernanda, dia +3 de 11:00 a 12:30 y dia +5 de 15:00 a 16:00.
+-- Como la carga es posterior al 9-10-2026, quedan despues de todos los bloques
+-- de arriba y de los que intenta restricciones/tutoring.sql: no se solapan.
+INSERT INTO bloque_disponibilidad (id, usuario_id, inicio_en, fin_en, estado, creado_en, actualizado_en) VALUES
+    ('60000000-0000-4000-8000-000000000013', '10000000-0000-4000-8000-000000000001', date_trunc('day', now(), 'UTC') + interval '3 days 21 hours', date_trunc('day', now(), 'UTC') + interval '3 days 22 hours', 'LIBRE', now(), now()),
+    ('60000000-0000-4000-8000-000000000014', '10000000-0000-4000-8000-000000000001', date_trunc('day', now(), 'UTC') + interval '5 days 22 hours', date_trunc('day', now(), 'UTC') + interval '5 days 23 hours 30 minutes', 'LIBRE', now(), now()),
+    ('60000000-0000-4000-8000-000000000015', '10000000-0000-4000-8000-000000000002', date_trunc('day', now(), 'UTC') + interval '4 days 21 hours 30 minutes', date_trunc('day', now(), 'UTC') + interval '4 days 22 hours 30 minutes', 'LIBRE', now(), now()),
+    ('60000000-0000-4000-8000-000000000016', '10000000-0000-4000-8000-000000000002', date_trunc('day', now(), 'UTC') + interval '6 days 13 hours', date_trunc('day', now(), 'UTC') + interval '6 days 14 hours', 'LIBRE', now(), now()),
+    ('60000000-0000-4000-8000-000000000017', '10000000-0000-4000-8000-000000000003', date_trunc('day', now(), 'UTC') + interval '3 days 14 hours', date_trunc('day', now(), 'UTC') + interval '3 days 15 hours 30 minutes', 'LIBRE', now(), now()),
+    ('60000000-0000-4000-8000-000000000018', '10000000-0000-4000-8000-000000000003', date_trunc('day', now(), 'UTC') + interval '5 days 18 hours', date_trunc('day', now(), 'UTC') + interval '5 days 19 hours', 'LIBRE', now(), now());
 
 -- Reservas: una en cada estado de la maquina del anexo A (seccion 9).
 -- El tutor no se guarda: es el dueno del bloque (3FN).
