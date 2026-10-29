@@ -66,3 +66,10 @@ JWT_CLAVE_PUBLICA = os.environ.get(
     "JWT_CLAVE_PUBLICA", str(BASE_DIR / "keys" / "jwt_public.pem")
 )
 JWT_EMISOR = "identity"
+
+# ---------- Consultas a Identidad y a Catalogo (HU-14, HU-41) ----------
+# Direcciones dentro de la red de Docker (tutorias/llamadas.py). Tutorias pide
+# GET /yo a Identidad con el mismo token de la peticion, y la malla de una
+# carrera a Catalogo, que es publica: ninguna de las dos necesita una clave.
+URL_IDENTIDAD = os.environ.get("URL_IDENTIDAD", "http://identity:8000")
+URL_CATALOGO = os.environ.get("URL_CATALOGO", "http://catalog:8000")
