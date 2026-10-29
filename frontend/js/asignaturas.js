@@ -2,19 +2,29 @@
 //   GET /api/catalog/v1/carreras                     -> selector de carrera
 //   GET /api/catalog/v1/asignaturas?buscar=texto     -> busqueda sin carrera
 //   GET /api/catalog/v1/carreras/{id}/asignaturas    -> malla vigente por semestre
+//   GET /api/tutoring/v1/tutores?asignatura={id}     -> tutores de una asignatura (HU-40)
+// Si la pagina llega con ?buscar=texto (el buscador de la portada), busca eso
+// al abrir. Cada tarjeta despliega sus tutores con «Ver tutores»: se piden la
+// primera vez que se abre y quedan guardados mientras la pagina siga abierta.
+// La peticion a Tutorias va sin la cabecera Authorization, como en tutores.js:
+// es un dato publico.
 // Los datos se escriben con textContent, nunca con innerHTML, para que un
 // nombre con etiquetas no se ejecute como HTML.
 
 const API = "/api/catalog/v1";
+const TUTORIAS = "/api/tutoring/v1";
 
 let esperaBusqueda;
 let mallaEnMemoria = null; // { carreraId, asignaturas: [...] }
+const tutoresPedidos = new Map(); // id de la asignatura -> promesa con sus tutores
 
 document.addEventListener("DOMContentLoaded", () => {
+    const buscador = document.getElementById("subjectSearch");
+    buscador.value = (new URLSearchParams(window.location.search).get("buscar") || "").trim();
+
     cargarCarreras();
     cargarAsignaturas();
 
-    const buscador = document.getElementById("subjectSearch");
     buscador.addEventListener("input", () => {
         clearTimeout(esperaBusqueda);
         esperaBusqueda = setTimeout(cargarAsignaturas, 300);
@@ -145,8 +155,110 @@ function tarjeta(asignatura) {
     creditos.append(
         ` ${asignatura.creditos ? `${asignatura.creditos} créditos` : "Créditos sin informar"}`
     );
-    pie.appendChild(creditos);
 
-    articulo.append(cuerpo, pie);
+    // Tutores de la asignatura (HU-40, criterio 1), debajo del pie.
+    const idPanel = `tutores-${asignatura.id}`;
+    const boton = elemento("button", "ver-tutores");
+    boton.type = "button";
+    boton.setAttribute("aria-expanded", "false");
+    boton.setAttribute("aria-controls", idPanel);
+    boton.append(elemento("span", null, "Ver tutores"));
+    const flecha = elemento("i", "fa-solid fa-chevron-down");
+    flecha.setAttribute("aria-hidden", "true");
+    boton.appendChild(flecha);
+    pie.append(creditos, boton);
+
+    const panel = elemento("div", "tutores-de-asignatura");
+    panel.id = idPanel;
+    panel.hidden = true;
+    panel.setAttribute("aria-live", "polite");
+    boton.addEventListener("click", () => alternarTutores(asignatura, boton, panel));
+
+    articulo.append(cuerpo, pie, panel);
     return articulo;
+}
+
+// ------------------------------------------------ tutores de una asignatura
+
+async function alternarTutores(asignatura, boton, panel) {
+    const abrir = panel.hidden;
+    panel.hidden = !abrir;
+    boton.setAttribute("aria-expanded", String(abrir));
+    boton.querySelector("span").textContent = abrir ? "Ocultar tutores" : "Ver tutores";
+    if (!abrir || panel.dataset.cargado === "si") {
+        return;
+    }
+
+    panel.replaceChildren(elemento("p", "nota", "Buscando tutores..."));
+    try {
+        const tutores = await tutoresDe(asignatura.id);
+        panel.dataset.cargado = "si";
+        if (tutores.length === 0) {
+            panel.replaceChildren(
+                elemento("p", "nota", "Todavía no hay tutores para esta asignatura.")
+            );
+            return;
+        }
+        const lista = elemento("ul");
+        lista.setAttribute("aria-label", `Tutores de ${asignatura.nombre}`);
+        lista.append(...tutores.map(filaDeTutor));
+        panel.replaceChildren(lista);
+    } catch (error) {
+        // Sin marcarlo como cargado: al volver a abrir se intenta de nuevo.
+        console.error("No se pudo consultar Tutorías:", error);
+        tutoresPedidos.delete(asignatura.id);
+        panel.replaceChildren(
+            elemento("p", "nota", "No pudimos cargar los tutores. Inténtalo de nuevo en unos minutos.")
+        );
+    }
+}
+
+function tutoresDe(asignaturaId) {
+    if (!tutoresPedidos.has(asignaturaId)) {
+        const url = `${TUTORIAS}/tutores?${new URLSearchParams({ asignatura: asignaturaId })}`;
+        tutoresPedidos.set(
+            asignaturaId,
+            fetch(url, { headers: { Accept: "application/json" } }).then((respuesta) => {
+                if (!respuesta.ok) {
+                    throw new Error(`Tutorías respondió ${respuesta.status}`);
+                }
+                return respuesta.json();
+            })
+        );
+    }
+    return tutoresPedidos.get(asignaturaId);
+}
+
+// Un tutor: su nombre con el enlace al perfil, su evaluación y su tarifa.
+function filaDeTutor(tutor) {
+    const fila = elemento("li", "tutor-de-asignatura");
+    const datos = elemento("div");
+    const enlace = elemento("a", null, `${tutor.nombre} ${tutor.apellido}`);
+    enlace.href = `tutor.html?${new URLSearchParams({ id: tutor.usuario_id })}`;
+
+    const detalle = elemento("span", "detalle");
+    const reputacion = tutor.reputacion;
+    if (reputacion && reputacion.total > 0) {
+        const estrella = elemento("i", "fa-solid fa-star");
+        estrella.setAttribute("aria-hidden", "true");
+        const promedio = Number(reputacion.promedio).toLocaleString("es-CL", {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+        });
+        detalle.append(estrella, ` ${promedio} (${reputacion.total})`);
+    } else {
+        detalle.textContent = "Sin evaluaciones";
+    }
+    datos.append(enlace, detalle);
+    fila.append(datos, elemento("strong", null, tarifaEnTexto(tutor.tarifa)));
+    return fila;
+}
+
+// "Gratis" si es 0; si no, en pesos con el separador de miles chileno: $5.000.
+function tarifaEnTexto(tarifa) {
+    const monto = Math.round(Number(tarifa));
+    if (monto === 0) {
+        return "Gratis";
+    }
+    return `$${String(monto).replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
 }

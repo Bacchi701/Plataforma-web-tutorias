@@ -76,10 +76,11 @@ function buscarTutor() {
 }
 
 
-// Abre la busqueda de tutores con el texto ya buscado (HU-18).
+// Abre Asignaturas con el texto ya buscado: ahi cada asignatura despliega
+// sus tutores (HU-40). La busqueda por nombre del tutor esta en tutores.html.
 function irABusqueda(texto) {
 
     window.location.href =
-        `tutores.html?buscar=${encodeURIComponent(texto)}`;
+        `asignaturas.html?buscar=${encodeURIComponent(texto)}`;
 
 }
