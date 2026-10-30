@@ -39,7 +39,25 @@ const Sesion = {
         return r;
     },
 
-    async renovar() {
+    // Una sola renovacion a la vez. Cada /refresh rota la cookie: si el
+    // encabezado y la pagina renuevan al mismo tiempo, el segundo /refresh
+    // llega con la cookie vieja, recibe 401 y esa parte de la pagina queda sin
+    // sesion. Mientras haya una renovacion en curso, las demas llamadas
+    // esperan esa misma respuesta. La promesa vive en el propio objeto, no en
+    // un nombre global: las paginas cargan scripts clasicos, que comparten los
+    // globales.
+    _renovacionEnCurso: null,
+
+    renovar() {
+        if (!this._renovacionEnCurso) {
+            this._renovacionEnCurso = this._renovarAhora().finally(() => {
+                this._renovacionEnCurso = null;
+            });
+        }
+        return this._renovacionEnCurso;
+    },
+
+    async _renovarAhora() {
         const r = await this.pedir("/refresh", { method: "POST" });
         this.tokenAcceso = r.ok ? r.cuerpo.token_acceso : null;
         return r.ok;

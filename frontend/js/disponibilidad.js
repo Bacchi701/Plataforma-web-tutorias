@@ -8,21 +8,8 @@
 // computador, y viajan en UTC (toISOString) (criterio 6, RNF-08).
 // Los datos se escriben con textContent, nunca con innerHTML.
 
-// El encabezado (sesion.js) y esta pagina piden la sesion al mismo tiempo, y
-// dos /refresh simultaneos gastan la misma renovacion: el segundo recibe 401 y
-// su parte de la pagina se queda sin sesion. Mientras haya una renovacion en
-// curso, las demas llamadas esperan esa misma respuesta.
-// Es el mismo bloque de perfil.js (HU-10): despues del 23-10 los dos pasan a sesion.js.
-const renovarSinCompartir = Sesion.renovar;
-let renovacionEnCurso = null;
-Sesion.renovar = function () {
-    if (!renovacionEnCurso) {
-        renovacionEnCurso = renovarSinCompartir.call(Sesion).finally(() => {
-            renovacionEnCurso = null;
-        });
-    }
-    return renovacionEnCurso;
-};
+// El encabezado (sesion.js) y esta pagina piden la sesion al mismo tiempo: la
+// renovacion se comparte en Sesion.renovar (sesion.js).
 
 // El resto va dentro de una funcion, para no chocar con los nombres globales
 // de sesion.js (Sesion, mensajeDeError, avisar...).
