@@ -1,6 +1,8 @@
-%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 5 de 5
-%% Vista global: solo las entidades que participan de una frontera entre servicios.
+%% Pilar 2 · Anexo A v1.5 — Modelo de datos · Diagrama 5 de 5
+%% Vista global: las entidades que participan de una frontera entre servicios, con algunas de su base como contexto.
 %% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% Es el modelo implementado: las migraciones del 01-10-2026, con la revisión de normalización
+%% del 30-09-2026. Coincide con el anexo A v1.5.
 %% Línea continua = clave foránea real dentro de una misma base.
 %% Línea punteada = referencia lógica entre servicios: ninguna base la garantiza.
 %% El prefijo del nombre indica la base: identidad_, catalogo_, tutorias_, pagos_.
@@ -45,8 +47,8 @@ erDiagram
 
     tutorias_usuario_ref {
         uuid usuario_id PK "copia de lectura"
-        varchar carrera_nombre "150"
-        varchar sede_nombre "120"
+        uuid carrera_id "copia · referencia lógica"
+        uuid sede_id "copia · referencia lógica"
         boolean activo "sincronizado por el programador · A-01 · hasta 5 min de desfase"
         numeric reputacion_promedio "dato propio de Tutorías"
     }
@@ -63,7 +65,7 @@ erDiagram
 
     tutorias_bloque_disponibilidad {
         uuid id PK "dos instantes en UTC"
-        varchar estado "LIBRE u OCUPADO"
+        varchar estado "LIBRE, OCUPADO o ELIMINADO"
     }
 
     tutorias_reserva {
@@ -91,15 +93,15 @@ erDiagram
     tutorias_asignatura_ref ||--o{ tutorias_perfil_tutor : "FK real en tutoring_db"
     tutorias_usuario_ref ||--o{ tutorias_bloque_disponibilidad : "FK real en tutoring_db"
     tutorias_bloque_disponibilidad ||--o{ tutorias_reserva : "FK real en tutoring_db"
-    tutorias_usuario_ref ||--o{ tutorias_reserva : "FK real · tutor y solicitante"
+    tutorias_usuario_ref ||--o{ tutorias_reserva : "FK real · solicitante (el tutor llega por el bloque)"
     tutorias_reserva ||--o| tutorias_evaluacion : "FK real en tutoring_db"
 
     identidad_usuario ||..o| tutorias_usuario_ref : "llamada 2 · nace al primer contacto con Tutorías"
-    catalogo_carrera ||..o{ tutorias_usuario_ref : "llamada 1 · copia carrera_nombre"
-    catalogo_sede ||..o{ tutorias_usuario_ref : "llamada 1 · copia sede_nombre"
     catalogo_asignatura ||..o| tutorias_asignatura_ref : "llamada 1 · copia sigla y nombre"
     catalogo_malla_asignatura }o..o{ tutorias_perfil_tutor : "llamada 1 · valida RN-01 al declarar"
     identidad_usuario }o..o| catalogo_carrera : "carrera_id · sin integridad referencial"
     identidad_usuario }o..o| catalogo_sede : "sede_id · sin integridad referencial"
+    tutorias_usuario_ref }o..o| catalogo_carrera : "carrera_id copiado · el nombre se pide a Catálogo (M-01)"
+    tutorias_usuario_ref }o..o| catalogo_sede : "sede_id copiado · el nombre se pide a Catálogo (M-01)"
     tutorias_reserva ||..o| pagos_pago : "llamadas 3 y 4 · sin integridad referencial"
-    tutorias_reserva }o..o{ identidad_aviso_correo : "llamada 2 · Tutorías pide el correo"
+    tutorias_reserva |o..o{ identidad_aviso_correo : "llamada 2 · Tutorías pide el correo"
