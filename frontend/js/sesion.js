@@ -150,3 +150,49 @@ async function mostrarSesionEnEncabezado() {
 }
 
 document.addEventListener("DOMContentLoaded", mostrarSesionEnEncabezado);
+
+// Boton ☰ del encabezado: hasta 950 px, .nav-menu y .nav-actions se esconden
+// y este boton los muestra debajo de la marca (.menu-abierto en styles.css).
+// Se cierra con Escape o al elegir un enlace.
+function activarMenuMovil() {
+    const boton = document.querySelector(".mobile-menu");
+    const encabezado = document.querySelector(".header");
+    if (!boton || !encabezado) {
+        return;
+    }
+    boton.type = "button";
+    boton.setAttribute("aria-label", "Abrir menú");
+    boton.setAttribute("aria-expanded", "false");
+
+    const marcar = (abierto) => {
+        encabezado.classList.toggle("menu-abierto", abierto);
+        boton.setAttribute("aria-expanded", String(abierto));
+        boton.setAttribute("aria-label", abierto ? "Cerrar menú" : "Abrir menú");
+    };
+
+    boton.addEventListener("click", () => {
+        marcar(!encabezado.classList.contains("menu-abierto"));
+    });
+
+    document.addEventListener("keydown", (evento) => {
+        if (evento.key !== "Escape" || !encabezado.classList.contains("menu-abierto")) {
+            return;
+        }
+        // Si el foco estaba en el menu, vuelve al boton en vez de perderse.
+        const focoEnMenu = encabezado.contains(document.activeElement);
+        marcar(false);
+        if (focoEnMenu) {
+            boton.focus();
+        }
+    });
+
+    // En el encabezado y no en cada enlace: .nav-actions cambia sus enlaces
+    // al abrir la sesion (mostrarSesionEnEncabezado).
+    encabezado.addEventListener("click", (evento) => {
+        if (evento.target.closest(".nav-menu a, .nav-actions a")) {
+            marcar(false);
+        }
+    });
+}
+
+document.addEventListener("DOMContentLoaded", activarMenuMovil);

@@ -611,6 +611,99 @@ button {
     font-size: 14px;
 }
 
+/* Cada paso se despliega con su detalle. Con mouse, al pasar el mouse o al
+   llegar con Tab, y el clic no hace nada. En pantallas táctiles, con un
+   toque en la tarjeta o en "Ver más". */
+.steps-grid {
+    align-items: start;
+}
+
+.step-card {
+    cursor: pointer;
+}
+
+.step-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--duoc-blue-light);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.step-toggle:focus-visible {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+.step-toggle i {
+    font-size: 12px;
+    transition: transform .3s;
+}
+
+.step-detail {
+    max-height: 0;
+    margin: 0;
+    padding: 0 0 0 18px;
+    overflow: hidden;
+    opacity: 0;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    transition: max-height .35s ease, opacity .25s ease, margin .35s ease;
+}
+
+.step-detail li + li {
+    margin-top: 6px;
+}
+
+.step-card.abierta .step-detail {
+    max-height: 420px;
+    margin-top: 12px;
+    opacity: 1;
+}
+
+.step-card.abierta .step-toggle i {
+    transform: rotate(180deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .step-card {
+        cursor: default;
+    }
+
+    .step-toggle {
+        display: none;
+    }
+
+    .step-card:hover .step-detail,
+    .step-card:focus-visible .step-detail {
+        max-height: 420px;
+        margin-top: 12px;
+        opacity: 1;
+    }
+
+    .step-card:focus-visible {
+        outline: 2px solid var(--duoc-blue-light);
+        outline-offset: 3px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .step-card,
+    .step-detail,
+    .step-toggle i {
+        transition: none;
+    }
+}
+
 
 /* =========================================
    TUTORES
@@ -1206,6 +1299,37 @@ footer a:hover {
 
     .mobile-menu {
         display: block;
+    }
+
+    /* Menú abierto con ☰ (sesion.js): los enlaces y los botones de la
+       sesión, en columna, debajo de la marca y del botón. */
+    .header.menu-abierto {
+        height: auto;
+    }
+
+    .header.menu-abierto .navbar {
+        flex-wrap: wrap;
+        padding: 16px 0 20px;
+    }
+
+    .header.menu-abierto .nav-menu,
+    .header.menu-abierto .nav-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+        width: 100%;
+        order: 1;
+    }
+
+    .header.menu-abierto .nav-menu {
+        margin-top: 18px;
+    }
+
+    .header.menu-abierto .nav-actions {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
     }
 
     .hero-grid {
