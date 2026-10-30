@@ -123,6 +123,7 @@ function mostrarPerfil(perfil, nombres) {
         .getElementById("reputacionTutor")
         .replaceChildren(...partesDeReputacion(perfil.reputacion));
 
+    llenarLista("etiquetasTutor", perfil.asignaturas.map(etiquetaDeAsignatura), null);
     llenarLista("listaAsignaturas", perfil.asignaturas.map(asignaturaDelPerfil), null);
     llenarLista("listaBloques", perfil.bloques.map(bloqueDisponible), "sinBloques");
     llenarLista("listaEvaluaciones", perfil.evaluaciones.map(evaluacionVisible), "sinEvaluaciones");
@@ -152,6 +153,16 @@ function partesDeReputacion(reputacion) {
         elemento("strong", null, decimal(reputacion.promedio)),
         elemento("span", null, `(${cantidad(reputacion.total, "evaluación", "evaluaciones")})`),
     ];
+}
+
+// Etiqueta con la sigla y el nombre, bajo el nombre del tutor.
+function etiquetaDeAsignatura(asignatura) {
+    const etiqueta = elemento("li");
+    etiqueta.append(
+        elemento("span", "etiqueta-sigla", asignatura.sigla),
+        elemento("span", null, asignatura.nombre)
+    );
+    return etiqueta;
 }
 
 function asignaturaDelPerfil(asignatura) {

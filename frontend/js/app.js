@@ -24,6 +24,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
+    // Pasos de "Encuentra ayuda en pocos pasos". Con mouse, la tarjeta se
+    // abre al pasar el mouse o al llegar con Tab (solo CSS) y el clic no
+    // hace nada. En pantallas tactiles, un toque en la tarjeta (o Enter en
+    // "Ver más") la deja abierta o la cierra.
+    const conMouse =
+        window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+    if (!conMouse) {
+
+        document.querySelectorAll(".step-card").forEach((tarjeta) => {
+
+            const boton = tarjeta.querySelector(".step-toggle");
+
+            if (!boton) {
+                return;
+            }
+
+            tarjeta.addEventListener("click", () => {
+
+                const abierta = tarjeta.classList.toggle("abierta");
+
+                boton.setAttribute("aria-expanded", String(abierta));
+                boton.querySelector("span").textContent = abierta ? "Ver menos" : "Ver más";
+
+            });
+
+        });
+    }
+
+
     // "Prueba con": cada asignatura abre la busqueda de tutores con su
     // nombre, o con data-buscar si el nombre del boton no coincide con el
     // del catalogo (el catalogo dice "Matematica", no "Matematicas").
