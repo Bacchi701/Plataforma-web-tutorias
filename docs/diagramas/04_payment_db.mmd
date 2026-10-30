@@ -1,11 +1,14 @@
-%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 4 de 5
+%% Pilar 2 · Anexo A v1.5 — Modelo de datos · Diagrama 4 de 5
 %% payment_db — Servicio de Pagos · 2 tablas
 %% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% Es el modelo implementado: las migraciones del 01-10-2026, con la revisión de normalización
+%% del 30-09-2026. Coincide con el anexo A v1.5.
+%% Los DEFAULT y los ON DELETE los aplica Django, no la base (anexo A, sección 2).
 %% Pagos no conoce usuarios ni asignaturas: solo reservas y montos.
 %% Si el componente se retira, estas dos tablas desaparecen y reserva.estado_pago queda en nulo.
 erDiagram
     pago {
-        uuid id PK "gen_random_uuid"
+        uuid id PK "uuid4 de Django"
         uuid reserva_id UK "referencia lógica a tutoring_db.reserva · un pago por reserva"
         numeric monto "8 enteros en pesos · CHECK mayor que cero · sin tarifa no hay pago"
         varchar estado "12 · DEFAULT PENDIENTE · PAGADO, FALLIDO o REEMBOLSADO · RN-05"

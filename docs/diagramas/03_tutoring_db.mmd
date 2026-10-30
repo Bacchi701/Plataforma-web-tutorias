@@ -1,18 +1,19 @@
-%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 3 de 5
+%% Pilar 2 · Anexo A v1.5 — Modelo de datos · Diagrama 3 de 5
 %% tutoring_db — Servicio de Tutorías · 7 tablas
 %% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% Es el modelo implementado: las migraciones del 01-10-2026, con la revisión de normalización
+%% del 30-09-2026. Coincide con el anexo A v1.5.
+%% Los DEFAULT y los ON DELETE los aplica Django, no la base (anexo A, sección 2).
 %% usuario_ref y asignatura_ref son copias de lectura de otros servicios (AD-07).
 %% Dentro de esta base son tablas normales, con FK reales: por eso la búsqueda de
 %% tutores se resuelve sin una sola llamada HTTP.
 erDiagram
     usuario_ref {
-        uuid usuario_id PK "el id de identity_db es la PK · la fila nace al primer contacto con Tutorías (T-02)"
+        uuid usuario_id PK "el id de identity_db es la PK · la fila nace al primer contacto con Tutorías (M-09)"
         varchar nombre "80 · copia"
         varchar apellido "80 · copia"
         uuid carrera_id "NULL · copia"
-        varchar carrera_nombre "150 · NULL · lo entrega Catálogo, no Identidad"
         uuid sede_id "NULL · copia"
-        varchar sede_nombre "120 · NULL · lo entrega Catálogo"
         boolean activo "DEFAULT true · sin esta columna RN-08 no se cumple (A-01) · hasta 5 min de desfase"
         numeric reputacion_promedio "3 y 2 decimales · DEFAULT 0 · CHECK entre 0 y 5"
         integer reputacion_total "DEFAULT 0 · evaluaciones visibles · CHECK no negativa"
@@ -38,27 +39,26 @@ erDiagram
     }
 
     bloque_disponibilidad {
-        uuid id PK "gen_random_uuid"
+        uuid id PK "uuid4 de Django"
         uuid usuario_id FK "ON DELETE CASCADE"
         timestamptz inicio_en "UTC · dos instantes en vez de fecha y horas (A-02) · solo futuro al crear"
         timestamptz fin_en "CHECK posterior a inicio_en · EXCLUDE gist impide solapar · RN-02"
-        varchar estado "10 · LIBRE u OCUPADO · pasa a OCUPADO al confirmar"
+        varchar estado "10 · LIBRE, OCUPADO o ELIMINADO · el EXCLUDE ignora los eliminados (T-169)"
         timestamptz creado_en "DEFAULT now"
         timestamptz actualizado_en "DEFAULT now"
     }
 
     reserva {
         uuid id PK "cruza a payment_db.pago.reserva_id"
-        uuid bloque_id FK "ON DELETE RESTRICT · único parcial por estado ocupado (A-03)"
-        uuid tutor_usuario_id FK "ON DELETE RESTRICT"
-        uuid solicitante_usuario_id FK "CHECK distinto del tutor · RN-03"
+        uuid bloque_id FK "ON DELETE RESTRICT · el tutor es el dueño del bloque (3FN) · único parcial (A-03)"
+        uuid solicitante_usuario_id FK "distinto del dueño del bloque: disparador trg_reserva_no_auto · RN-03"
         uuid asignatura_id FK "ON DELETE RESTRICT"
         varchar estado "12 · DEFAULT SOLICITADA · siete valores · ver sección 9"
         varchar nota "500 · NULL · la escribe el solicitante · RF-07"
         varchar modalidad "12 · NULL · PRESENCIAL o EN_LINEA · obligatoria al confirmar · RN-07"
         varchar lugar_o_enlace "300 · NULL · lo indica el tutor al confirmar · RN-07"
         numeric monto "8 enteros · copia congelada de la tarifa al solicitar (A-04)"
-        varchar estado_pago "12 · NULL · copia de lectura de Pagos · NULL si monto es 0"
+        varchar estado_pago "12 · NULL · copia de lectura de Pagos · NULL si monto es 0 o hasta que Pagos crea el pago (T-174)"
         timestamptz pago_actualizado_en "NULL · descarta avisos fuera de orden (A-06)"
         uuid cancelada_por_usuario_id FK "NULL · quién canceló · RN-04 (A-05)"
         timestamptz creada_en "DEFAULT now"
@@ -92,7 +92,6 @@ erDiagram
     asignatura_ref ||--o{ perfil_tutor : "es tutoreada en"
     usuario_ref ||--o{ bloque_disponibilidad : "publica"
     bloque_disponibilidad ||--o{ reserva : "recibe solicitudes de"
-    usuario_ref ||--o{ reserva : "imparte como tutor"
     usuario_ref ||--o{ reserva : "solicita como estudiante"
     usuario_ref |o--o{ reserva : "canceló · RN-04"
     asignatura_ref ||--o{ reserva : "es la materia de"

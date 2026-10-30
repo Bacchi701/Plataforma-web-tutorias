@@ -1,13 +1,16 @@
-%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 1 de 5
+%% Pilar 2 · Anexo A v1.5 — Modelo de datos · Diagrama 1 de 5
 %% identity_db — Servicio de Identidad · 4 tablas
 %% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% Es el modelo implementado: las migraciones del 01-10-2026, con la revisión de normalización
+%% del 30-09-2026. Coincide con el anexo A v1.5.
+%% Los DEFAULT y los ON DELETE los aplica Django, no la base (anexo A, sección 2).
 %% Toda clave foránea de este diagrama es real dentro de identity_db.
 %% Las referencias a otras bases (carrera_id, sede_id) son identificadores sueltos, sin FK: AD-08.
 erDiagram
     usuario {
-        uuid id PK "gen_random_uuid · viaja como sub del JWT"
+        uuid id PK "uuid4 de Django · viaja como sub del JWT"
         varchar email UK "150 · único por lower(email) · CHECK dominio duocuc.cl"
-        varchar password_hash "128 · Argon2 o PBKDF2 · nunca sale del servicio"
+        varchar password_hash "128 · PBKDF2 de Django · nunca sale del servicio"
         varchar nombre "80 · se copia a tutoring_db.usuario_ref"
         varchar apellido "80 · se copia a tutoring_db.usuario_ref"
         uuid carrera_id "NULL · referencia lógica a catalog_db.carrera"
