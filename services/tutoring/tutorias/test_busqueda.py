@@ -1,4 +1,4 @@
-"""Pruebas de la busqueda de tutores (HU-20, criterios 1 a 4).
+"""Pruebas de la busqueda de tutores (HU-20, criterios 1 a 4, y HU-40).
 
 Cada prueba arma sus datos con el modelo y consulta la API sin sesion, como lo
 hace el frontend. El criterio 5 (500 usuarios, menos de 2 segundos) no se mide
@@ -34,11 +34,11 @@ TUTORES = "/api/tutoring/v1/tutores"
 # ------------------------------------------------------------- datos de prueba
 
 
-def persona(nombre, activo=True, promedio="0.00", total=0):
+def persona(nombre, activo=True, promedio="0.00", total=0, apellido="Demo"):
     return UsuarioRef.objects.create(
         usuario_id=uuid.uuid4(),
         nombre=nombre,
-        apellido="Demo",
+        apellido=apellido,
         carrera_id=uuid.uuid4(),
         sede_id=uuid.uuid4(),
         activo=activo,
@@ -278,18 +278,184 @@ def test_una_asignatura_sin_tutores_responde_una_lista_vacia(client, base_de_dat
 @pytest.mark.parametrize(
     ("consulta", "codigo"),
     [
-        ({}, "asignatura_requerida"),
-        ({"asignatura": ""}, "asignatura_requerida"),
         ({"asignatura": "base-de-datos"}, "asignatura_invalida"),
+        ({"min_reputacion": "0"}, "reputacion_invalida"),
+        ({"min_reputacion": "5.5"}, "reputacion_invalida"),
+        ({"min_reputacion": "cuatro"}, "reputacion_invalida"),
+        ({"min_reputacion": "NaN"}, "reputacion_invalida"),
+        ({"min_reputacion": "1e3"}, "reputacion_invalida"),
+        ({"buscar": "a" * 81}, "busqueda_invalida"),
     ],
 )
-def test_sin_asignatura_o_con_un_valor_que_no_es_uuid_responde_400(
-    client, consulta, codigo
-):
+def test_parametros_invalidos_responden_400(client, consulta, codigo):
     respuesta = client.get(TUTORES, consulta)
 
     assert respuesta.status_code == 400
     assert codigo_de_error(respuesta) == codigo
+
+
+# --------------------------------------- GET /tutores sin asignatura (HU-40)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("consulta", [{}, {"asignatura": ""}, {"asignatura": "  "}])
+def test_sin_asignatura_lista_los_mejor_evaluados_con_sus_asignaturas(
+    client, base_de_datos, redes, consulta
+):
+    """Criterio 2: sin asignatura, un resultado por tutor, del mejor evaluado."""
+    valentina = persona("Valentina", promedio="5.00", total=1, apellido="Soto")
+    PerfilTutor.objects.create(usuario=valentina, asignatura=redes, tarifa=2000)
+    PerfilTutor.objects.create(usuario=valentina, asignatura=base_de_datos, tarifa=0)
+    matias = persona("Matías", promedio="4.50", total=4, apellido="Fuentes")
+    PerfilTutor.objects.create(usuario=matias, asignatura=base_de_datos, tarifa=3000)
+    nuevo = persona("Nuevo")
+    PerfilTutor.objects.create(usuario=nuevo, asignatura=redes)
+    # No salen: la cuenta desactivada (RN-08) y el perfil desactivado (RN-01).
+    desactivada = persona("Desactivada", activo=False, promedio="5.00", total=3)
+    PerfilTutor.objects.create(usuario=desactivada, asignatura=redes)
+    sin_perfil = persona("Sin perfil activo", promedio="5.00", total=3)
+    PerfilTutor.objects.create(usuario=sin_perfil, asignatura=redes, activo=False)
+
+    respuesta = client.get(TUTORES, consulta)
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert nombres(cuerpo) == ["Valentina", "Matías", "Nuevo"]
+    primera = cuerpo[0]
+    assert set(primera) == {
+        "usuario_id",
+        "nombre",
+        "apellido",
+        "carrera_id",
+        "sede_id",
+        "reputacion",
+        "asignaturas",
+    }
+    assert primera["usuario_id"] == str(valentina.usuario_id)
+    assert primera["reputacion"] == {"promedio": 5.0, "total": 1}
+    # Sus asignaturas activas, por sigla, cada una con su tarifa.
+    assert primera["asignaturas"] == [
+        {
+            "asignatura_id": str(base_de_datos.asignatura_id),
+            "sigla": "BDD1101",
+            "nombre": "Base de Datos",
+            "tarifa": 0,
+        },
+        {
+            "asignatura_id": str(redes.asignatura_id),
+            "sigla": "RED1101",
+            "nombre": "Fundamentos de Redes",
+            "tarifa": 2000,
+        },
+    ]
+
+
+@pytest.mark.django_db
+def test_sin_asignatura_trae_hasta_24_tutores(client, base_de_datos):
+    for numero in range(25):
+        tutor = persona(f"Tutor {numero:02d}")
+        PerfilTutor.objects.create(usuario=tutor, asignatura=base_de_datos)
+
+    cuerpo = client.get(TUTORES).json()
+
+    assert len(cuerpo) == 24
+    # Con la misma reputacion, el orden es por nombre: queda fuera el ultimo.
+    assert nombres(cuerpo)[-1] == "Tutor 23"
+
+
+@pytest.mark.django_db
+def test_busca_por_nombre_y_apellido_sin_tildes_ni_mayusculas(
+    client, base_de_datos, redes
+):
+    """Criterio 3: cada palabra tiene que estar en el nombre o el apellido."""
+    matias = persona("Matías", apellido="Fuentes")
+    PerfilTutor.objects.create(usuario=matias, asignatura=base_de_datos)
+    valentina = persona("Valentina", apellido="Soto Muñoz")
+    PerfilTutor.objects.create(usuario=valentina, asignatura=redes)
+
+    casos = {
+        "matias": ["Matías"],
+        "MATÍAS": ["Matías"],
+        "mat fue": ["Matías"],
+        "munoz": ["Valentina"],
+        "  soto   val ": ["Valentina"],
+        "matias soto": [],
+        "zzz": [],
+    }
+    for texto, esperados in casos.items():
+        respuesta = client.get(TUTORES, {"buscar": texto})
+        assert respuesta.status_code == 200, texto
+        assert nombres(respuesta.json()) == esperados, texto
+
+
+@pytest.mark.django_db
+def test_la_busqueda_por_nombre_tambien_filtra_una_asignatura(
+    client, base_de_datos, redes
+):
+    matias = persona("Matías", apellido="Fuentes")
+    PerfilTutor.objects.create(usuario=matias, asignatura=base_de_datos, tarifa=3000)
+    PerfilTutor.objects.create(usuario=matias, asignatura=redes)
+    PerfilTutor.objects.create(usuario=persona("Valentina"), asignatura=base_de_datos)
+
+    respuesta = client.get(
+        TUTORES, {"asignatura": str(base_de_datos.asignatura_id), "buscar": "matias"}
+    )
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    # Con asignatura, el formato de HU-20: la tarifa en esa asignatura.
+    assert nombres(cuerpo) == ["Matías"]
+    assert cuerpo[0]["tarifa"] == 3000
+    assert cuerpo[0]["asignatura"]["sigla"] == "BDD1101"
+
+
+@pytest.mark.django_db
+def test_la_evaluacion_minima_deja_fuera_a_los_de_menos_y_a_los_sin_evaluaciones(
+    client, base_de_datos
+):
+    """Criterio 4: los que todavia no tienen evaluaciones quedan fuera."""
+    for nombre, promedio, total in (
+        ("Cinco", "5.00", 1),
+        ("Cuatro y medio", "4.50", 2),
+        ("Tres", "3.00", 5),
+        ("Sin evaluaciones", "0.00", 0),
+    ):
+        tutor = persona(nombre, promedio=promedio, total=total)
+        PerfilTutor.objects.create(usuario=tutor, asignatura=base_de_datos)
+
+    casos = {
+        "4": ["Cinco", "Cuatro y medio"],
+        "4,5": ["Cinco", "Cuatro y medio"],
+        "4.6": ["Cinco"],
+        "3": ["Cinco", "Cuatro y medio", "Tres"],
+        "1": ["Cinco", "Cuatro y medio", "Tres"],
+    }
+    for minimo, esperados in casos.items():
+        sin_asignatura = client.get(TUTORES, {"min_reputacion": minimo})
+        con_asignatura = client.get(
+            TUTORES,
+            {
+                "asignatura": str(base_de_datos.asignatura_id),
+                "min_reputacion": minimo,
+            },
+        )
+        assert nombres(sin_asignatura.json()) == esperados, minimo
+        assert nombres(con_asignatura.json()) == esperados, minimo
+
+
+@pytest.mark.django_db
+def test_sin_asignatura_no_hace_una_consulta_por_tutor(client, base_de_datos, redes):
+    tutor = persona("Uno")
+    PerfilTutor.objects.create(usuario=tutor, asignatura=base_de_datos)
+    con_uno = cantidad_de_consultas(client, TUTORES)
+
+    for nombre in ("Dos", "Tres", "Cuatro"):
+        otro = persona(nombre)
+        PerfilTutor.objects.create(usuario=otro, asignatura=base_de_datos)
+        PerfilTutor.objects.create(usuario=otro, asignatura=redes)
+    con_cuatro = cantidad_de_consultas(client, TUTORES, buscar="o")
+
+    assert con_cuatro == con_uno
 
 
 # ------------------------------------------------------ GET /tutores/<id> (3)
@@ -444,6 +610,7 @@ def test_no_llama_a_otros_servicios_ni_devuelve_el_correo(
 
     for respuesta in (
         buscar(client, base_de_datos),
+        client.get(TUTORES),
         perfil_de(client, tutora.usuario_id),
     ):
         assert respuesta.status_code == 200

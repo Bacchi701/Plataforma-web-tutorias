@@ -1,0 +1,113 @@
+/* =========================================
+   ASIGNATURAS CON SUS TUTORES (HU-40)
+   asignaturas.html. Se carga despues de styles.css y usa sus variables.
+========================================= */
+
+/* Al desplegar una tarjeta, las de su fila no se estiran */
+.subjects-list {
+    align-items: start;
+}
+
+.ver-tutores {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--duoc-blue);
+    border-radius: 7px;
+    background: var(--white);
+    color: var(--duoc-blue);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: .2s;
+}
+
+.ver-tutores:hover,
+.ver-tutores[aria-expanded="true"] {
+    background: var(--duoc-blue);
+    color: var(--white);
+}
+
+.ver-tutores:focus-visible,
+.tutor-de-asignatura a:focus-visible {
+    outline: 3px solid var(--duoc-blue-light);
+    outline-offset: 2px;
+}
+
+.ver-tutores i {
+    font-size: 12px;
+    transition: transform .3s;
+}
+
+.ver-tutores[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+
+/* Pie de la tarjeta: los créditos a la izquierda y «Ver tutores» a la derecha */
+.subject-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.tutores-de-asignatura {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.tutores-de-asignatura[hidden] {
+    display: none;
+}
+
+.tutores-de-asignatura ul {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tutor-de-asignatura {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.tutor-de-asignatura a {
+    color: var(--duoc-blue);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.tutor-de-asignatura .detalle {
+    display: block;
+    color: var(--text-light);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.tutor-de-asignatura .fa-star {
+    color: var(--duoc-yellow);
+}
+
+.tutor-de-asignatura strong {
+    flex-shrink: 0;
+    color: var(--duoc-blue);
+    font-size: 14px;
+}
+
+.tutores-de-asignatura .nota {
+    color: var(--text-light);
+    font-size: 14px;
+}

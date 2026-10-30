@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tutores | Tutorías Duoc UC</title>
-    <meta name="description" content="Busca una asignatura y encuentra estudiantes tutores en la plataforma de tutorías Duoc UC.">
+    <meta name="description" content="Busca un tutor por su nombre o revisa los tutores mejor evaluados de la plataforma de tutorías Duoc UC.">
 
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/tutores.css">
@@ -50,23 +50,32 @@
     <div class="container">
         <div class="subjects-hero-content">
             <span class="page-label">BUSCA UN TUTOR</span>
-            <h1>¿Con qué asignatura necesitas ayuda?</h1>
+            <h1>Encuentra a tu tutor</h1>
             <p>
-                Escribe parte del nombre o de la sigla, elige la asignatura y revisa quién la tutorea, con su tarifa y su reputación.
+                Busca a un tutor por su nombre o revisa los mejor evaluados. Si buscas por asignatura, entra a <a href="asignaturas.html" class="enlace-texto">Asignaturas</a> y despliega sus tutores.
             </p>
         </div>
     </div>
 </section>
 
-<!-- BUSCADOR DE ASIGNATURAS (API de Catálogo, HU-12) -->
+<!-- BUSCADOR POR NOMBRE Y FILTRO POR EVALUACIÓN (API de Tutorías, HU-40) -->
 <section class="subjects-tools">
     <div class="container">
         <form class="subjects-search-box" id="formularioBusqueda" role="search">
             <div class="subjects-search-row">
                 <div class="subjects-search-input">
                     <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                    <label for="textoBusqueda" class="busqueda-etiqueta">Asignatura</label>
-                    <input type="text" id="textoBusqueda" placeholder="Buscar por nombre o sigla..." autocomplete="off" enterkeyhint="search">
+                    <label for="textoBusqueda" class="busqueda-etiqueta">Nombre del tutor</label>
+                    <input type="text" id="textoBusqueda" placeholder="Buscar por nombre o apellido..." autocomplete="off" enterkeyhint="search" maxlength="80">
+                </div>
+
+                <div>
+                    <label for="minimoReputacion" class="busqueda-etiqueta">Evaluación</label>
+                    <select id="minimoReputacion" class="subjects-search-select">
+                        <option value="">Todas las evaluaciones</option>
+                        <option value="4">4 estrellas o más</option>
+                        <option value="3">3 estrellas o más</option>
+                    </select>
                 </div>
 
                 <button type="submit" class="subjects-search-button">
@@ -77,32 +86,12 @@
     </div>
 </section>
 
-<!-- PASO 1: ASIGNATURAS QUE COINCIDEN -->
-<section class="busqueda-seccion" aria-labelledby="tituloAsignaturas">
+<!-- RESULTADOS: los mejor evaluados, o los que coinciden con el nombre -->
+<section class="busqueda-seccion" aria-labelledby="tituloTutores">
     <div class="container">
         <div class="subjects-results-header busqueda-encabezado">
-            <h2 id="tituloAsignaturas">Asignaturas</h2>
-            <span class="busqueda-contador" id="contadorAsignaturas" aria-live="polite"></span>
-        </div>
-
-        <!-- Botones que llena js/tutores.js con la búsqueda de Catálogo -->
-        <div class="busqueda-asignaturas" id="listaAsignaturas"></div>
-
-        <!-- Aviso: qué hacer, sin resultados o sin conexión (criterio 4) -->
-        <div class="no-results busqueda-aviso" id="avisoAsignaturas" aria-live="polite">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <h3>Empieza por la asignatura</h3>
-            <p>Escribe parte del nombre o de la sigla para ver las asignaturas que coinciden.</p>
-        </div>
-    </div>
-</section>
-
-<!-- PASO 2: TUTORES DE LA ASIGNATURA ELEGIDA (API de Tutorías, HU-20) -->
-<section class="busqueda-seccion hidden" id="seccionTutores" aria-labelledby="tituloTutores">
-    <div class="container">
-        <div class="subjects-results-header busqueda-encabezado">
-            <h2 id="tituloTutores">Tutores</h2>
-            <span class="busqueda-contador" id="contadorTutores" aria-live="polite"></span>
+            <h2 id="tituloTutores">Tutores mejor evaluados</h2>
+            <span class="busqueda-contador" id="contadorTutores" aria-live="polite">Cargando tutores...</span>
         </div>
 
         <!-- Tarjetas que llena js/tutores.js -->

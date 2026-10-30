@@ -1,54 +1,57 @@
-// Busqueda de tutores (HU-18) sobre las API reales, por el gateway:
-//   GET /api/catalog/v1/asignaturas?buscar=texto   -> asignaturas que coinciden (HU-12)
-//   GET /api/tutoring/v1/tutores?asignatura={id}   -> tutores de la elegida (HU-20)
-//   GET /api/catalog/v1/carreras y /sedes          -> nombres de carrera y sede, una vez
-// Si la pagina llega con ?buscar=texto (el buscador de la portada), busca eso
-// al abrir. Lo buscado y la asignatura elegida quedan en la direccion, para que
-// al volver desde el perfil del tutor se vea lo mismo.
+// Busqueda de tutores por nombre (HU-40), sobre las API reales, por el gateway:
+//   GET /api/tutoring/v1/tutores                      -> los mejor evaluados
+//   GET /api/tutoring/v1/tutores?buscar=texto         -> los que coinciden con el nombre
+//   GET /api/tutoring/v1/tutores?min_reputacion=4     -> solo con 4 estrellas o mas
+//   GET /api/catalog/v1/carreras y /sedes             -> nombres de carrera y sede, una vez
+// La busqueda por asignatura esta en asignaturas.html: cada asignatura
+// despliega sus tutores (HU-40, criterio 1).
+// Lo buscado queda en la direccion (?buscar= y ?min_reputacion=), para que al
+// volver desde el perfil del tutor se vea lo mismo.
 //
 // Las peticiones a Tutorias van sin la cabecera Authorization, a proposito: son
 // datos publicos, y desde HU-17 Tutorias autentica en todas sus rutas, asi que
 // un token vencido o invalido haria responder 401 tambien a esta busqueda.
 // Tampoco se llama a Sesion.yo() ni a Sesion.renovar(): el encabezado
-// (sesion.js) ya renueva la sesion al abrir la pagina, y dos renovaciones a la
-// vez con la misma cookie dejarian a una de las dos sin sesion.
+// (sesion.js) ya renueva la sesion al abrir la pagina.
 //
 // Los datos se escriben con textContent y nodos de createElement, nunca con
 // innerHTML, para que un nombre con etiquetas no se ejecute como HTML.
 
 const CATALOGO = "/api/catalog/v1";
 const TUTORIAS = "/api/tutoring/v1";
+// En la tarjeta caben cuatro etiquetas; el resto se cuenta en una quinta.
+const MAXIMO_ETIQUETAS = 4;
 
 let esperaBusqueda;
-// Cada busqueda y cada eleccion lleva un numero: si llega la respuesta de una
-// anterior, despues de que el usuario cambio lo que buscaba, se descarta.
+// Cada busqueda lleva un numero: si llega la respuesta de una anterior,
+// despues de que el usuario cambio lo que buscaba, se descarta.
 let ultimaBusqueda = 0;
-let ultimaEleccion = 0;
-let textoDeLaLista = ""; // lo que se busco para la lista que esta en pantalla
 let nombresCatalogo = null; // promesa con { carreras, sedes }: Map de id a nombre
 
 document.addEventListener("DOMContentLoaded", () => {
     const formulario = document.getElementById("formularioBusqueda");
     const caja = document.getElementById("textoBusqueda");
+    const minimo = document.getElementById("minimoReputacion");
+
+    const parametros = new URLSearchParams(window.location.search);
+    caja.value = (parametros.get("buscar") || "").trim();
+    const minimoPedido = parametros.get("min_reputacion") || "";
+    if ([...minimo.options].some((opcion) => opcion.value === minimoPedido)) {
+        minimo.value = minimoPedido;
+    }
 
     caja.addEventListener("input", () => {
         clearTimeout(esperaBusqueda);
-        esperaBusqueda = setTimeout(() => buscarAsignaturas(caja.value), 300);
+        esperaBusqueda = setTimeout(buscarTutores, 300);
     });
+    minimo.addEventListener("change", buscarTutores);
     formulario.addEventListener("submit", (evento) => {
         evento.preventDefault();
         clearTimeout(esperaBusqueda);
-        buscarAsignaturas(caja.value);
+        buscarTutores();
     });
 
-    nombresDelCatalogo(); // se piden de inmediato, para tenerlos al elegir
-
-    const parametros = new URLSearchParams(window.location.search);
-    const texto = (parametros.get("buscar") || "").trim();
-    if (texto) {
-        caja.value = texto;
-        buscarAsignaturas(texto, parametros.get("asignatura"));
-    }
+    buscarTutores();
 });
 
 async function pedir(url) {
@@ -80,45 +83,44 @@ function nombresDelCatalogo() {
     return nombresCatalogo;
 }
 
-// ------------------------------------------------ paso 1: las asignaturas
-
-async function buscarAsignaturas(textoEscrito, idPorElegir = null) {
-    const texto = textoEscrito.trim();
+async function buscarTutores() {
+    const texto = document.getElementById("textoBusqueda").value.trim();
+    const minimo = document.getElementById("minimoReputacion").value;
     const numero = ++ultimaBusqueda;
-    const lista = document.getElementById("listaAsignaturas");
-    const contador = document.getElementById("contadorAsignaturas");
+    const lista = document.getElementById("listaTutores");
+    const contador = document.getElementById("contadorTutores");
 
-    ocultarTutores();
-    if (!texto) {
-        textoDeLaLista = "";
-        guardarEnDireccion("", null);
-        lista.replaceChildren();
-        contador.textContent = "";
-        mostrarAviso(
-            "avisoAsignaturas",
-            "fa-magnifying-glass",
-            "Empieza por la asignatura",
-            "Escribe parte del nombre o de la sigla para ver las asignaturas que coinciden."
-        );
-        return;
-    }
-
+    guardarEnDireccion(texto, minimo);
+    document.getElementById("tituloTutores").textContent = texto
+        ? `Tutores que coinciden con «${texto}»`
+        : "Tutores mejor evaluados";
     contador.textContent = "Buscando...";
-    let asignaturas;
+    ocultarAviso();
+
+    const consulta = new URLSearchParams();
+    if (texto) {
+        consulta.set("buscar", texto);
+    }
+    if (minimo) {
+        consulta.set("min_reputacion", minimo);
+    }
+    const url = `${TUTORIAS}/tutores${consulta.toString() ? `?${consulta}` : ""}`;
+
+    let tutores;
+    let nombres;
     try {
-        asignaturas = await pedir(`${CATALOGO}/asignaturas?buscar=${encodeURIComponent(texto)}`);
+        [tutores, nombres] = await Promise.all([pedir(url), nombresDelCatalogo()]);
     } catch (error) {
         if (numero !== ultimaBusqueda) {
             return;
         }
-        console.error("No se pudo consultar el catálogo:", error);
+        console.error("No se pudo consultar Tutorías:", error);
         lista.replaceChildren();
         contador.textContent = "";
         mostrarAviso(
-            "avisoAsignaturas",
             "fa-triangle-exclamation",
-            "No pudimos buscar asignaturas",
-            "El catálogo no respondió. Revisa tu conexión e inténtalo de nuevo en unos minutos."
+            "No pudimos cargar los tutores",
+            "El servicio de tutorías no respondió. Inténtalo de nuevo en unos minutos."
         );
         return;
     }
@@ -126,102 +128,37 @@ async function buscarAsignaturas(textoEscrito, idPorElegir = null) {
         return; // mientras tanto el usuario escribio otra cosa
     }
 
-    textoDeLaLista = texto;
-    guardarEnDireccion(texto, null);
-    lista.replaceChildren(...asignaturas.map(botonDeAsignatura));
-    contador.textContent = cantidad(asignaturas.length, "asignatura", "asignaturas");
-    if (asignaturas.length === 0) {
-        mostrarAviso(
-            "avisoAsignaturas",
-            "fa-magnifying-glass",
-            "No encontramos asignaturas",
-            `Nada coincide con «${texto}». Prueba con otra parte del nombre o con la sigla.`
-        );
-    } else {
-        ocultarAviso("avisoAsignaturas");
-    }
-
-    const elegida = asignaturas.find((asignatura) => asignatura.id === idPorElegir);
-    if (elegida) {
-        elegirAsignatura(elegida);
-    }
-}
-
-function botonDeAsignatura(asignatura) {
-    const boton = elemento("button", "busqueda-asignatura");
-    boton.type = "button";
-    boton.dataset.id = asignatura.id;
-    boton.setAttribute("aria-pressed", "false");
-    boton.append(
-        elemento("span", "busqueda-sigla", asignatura.sigla),
-        elemento("span", "busqueda-nombre", asignatura.nombre)
-    );
-    boton.addEventListener("click", () => elegirAsignatura(asignatura));
-    return boton;
-}
-
-// ------------------------------------------------ paso 2: los tutores
-
-async function elegirAsignatura(asignatura) {
-    const numero = ++ultimaEleccion;
-    const seccion = document.getElementById("seccionTutores");
-    const lista = document.getElementById("listaTutores");
-    const contador = document.getElementById("contadorTutores");
-
-    document.querySelectorAll(".busqueda-asignatura").forEach((boton) => {
-        boton.setAttribute("aria-pressed", String(boton.dataset.id === asignatura.id));
-    });
-    guardarEnDireccion(textoDeLaLista, asignatura.id);
-
-    document.getElementById("tituloTutores").textContent =
-        `Tutores de ${asignatura.nombre} (${asignatura.sigla})`;
-    lista.replaceChildren();
-    ocultarAviso("avisoTutores");
-    contador.textContent = "Buscando tutores...";
-    seccion.classList.remove("hidden");
-    seccion.scrollIntoView({ behavior: "smooth", block: "start" });
-
-    let tutores;
-    let nombres;
-    try {
-        [tutores, nombres] = await Promise.all([
-            pedir(`${TUTORIAS}/tutores?asignatura=${encodeURIComponent(asignatura.id)}`),
-            nombresDelCatalogo(),
-        ]);
-    } catch (error) {
-        if (numero !== ultimaEleccion) {
-            return;
-        }
-        console.error("No se pudo consultar Tutorías:", error);
-        contador.textContent = "";
-        mostrarAviso(
-            "avisoTutores",
-            "fa-triangle-exclamation",
-            "No pudimos cargar los tutores",
-            "El servicio de tutorías no respondió. Inténtalo de nuevo en unos minutos."
-        );
-        return;
-    }
-    if (numero !== ultimaEleccion) {
-        return; // mientras tanto el usuario eligio otra asignatura o busco otra cosa
-    }
-
+    lista.replaceChildren(...tutores.map((tutor) => tarjetaDeTutor(tutor, nombres)));
     contador.textContent = cantidad(tutores.length, "tutor", "tutores");
     if (tutores.length === 0) {
+        mostrarSinResultados(texto, minimo);
+    }
+}
+
+// Sin resultados: si se busco un nombre, puede ser una asignatura (los
+// enlaces de antes llegaban aqui con ?buscar=asignatura).
+function mostrarSinResultados(texto, minimo) {
+    if (texto) {
+        const enlace = elemento("a", "enlace-texto", "Asignaturas");
+        enlace.href = `asignaturas.html?${new URLSearchParams({ buscar: texto })}`;
+        const parrafo = elemento("p", null, "Revisa cómo se escribe. Si es una asignatura, búscala en ");
+        parrafo.append(enlace, ".");
+        mostrarAviso("fa-magnifying-glass", `No encontramos tutores con «${texto}»`, parrafo);
+        return;
+    }
+    if (minimo) {
         mostrarAviso(
-            "avisoTutores",
-            "fa-user-graduate",
-            "Todavía no hay tutores para esta asignatura",
-            "Prueba con otra asignatura o vuelve a buscar más adelante."
+            "fa-star",
+            "Ningún tutor llega a esa evaluación",
+            "Prueba con «Todas las evaluaciones»: los tutores nuevos todavía no tienen evaluaciones."
         );
         return;
     }
-    lista.replaceChildren(...tutores.map((tutor) => tarjetaDeTutor(tutor, nombres)));
-}
-
-function ocultarTutores() {
-    ultimaEleccion++; // descarta la respuesta de una eleccion que siga en camino
-    document.getElementById("seccionTutores").classList.add("hidden");
+    mostrarAviso(
+        "fa-user-graduate",
+        "Todavía no hay tutores",
+        "Cuando un estudiante declare una asignatura que puede enseñar, aparecerá aquí."
+    );
 }
 
 function tarjetaDeTutor(tutor, nombres) {
@@ -240,8 +177,8 @@ function tarjetaDeTutor(tutor, nombres) {
     const pie = elemento("div", "tutor-footer");
     const precio = elemento("div");
     precio.append(
-        elemento("span", null, "Tarifa"),
-        elemento("strong", null, tarifaEnTexto(tutor.tarifa))
+        elemento("span", null, "Tarifa desde"),
+        elemento("strong", null, tarifaEnTexto(tarifaMinima(tutor.asignaturas)))
     );
     const enlace = elemento("a", "tarjeta-perfil", "Ver perfil");
     enlace.href = `tutor.html?${new URLSearchParams({ id: tutor.usuario_id })}`;
@@ -254,9 +191,30 @@ function tarjetaDeTutor(tutor, nombres) {
         elemento("p", "career", nombres.carreras.get(tutor.carrera_id) || "Carrera sin informar"),
         sede,
         lineaDeReputacion(tutor.reputacion),
+        etiquetasDeAsignaturas(tutor.asignaturas),
         pie
     );
     return tarjeta;
+}
+
+function etiquetasDeAsignaturas(asignaturas) {
+    const lista = elemento("ul", "tarjeta-etiquetas");
+    lista.setAttribute("aria-label", "Asignaturas que imparte");
+    asignaturas.slice(0, MAXIMO_ETIQUETAS).forEach((asignatura) => {
+        const etiqueta = elemento("li");
+        etiqueta.title = `${asignatura.sigla} · ${asignatura.nombre}`;
+        etiqueta.textContent = asignatura.nombre;
+        lista.appendChild(etiqueta);
+    });
+    const restantes = asignaturas.length - MAXIMO_ETIQUETAS;
+    if (restantes > 0) {
+        lista.appendChild(elemento("li", "etiqueta-mas", `+${restantes} más`));
+    }
+    return lista;
+}
+
+function tarifaMinima(asignaturas) {
+    return Math.min(...asignaturas.map((asignatura) => Number(asignatura.tarifa)));
 }
 
 // Promedio con una estrella y la cantidad de evaluaciones: "5,0 (1)".
@@ -279,31 +237,29 @@ function lineaDeReputacion(reputacion) {
 
 // ------------------------------------------------ utilidades
 
-// Deja en la direccion lo buscado y la asignatura elegida, sin recargar.
-function guardarEnDireccion(texto, asignaturaId) {
+// Deja en la direccion lo buscado, sin recargar.
+function guardarEnDireccion(texto, minimo) {
     const parametros = new URLSearchParams();
     if (texto) {
         parametros.set("buscar", texto);
     }
-    if (asignaturaId) {
-        parametros.set("asignatura", asignaturaId);
+    if (minimo) {
+        parametros.set("min_reputacion", minimo);
     }
     const consulta = parametros.toString();
     history.replaceState(null, "", consulta ? `?${consulta}` : window.location.pathname);
 }
 
-function mostrarAviso(id, claseIcono, titulo, texto) {
-    const caja = document.getElementById(id);
-    caja.replaceChildren(
-        icono(`fa-solid ${claseIcono}`),
-        elemento("h3", null, titulo),
-        elemento("p", null, texto)
-    );
+// texto puede ser un texto o un nodo ya armado.
+function mostrarAviso(claseIcono, titulo, texto) {
+    const caja = document.getElementById("avisoTutores");
+    const cuerpo = typeof texto === "string" ? elemento("p", null, texto) : texto;
+    caja.replaceChildren(icono(`fa-solid ${claseIcono}`), elemento("h3", null, titulo), cuerpo);
     caja.classList.remove("hidden");
 }
 
-function ocultarAviso(id) {
-    document.getElementById(id).classList.add("hidden");
+function ocultarAviso() {
+    document.getElementById("avisoTutores").classList.add("hidden");
 }
 
 function elemento(etiqueta, clase, texto) {

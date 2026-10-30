@@ -78,6 +78,12 @@ info:
       responden desde HU-17 si la petición trae un token que no sirve
       (`components/responses/TokenNoValido`), y deja solo el formato único
       de error, que con HU-17 es el único que sale.
+    - Próxima versión, al cerrar el sprint 3 (HU-40): en `GET /tutores` la
+      asignatura pasa a ser opcional. Sin ella, la búsqueda trae los tutores
+      mejor evaluados, un resultado por tutor con todas sus asignaturas
+      (esquema `TutorDestacado`). Agrega los parámetros `buscar` (nombre o
+      apellido) y `min_reputacion`, con sus errores `busqueda_invalida` y
+      `reputacion_invalida`, y deja de usar `asignatura_requerida`.
 
     - Próxima versión, al cerrar el sprint 3 (HU-14 y HU-41): agrega las
       asignaturas que el usuario declara que puede enseñar, con sesión:
@@ -92,7 +98,7 @@ servers:
 
 tags:
   - name: Búsqueda
-    description: Búsqueda de tutores por asignatura y perfil público de cada tutor (HU-20). Sin sesión.
+    description: Búsqueda de tutores por asignatura o por nombre, y perfil público de cada tutor (HU-20 y HU-40). Sin sesión.
   - name: Disponibilidad
     description: Bloques de disponibilidad del tutor, con sesión (HU-15).
   - name: Asignaturas del tutor
@@ -108,47 +114,118 @@ paths:
     get:
       tags: [Búsqueda]
       operationId: buscarTutores
-      summary: Buscar los tutores de una asignatura
+      summary: Buscar tutores por asignatura o por nombre
       description: |
-        Lista los tutores con perfil activo en la asignatura (HU-20,
-        criterios 1 y 2). Es pública: no pide token.
+        Lista los tutores con perfil activo (HU-20, criterios 1 y 2, y
+        HU-40). Es pública: no pide token.
 
+        - **Con `asignatura`**: los tutores de esa asignatura, cada uno con
+          su tarifa y su descripción en ella (esquema `TutorEncontrado`). No
+          pagina: trae todos. Orden: primero la reputación, de mayor a menor
+          (el promedio y, si empata, la cantidad de evaluaciones); después la
+          tarifa, de menor a mayor; y si todo eso empata, el nombre, el
+          apellido y el identificador del tutor.
+        - **Sin `asignatura`** (HU-40): un resultado por tutor, con todas sus
+          asignaturas activas, ordenadas por sigla (esquema
+          `TutorDestacado`). Orden: la reputación, como arriba, y después el
+          nombre, el apellido y el identificador. Trae hasta 24 tutores: los
+          mejor evaluados. Con `buscar`, hasta 48.
+        - `buscar` compara cada palabra con el nombre y el apellido, sin
+          tildes ni mayúsculas: «matias fue» encuentra a Matías Fuentes.
+          Sirve con y sin `asignatura`.
+        - `min_reputacion` deja solo a los tutores con ese promedio o más.
+          Los que todavía no tienen evaluaciones quedan fuera.
         - No salen el tutor con la cuenta desactivada (`usuario_ref.activo`,
-          RN-08) ni el que tiene desactivado su perfil en esa asignatura
-          (RN-01).
-        - Orden: primero la reputación, de mayor a menor (el promedio y, si
-          empata, la cantidad de evaluaciones); después la tarifa, de menor a
-          mayor; y si todo eso empata, el nombre, el apellido y el
-          identificador del tutor.
-        - Cada tutor trae su tarifa y su descripción en esa asignatura.
-        - No pagina: trae todos los tutores de la asignatura.
-        - Una asignatura sin tutores, o que no está en Tutorías, responde 200
-          con la lista vacía.
+          RN-08) ni sus perfiles desactivados (RN-01).
+        - Sin resultados, o con una asignatura que no está en Tutorías,
+          responde 200 con la lista vacía.
       security:
         - tokenAcceso: []
         - {}
       parameters:
         - name: asignatura
           in: query
-          required: true
+          required: false
           description: |
             Identificador de la asignatura en Catálogo. Se recortan los
-            espacios al inicio y al final. Se lee con `uuid.UUID` de Python,
-            que también acepta mayúsculas y el uuid sin guiones.
+            espacios al inicio y al final; vacía es como no mandarla. Se lee
+            con `uuid.UUID` de Python, que también acepta mayúsculas y el uuid
+            sin guiones.
           schema:
             type: string
             format: uuid
           example: 40000000-0000-4000-8000-000000000006
+        - name: buscar
+          in: query
+          required: false
+          description: |
+            Nombre o apellido del tutor, hasta 80 caracteres. Se ignoran los
+            espacios repetidos, las tildes y las mayúsculas, y cada palabra
+            tiene que aparecer en el nombre o el apellido.
+          schema:
+            type: string
+            maxLength: 80
+          example: matias
+        - name: min_reputacion
+          in: query
+          required: false
+          description: |
+            Promedio mínimo de las evaluaciones, de 1 a 5. Acepta punto o
+            coma decimal: `4`, `4.5` o `4,5`.
+          schema:
+            type: number
+            minimum: 1
+            maximum: 5
+          example: 4
       responses:
         '200':
-          description: Los tutores de la asignatura, en orden. La lista puede venir vacía.
+          description: |
+            Los tutores, en orden. Con `asignatura`, cada elemento es un
+            `TutorEncontrado`; sin ella, un `TutorDestacado`. La lista puede
+            venir vacía.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/TutorEncontrado'
+                  oneOf:
+                    - $ref: '#/components/schemas/TutorEncontrado'
+                    - $ref: '#/components/schemas/TutorDestacado'
               examples:
+                mejor_evaluados:
+                  summary: Sin parámetros, los tutores mejor evaluados
+                  description: Datos de ejemplo de `data/seeds/demo`, recortados a dos tutores. Valentina va primero por su reputación.
+                  value:
+                    - usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                      carrera_id: 20000000-0000-4000-8000-000000000001
+                      sede_id: 30000000-0000-4000-8000-000000000011
+                      reputacion:
+                        promedio: 5.0
+                        total: 1
+                      asignaturas:
+                        - asignatura_id: 40000000-0000-4000-8000-000000000006
+                          sigla: BDD1101
+                          nombre: Base de Datos
+                          tarifa: 5000
+                        - asignatura_id: 40000000-0000-4000-8000-000000000005
+                          sigla: PRO1101
+                          nombre: Programación de Algoritmos
+                          tarifa: 0
+                    - usuario_id: 10000000-0000-4000-8000-000000000002
+                      nombre: Matías
+                      apellido: Fuentes
+                      carrera_id: 20000000-0000-4000-8000-000000000002
+                      sede_id: 30000000-0000-4000-8000-000000000004
+                      reputacion:
+                        promedio: 0.0
+                        total: 0
+                      asignaturas:
+                        - asignatura_id: 40000000-0000-4000-8000-000000000005
+                          sigla: PRO1101
+                          nombre: Programación de Algoritmos
+                          tarifa: 3000
                 base_de_datos:
                   summary: Base de Datos (BDD1101), con una tutora
                   description: Datos de ejemplo de `data/seeds/demo`. Valentina enseña Base de Datos a $5.000 y tiene una evaluación, de 5.
@@ -205,19 +282,26 @@ paths:
                   value: []
         '400':
           description: |
-            Falta `asignatura`, viene vacía o solo con espacios
-            (`asignatura_requerida`), o no es un uuid (`asignatura_invalida`).
-            En los dos casos `detalles` viene en null.
+            `asignatura` no es un uuid (`asignatura_invalida`),
+            `min_reputacion` no es un número de 1 a 5 (`reputacion_invalida`)
+            o `buscar` pasa de 80 caracteres (`busqueda_invalida`). En los tres
+            casos `detalles` viene en null.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               examples:
-                asignatura_requerida:
-                  summary: Sin el parámetro asignatura, o vacío
+                reputacion_invalida:
+                  summary: Una evaluación mínima fuera de 1 a 5, como ?min_reputacion=6
                   value:
-                    codigo: asignatura_requerida
-                    mensaje: 'Indica la asignatura con ?asignatura=<identificador>.'
+                    codigo: reputacion_invalida
+                    mensaje: La evaluación mínima tiene que ser un número de 1 a 5.
+                    detalles: null
+                busqueda_invalida:
+                  summary: Un texto de más de 80 caracteres en ?buscar=
+                  value:
+                    codigo: busqueda_invalida
+                    mensaje: Escribe hasta 80 caracteres para buscar a un tutor.
                     detalles: null
                 asignatura_invalida:
                   summary: Un valor que no es uuid, como ?asignatura=abc
@@ -1379,6 +1463,58 @@ components:
         reputacion:
           $ref: '#/components/schemas/Reputacion'
 
+    TutorDestacado:
+      type: object
+      description: Un tutor de la búsqueda sin asignatura (HU-40), con todas sus asignaturas activas.
+      required: [usuario_id, nombre, apellido, carrera_id, sede_id, reputacion, asignaturas]
+      properties:
+        usuario_id:
+          type: string
+          format: uuid
+          description: Identificador del usuario en Identidad. Es el que pide `GET /tutores/{usuario_id}`.
+        nombre:
+          type: string
+          maxLength: 80
+        apellido:
+          type: string
+          maxLength: 80
+        carrera_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la carrera en Catálogo. Viene en null si la copia del usuario en Tutorías no la tiene.
+        sede_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la sede en Catálogo. Viene en null si la copia del usuario en Tutorías no la tiene.
+        reputacion:
+          $ref: '#/components/schemas/Reputacion'
+        asignaturas:
+          type: array
+          description: Sus asignaturas con perfil activo, ordenadas por sigla. Nunca viene vacía.
+          items:
+            $ref: '#/components/schemas/AsignaturaConTarifa'
+
+    AsignaturaConTarifa:
+      type: object
+      description: Una asignatura del tutor, con su tarifa en ella.
+      required: [asignatura_id, sigla, nombre, tarifa]
+      properties:
+        asignatura_id:
+          type: string
+          format: uuid
+        sigla:
+          type: string
+          maxLength: 15
+        nombre:
+          type: string
+          maxLength: 150
+        tarifa:
+          type: integer
+          minimum: 0
+          description: En pesos chilenos. 0 es una tutoría gratuita (RN-05).
+
     AsignaturaBuscada:
       type: object
       description: La asignatura de la búsqueda, de la copia de lectura de Catálogo (`asignatura_ref`).
@@ -1700,8 +1836,8 @@ components:
         Identidad.
 
         - Errores con código propio: `detalles` = null. En las rutas de este
-          contrato son asignatura_requerida, asignatura_invalida,
-          fecha_invalida, zona_horaria_requerida, fin_antes_de_inicio y
+          contrato son asignatura_invalida, reputacion_invalida,
+          busqueda_invalida, fecha_invalida, zona_horaria_requerida, fin_antes_de_inicio y
           bloque_en_el_pasado (400); not_authenticated, token_invalido,
           token_vencido y authentication_failed (401); no_es_tutor (403);
           not_found (404); bloque_solapado, bloque_con_solicitudes y

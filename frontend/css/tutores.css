@@ -404,3 +404,46 @@
         padding: 18px;
     }
 }
+
+
+/* =========================================
+   BUSQUEDA POR NOMBRE (HU-40)
+========================================= */
+
+.enlace-texto {
+    color: var(--duoc-blue-light);
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.enlace-texto:focus-visible {
+    outline: 3px solid var(--duoc-blue-light);
+    outline-offset: 2px;
+}
+
+/* Asignaturas que imparte el tutor, en su tarjeta de la busqueda */
+.tarjeta-etiquetas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 18px;
+    padding: 0;
+    list-style: none;
+}
+
+.tarjeta-etiquetas li {
+    max-width: 100%;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(253, 189, 45, .18);
+    color: var(--duoc-blue);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.tarjeta-etiquetas .etiqueta-mas {
+    background: #EEF2F6;
+    color: var(--text-light);
+}

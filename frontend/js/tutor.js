@@ -45,11 +45,13 @@ async function pedir(url) {
 function prepararVolver() {
     try {
         const anterior = new URL(document.referrer);
+        // Vuelve a la busqueda de donde vino: tutores.html o asignaturas.html.
+        const pagina = anterior.pathname.split("/").pop();
         if (
             anterior.origin === window.location.origin &&
-            anterior.pathname.endsWith("/tutores.html")
+            (pagina === "tutores.html" || pagina === "asignaturas.html")
         ) {
-            document.getElementById("enlaceVolver").href = `tutores.html${anterior.search}`;
+            document.getElementById("enlaceVolver").href = `${pagina}${anterior.search}`;
         }
     } catch {
         // Sin pagina anterior: queda el enlace a tutores.html.
