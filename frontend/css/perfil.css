@@ -190,6 +190,185 @@
 
 
 /* =========================================
+   ASIGNATURAS QUE ENSEÑO (HU-14)
+   La arma js/mis-asignaturas.js.
+========================================= */
+
+.mis-asig {
+    margin-top: 24px;
+}
+
+.mis-asig-texto {
+    height: auto;
+    min-height: 96px;
+    padding: 12px 14px;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.mis-asig-lista {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.mis-asig-item {
+    display: grid;
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--success);
+    border-radius: 12px;
+}
+
+.mis-asig-inactiva {
+    border-left-color: #9CA3AF;
+    background: #F9FAFB;
+}
+
+.mis-asig-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px 12px;
+}
+
+.mis-asig-titulo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    min-width: 0;
+    color: var(--dark);
+}
+
+.mis-asig-titulo strong {
+    overflow-wrap: anywhere;
+}
+
+.mis-asig-sigla {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(48, 127, 226, .10);
+    color: var(--duoc-blue);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    white-space: nowrap;
+}
+
+.mis-asig-estado {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #DCFCE7;
+    color: #15803D;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.mis-asig-inactiva .mis-asig-estado {
+    background: #EEF2F6;
+    color: var(--text-light);
+}
+
+.mis-asig-tarifa {
+    color: var(--text);
+    font-size: 14px;
+}
+
+.mis-asig-tarifa strong {
+    color: var(--duoc-blue);
+}
+
+.mis-asig-descripcion {
+    color: var(--text-light);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.mis-asig-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.mis-asig-boton {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--white);
+    color: var(--duoc-blue);
+    font-size: 14px;
+    font-weight: 600;
+    transition: .2s;
+}
+
+.mis-asig-boton:hover {
+    border-color: var(--duoc-blue-light);
+    background: #F4F8FB;
+}
+
+.mis-asig-boton:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+
+.mis-asig-boton-peligro {
+    color: #B91C1C;
+}
+
+.mis-asig-boton-peligro:hover {
+    border-color: #FECACA;
+    background: #FEF2F2;
+}
+
+/* Cambiar la tarifa: la etiqueta arriba, el campo y el botón en una fila. */
+.mis-asig-edicion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px 10px;
+}
+
+.mis-asig-edicion .profile-label {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+}
+
+.mis-asig-guardar {
+    width: auto;
+    height: 50px;
+    padding: 0 18px;
+}
+
+.mis-asig-siguiente {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #EEF5FD;
+    color: var(--duoc-blue);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.mis-asig-siguiente a {
+    color: var(--duoc-blue-light);
+    text-decoration: underline;
+}
+
+
+/* =========================================
    TELÉFONO (RNF-03: se lee completo a 360 px)
 ========================================= */
 
@@ -204,5 +383,13 @@
 
     .profile-row {
         grid-template-columns: 1fr;
+    }
+
+    .mis-asig-edicion {
+        grid-template-columns: 1fr;
+    }
+
+    .mis-asig-guardar {
+        width: 100%;
     }
 }

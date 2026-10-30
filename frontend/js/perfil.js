@@ -219,6 +219,7 @@ async function guardarPerfil(evento) {
         if (r.ok) {
             mostrarPerfil(r.cuerpo);
             avisarEnPerfil("success", "Tu perfil quedó guardado.");
+            document.dispatchEvent(new CustomEvent("perfil-guardado", { detail: r.cuerpo }));
         } else if (r.estado === 401) {
             mostrarSinSesion("Tu sesión terminó. Vuelve a iniciar sesión para guardar tu perfil.");
         } else {

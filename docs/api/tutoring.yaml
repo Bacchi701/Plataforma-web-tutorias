@@ -6,13 +6,16 @@ info:
   description: |
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
-    - Describe lo que hace Tutorías con HU-17, HU-20 y HU-15: la búsqueda de
-      tutores y el perfil público de cada tutor (HU-20), los bloques de
-      disponibilidad del tutor (HU-15) y `/estado`, que existe desde HU-01.
+    - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14 y HU-41:
+      la búsqueda de tutores y el perfil público de cada tutor (HU-20), los
+      bloques de disponibilidad del tutor (HU-15), las asignaturas que el
+      usuario declara que puede enseñar (HU-14), la copia de sus datos que
+      guarda Tutorías (HU-41) y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
     - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
-      búsqueda y el perfil, y HU-15 agrega los bloques del tutor.
+      búsqueda y el perfil, HU-15 los bloques del tutor, y HU-14 y HU-41
+      agregan las asignaturas del tutor y la copia de sus datos.
     - Un cambio a lo ya publicado se acuerda entre los tres antes de
       implementarse (acuerdo A4), como en Identidad. Los cambios y las rutas
       nuevas se anotan en «Cambios», al final de esta descripción.
@@ -20,18 +23,18 @@ info:
     **Sesión (HU-17).** Tutorías no emite tokens: verifica el token de acceso
     que firma Identidad, un JWT RS256 (esquema `tokenAcceso`), con la clave
     pública, el emisor `identity` y las reclamaciones `sub`, `iat`, `exp` e
-    `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. No le
-    pregunta a Identidad: quien hace la petición sale del token.
-    - Las rutas de disponibilidad piden el token: sin él responden 401
-      (`not_authenticated`).
+    `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. Para
+    saber quién hace la petición no le pregunta a Identidad: sale del token.
+    - Las rutas de disponibilidad, las de `/perfiles` y `/yo/refrescar` piden
+      el token: sin él responden 401 (`not_authenticated`).
     - `/estado`, `/tutores` y `/tutores/{usuario_id}` no piden token. Pero si
       la petición trae uno que no sirve (vencido, inválido o con la cabecera
       mal formada), responden 401 igual, porque Tutorías revisa el token
       antes de llegar a la ruta.
     - Si Tutorías no encuentra la clave pública, toda petición con token
       responde 503 `claves_no_configuradas` (ver
-      `components/responses/ClavesNoConfiguradas`). Está en las rutas de
-      disponibilidad, que siempre llevan token.
+      `components/responses/ClavesNoConfiguradas`). Está en las rutas que
+      siempre llevan token.
 
     **Formato de error (Pilar 2, sección 11).** Toda respuesta de error trae
     `codigo`, `mensaje` y `detalles` (ver el esquema `Error`, el mismo de
@@ -40,9 +43,18 @@ info:
     la ruta no existe (ver `GET /tutores/{usuario_id}`).
 
     **Datos.**
-    - Todo sale de tutoring_db, sin llamar a Identidad ni a Catálogo
-      (AD-07): el tutor y la asignatura vienen de las copias de lectura
-      `usuario_ref` y `asignatura_ref`.
+    - La búsqueda, el perfil público, la disponibilidad y `GET /perfiles`
+      salen de tutoring_db, sin llamar a Identidad ni a Catálogo (AD-07): el
+      tutor y la asignatura vienen de las copias de lectura `usuario_ref` y
+      `asignatura_ref`.
+    - Esas copias se crean o se ponen al día cuando el usuario declara o
+      reactiva una asignatura (HU-14, decisión T-166) y cuando la página
+      pide `POST /yo/refrescar` al abrir y al guardar «Mi perfil» (HU-41). Para
+      eso Tutorías pide a Identidad `GET /api/identity/v1/yo`, con el mismo
+      token de la petición, y a Catálogo la malla de la carrera,
+      `GET /api/catalog/v1/carreras/{id}/asignaturas`, que es pública. Si uno
+      de los dos no responde en 3 segundos, la ruta responde 503
+      `servicio_no_disponible` (`components/responses/SinOtroServicio`).
     - Ninguna respuesta trae el correo de nadie (RNF-07).
     - Los identificadores van como texto. La carrera y la sede van como
       identificador de Catálogo: el nombre se toma de
@@ -67,6 +79,13 @@ info:
       (`components/responses/TokenNoValido`), y deja solo el formato único
       de error, que con HU-17 es el único que sale.
 
+    - Próxima versión, al cerrar el sprint 3 (HU-14 y HU-41): agrega las
+      asignaturas que el usuario declara que puede enseñar, con sesión:
+      `GET` y `POST /perfiles` y `PATCH /perfiles/{perfil_id}`, y
+      `POST /yo/refrescar`, que pone al día la copia de sus datos. Con ellas,
+      Tutorías consulta a Identidad y a Catálogo (ver «Datos») y suma los
+      códigos de error de esas rutas (ver el esquema `Error`).
+
 servers:
   - url: http://localhost:8080/api/tutoring/v1
     description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
@@ -76,6 +95,10 @@ tags:
     description: Búsqueda de tutores por asignatura y perfil público de cada tutor (HU-20). Sin sesión.
   - name: Disponibilidad
     description: Bloques de disponibilidad del tutor, con sesión (HU-15).
+  - name: Asignaturas del tutor
+    description: Las asignaturas que el usuario declara que puede enseñar, con su tarifa (HU-14). Con sesión.
+  - name: Copia del usuario
+    description: La copia de los datos del usuario que guarda Tutorías, `usuario_ref` (HU-41). Con sesión.
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -595,6 +618,311 @@ paths:
         '503':
           $ref: '#/components/responses/ClavesNoConfiguradas'
 
+  /perfiles:
+    get:
+      tags: [Asignaturas del tutor]
+      operationId: verAsignaturasDeclaradas
+      summary: Las asignaturas que declaró un usuario
+      description: |
+        Las asignaturas que el usuario `usuario` declaró que puede enseñar,
+        cada una con su tarifa, ordenadas por sigla (HU-14).
+
+        - Si `usuario` es quien hace la petición, trae las activas y las
+          desactivadas: es la lista de «Mi perfil».
+        - Si es otro usuario, solo las activas, y ninguna si su cuenta está
+          desactivada en Tutorías (RN-08).
+        - No llama a otros servicios. No pagina.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - name: usuario
+          in: query
+          required: true
+          description: Identificador del usuario en Identidad, un uuid. Sin él, o si no es un uuid, responde 400 `usuario_requerido`.
+          schema:
+            type: string
+            format: uuid
+          example: 10000000-0000-4000-8000-000000000004
+      responses:
+        '200':
+          description: Sus asignaturas declaradas, por sigla. La lista puede venir vacía.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Perfil'
+              examples:
+                camila:
+                  summary: Camila, pedida por ella misma, con una asignatura activa y otra desactivada
+                  value:
+                    - id: 7d1c2b3a-4e5f-4a6b-9c8d-0e1f2a3b4c5d
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000006
+                        sigla: BDD1101
+                        nombre: Base de Datos
+                      tarifa: 0
+                      descripcion: Modelo entidad-relación y consultas SQL.
+                      activo: true
+                      creado_en: '2026-10-29T18:10:00Z'
+                    - id: 2f4e6a8c-1b3d-4f5a-8b7c-9d0e1f2a3b4c
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000001
+                        sigla: MAT1101
+                        nombre: Matemática Aplicada
+                      tarifa: 4000
+                      descripcion: null
+                      activo: false
+                      creado_en: '2026-10-29T18:12:00Z'
+                diego:
+                  summary: Diego, que no ha declarado asignaturas
+                  value: []
+        '400':
+          description: Falta `usuario` o no es un uuid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: usuario_requerido
+                mensaje: 'Indica de quién son las asignaturas: ?usuario=<id del usuario>.'
+                detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+    post:
+      tags: [Asignaturas del tutor]
+      operationId: declararAsignatura
+      summary: Declarar una asignatura que puede enseñar
+      description: |
+        El usuario del token declara una asignatura que puede enseñar, con su
+        tarifa (HU-14, RF-03). Desde ese momento aparece como tutor de esa
+        asignatura en la búsqueda y puede publicar bloques (HU-15).
+
+        Se revisa en este orden:
+        1. El cuerpo, sin llamar a nadie: `asignatura_id` es un uuid (400
+           `asignatura_invalida`); `tarifa` es un entero de 0 a 99.999.999,
+           no un decimal, un texto ni un booleano (400 `tarifa_invalida`), y
+           `descripcion`, si viene, es un texto de hasta 500 caracteres (400
+           `descripcion_invalida`).
+        2. Los datos del usuario, con una llamada a Identidad (`GET /yo`, con
+           el mismo token), que crea o pone al día su copia, `usuario_ref`
+           (decisión T-166). Si Identidad no reconoce la cuenta: 403
+           `cuenta_inactiva`.
+        3. Que tenga carrera y nivel en su perfil (400 `perfil_incompleto`).
+        4. La malla vigente de su carrera, con una llamada a Catálogo. Si
+           Catálogo no tiene esa carrera: 400 `carrera_no_valida`.
+        5. RN-01: la asignatura tiene que estar en esa malla, en un semestre
+           anterior al que cursa (400 `asignatura_no_habilitada`, con su
+           nivel en el mensaje). En primer semestre no hay ninguna, y no se
+           llama a Catálogo.
+        6. En una transacción, crea o pone al día `asignatura_ref` con la
+           sigla y el nombre de Catálogo, y después el perfil. Si no existía,
+           lo crea activo (201). Si existía desactivado, lo reactiva con la
+           tarifa y la descripción nuevas (200). Si ya estaba activo, 409
+           `asignatura_ya_declarada`, también cuando dos envíos llegan a la
+           vez (restricción `ux_perfil_usuario_asignatura`).
+
+        - Una tarifa 0 es una tutoría gratuita (RN-05).
+        - Si Identidad o Catálogo no responden: 503 `servicio_no_disponible`.
+          Si es Identidad, no queda nada escrito; si es Catálogo, la copia del
+          usuario puede quedar al día, pero no `asignatura_ref` ni el perfil.
+        - La descripción se guarda sin los espacios de los lados; vacía queda
+          en null. Otros campos del cuerpo se ignoran.
+      security:
+        - tokenAcceso: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevoPerfil'
+            examples:
+              gratuita:
+                summary: Camila, en el semestre 2, declara Base de Datos, del semestre 1, gratis
+                value:
+                  asignatura_id: 40000000-0000-4000-8000-000000000006
+                  tarifa: 0
+                  descripcion: Modelo entidad-relación y consultas SQL.
+              con_tarifa:
+                summary: Matemática Aplicada, del semestre 1, a $4.000
+                value:
+                  asignatura_id: 40000000-0000-4000-8000-000000000001
+                  tarifa: 4000
+      responses:
+        '200':
+          description: La asignatura estaba declarada y desactivada. Queda activa otra vez, con la tarifa y la descripción nuevas, y el mismo `id`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Perfil'
+        '201':
+          description: Asignatura declarada. Queda activa y sale en la búsqueda.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Perfil'
+              example:
+                id: 7d1c2b3a-4e5f-4a6b-9c8d-0e1f2a3b4c5d
+                asignatura:
+                  asignatura_id: 40000000-0000-4000-8000-000000000006
+                  sigla: BDD1101
+                  nombre: Base de Datos
+                tarifa: 0
+                descripcion: Modelo entidad-relación y consultas SQL.
+                activo: true
+                creado_en: '2026-10-29T18:10:00Z'
+        '400':
+          $ref: '#/components/responses/AsignaturaNoDeclarable'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/CuentaInactiva'
+        '409':
+          description: La asignatura ya está declarada y activa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                asignatura_ya_declarada:
+                  $ref: '#/components/examples/AsignaturaYaDeclarada'
+        '503':
+          $ref: '#/components/responses/SinOtroServicio'
+
+  /perfiles/{perfil_id}:
+    patch:
+      tags: [Asignaturas del tutor]
+      operationId: editarAsignaturaDeclarada
+      summary: Cambiar la tarifa, la descripción o si está activa
+      description: |
+        Cambia una asignatura que declaró el usuario del token (HU-14,
+        criterio 5). Basta con mandar lo que cambia: lo que no viene se
+        conserva.
+
+        - Solo la cambia su dueño: una de otro usuario o una que no existe
+          responden el mismo 404, para no revelar que existe.
+        - `tarifa` y `descripcion` tienen las reglas de `POST /perfiles` (400
+          `tarifa_invalida` y `descripcion_invalida`), y `activo` es true o
+          false (400 `activo_invalido`). `descripcion` en null la borra.
+        - Cambiar la tarifa o la descripción, o desactivarla, no llama a otros
+          servicios. Desactivada, deja de salir en la búsqueda y en el perfil
+          público, y no cuenta para publicar bloques.
+        - Pedir `activo: true` vuelve a revisar RN-01 como al declararla,
+          aunque ya esté activa, porque la carrera o el nivel pueden haber
+          cambiado: llama a Identidad y a Catálogo, y puede responder 400
+          `perfil_incompleto`, `carrera_no_valida` o
+          `asignatura_no_habilitada`, 403 `cuenta_inactiva` o 503.
+        - El monto de las reservas ya creadas no cambia: es una copia de la
+          tarifa del momento en que se solicitaron (ajuste A-04).
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/PerfilId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambioDePerfil'
+            examples:
+              tarifa:
+                summary: Subir la tarifa a $5.000
+                value:
+                  tarifa: 5000
+              desactivar:
+                summary: Dejar de enseñarla por ahora
+                value:
+                  activo: false
+      responses:
+        '200':
+          description: La asignatura declarada, con los cambios.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Perfil'
+              example:
+                id: 2f4e6a8c-1b3d-4f5a-8b7c-9d0e1f2a3b4c
+                asignatura:
+                  asignatura_id: 40000000-0000-4000-8000-000000000001
+                  sigla: MAT1101
+                  nombre: Matemática Aplicada
+                tarifa: 5000
+                descripcion: null
+                activo: true
+                creado_en: '2026-10-29T18:12:00Z'
+        '400':
+          description: |
+            Un campo no sirve (`tarifa_invalida`, `descripcion_invalida` o
+            `activo_invalido`) o, al reactivarla, RN-01 ya no la habilita
+            (`perfil_incompleto`, `carrera_no_valida` o
+            `asignatura_no_habilitada`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                tarifa_invalida:
+                  $ref: '#/components/examples/TarifaInvalida'
+                activo_invalido:
+                  $ref: '#/components/examples/ActivoInvalido'
+                asignatura_no_habilitada:
+                  $ref: '#/components/examples/AsignaturaNoHabilitada'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/CuentaInactiva'
+        '404':
+          $ref: '#/components/responses/PerfilNoEncontrado'
+        '503':
+          $ref: '#/components/responses/SinOtroServicio'
+
+  /yo/refrescar:
+    post:
+      tags: [Copia del usuario]
+      operationId: refrescarMiCopia
+      summary: Poner al día la copia de mis datos en Tutorías
+      description: |
+        Tutorías pide a Identidad los datos del usuario del token (`GET /yo`,
+        con el mismo token) y pone al día su copia, `usuario_ref`: nombre,
+        apellido, carrera y sede (HU-41). Así la búsqueda y el perfil público
+        muestran el nombre nuevo.
+
+        - La página «Mi perfil» la llama al abrirse y después de guardar el
+          perfil en Identidad. Si Tutorías no responde, el perfil igual quedó
+          guardado en Identidad, y la copia se pone al día la próxima vez: al
+          abrir o guardar otra vez «Mi perfil», o al declarar una asignatura.
+        - Si el usuario todavía no tiene copia en Tutorías, no se crea ni se
+          llama a Identidad: la copia nace con su primer contacto, al declarar
+          una asignatura (M-09 del anexo A). Responde `actualizada: false`.
+        - Si Identidad no reconoce la cuenta: 403 `cuenta_inactiva`, y la
+          copia queda desactivada, fuera de la búsqueda (RN-08).
+        - No toca la reputación. No lleva cuerpo.
+      security:
+        - tokenAcceso: []
+      responses:
+        '200':
+          description: Lo que pasó con la copia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopiaRefrescada'
+              examples:
+                actualizada:
+                  summary: Camila, que ya tiene copia en Tutorías
+                  value:
+                    actualizada: true
+                sin_copia:
+                  summary: Un usuario que todavía no ha declarado asignaturas ni tiene copia
+                  value:
+                    actualizada: false
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/CuentaInactiva'
+        '503':
+          $ref: '#/components/responses/SinOtroServicio'
+
   /estado:
     get:
       tags: [Estado]
@@ -667,6 +995,19 @@ components:
         format: uuid
         pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       example: 4b7e2c1a-9d3f-4e6b-8a5c-1f2e3d4c5b6a
+    PerfilId:
+      name: perfil_id
+      in: path
+      required: true
+      description: |
+        Identificador de la asignatura declarada, el `id` que entregan `GET`
+        y `POST /perfiles`: un uuid en minúsculas y con guiones. Con otra
+        forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 7d1c2b3a-4e5f-4a6b-9c8d-0e1f2a3b4c5d
 
   responses:
     TokenNoValido:
@@ -791,6 +1132,95 @@ components:
             ruta_inexistente:
               summary: DELETE /disponibilidad/abc con DJANGO_DEBUG=1 (recortada)
               value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/tutoring/v1/disponibilidad/abc</title>...</html>'
+    AsignaturaNoDeclarable:
+      description: |
+        La asignatura no se puede declarar. Los códigos posibles, en el orden
+        en que se revisan, son:
+        - `asignatura_invalida`: falta `asignatura_id` o no es un uuid;
+        - `tarifa_invalida`: falta `tarifa`, o no es un entero de 0 a
+          99.999.999;
+        - `descripcion_invalida`: no es un texto, tiene más de 500
+          caracteres o trae caracteres que no se pueden guardar, como el nulo;
+        - `perfil_incompleto`: el usuario no tiene carrera o nivel en su
+          perfil de Identidad;
+        - `carrera_no_valida`: Catálogo no tiene su carrera activa;
+        - `asignatura_no_habilitada`: no está en la malla vigente de su
+          carrera, en un semestre anterior al que cursa (RN-01).
+
+        Si el cuerpo no es JSON válido, responde `parse_error`, con el mensaje
+        del framework.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            asignatura_invalida:
+              $ref: '#/components/examples/AsignaturaInvalida'
+            tarifa_invalida:
+              $ref: '#/components/examples/TarifaInvalida'
+            descripcion_invalida:
+              $ref: '#/components/examples/DescripcionInvalida'
+            perfil_incompleto:
+              $ref: '#/components/examples/PerfilIncompleto'
+            carrera_no_valida:
+              $ref: '#/components/examples/CarreraNoValida'
+            asignatura_no_habilitada:
+              $ref: '#/components/examples/AsignaturaNoHabilitada'
+    CuentaInactiva:
+      description: |
+        Identidad no reconoce la cuenta del token: no existe o está
+        desactivada. Si tenía copia en Tutorías, la copia queda desactivada y
+        deja de salir en la búsqueda (RN-08).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: cuenta_inactiva
+            mensaje: La cuenta no existe o está desactivada.
+            detalles: null
+    PerfilNoEncontrado:
+      description: |
+        El usuario del token no tiene una asignatura declarada con ese
+        identificador: no existe o es de otro usuario. Los dos casos responden
+        lo mismo, para no revelar que existe.
+
+        Si `perfil_id` no es un uuid en minúsculas, la ruta no existe y
+        responde Django con su página 404, en HTML, como en
+        `PATCH /disponibilidad/{bloque_id}`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: not_found
+            mensaje: No tienes una asignatura declarada con ese identificador.
+            detalles: null
+    SinOtroServicio:
+      description: |
+        Tutorías no pudo consultar a Identidad o a Catálogo: no responde, se
+        demora más de 3 segundos o responde con un error 5xx. El código es
+        `servicio_no_disponible` y el mensaje dice qué servicio falló.
+
+        También puede ser `claves_no_configuradas`, si falta la clave pública
+        (ver `ClavesNoConfiguradas`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            identidad:
+              summary: Identidad no responde
+              value:
+                codigo: servicio_no_disponible
+                mensaje: No pudimos comunicarnos con el servicio de Identidad. Intenta de nuevo en unos minutos.
+                detalles: null
+            catalogo:
+              summary: Catálogo no responde
+              value:
+                codigo: servicio_no_disponible
+                mensaje: No pudimos comunicarnos con el servicio de Catálogo. Intenta de nuevo en unos minutos.
+                detalles: null
 
   examples:
     TokenInvalido:
@@ -858,6 +1288,54 @@ components:
       value:
         codigo: bloque_con_solicitudes
         mensaje: El bloque tiene solicitudes pendientes y no se puede editar. Si lo eliminas, esas solicitudes quedan rechazadas.
+        detalles: null
+    AsignaturaInvalida:
+      summary: Sin asignatura_id, o uno que no es un uuid
+      value:
+        codigo: asignatura_invalida
+        mensaje: Elige la asignatura que quieres enseñar.
+        detalles: null
+    TarifaInvalida:
+      summary: Una tarifa con decimales, como 4500.5
+      value:
+        codigo: tarifa_invalida
+        mensaje: La tarifa tiene que ser un número entero de pesos, desde 0 (gratuita) hasta 99.999.999.
+        detalles: null
+    DescripcionInvalida:
+      summary: Una descripción de más de 500 caracteres
+      value:
+        codigo: descripcion_invalida
+        mensaje: La descripción puede tener hasta 500 caracteres.
+        detalles: null
+    PerfilIncompleto:
+      summary: Un usuario sin carrera o sin nivel en su perfil
+      value:
+        codigo: perfil_incompleto
+        mensaje: Completa tu carrera y tu nivel en Mi perfil antes de declarar asignaturas.
+        detalles: null
+    CarreraNoValida:
+      summary: La carrera del usuario no está en el catálogo
+      value:
+        codigo: carrera_no_valida
+        mensaje: Tu carrera no está en el catálogo. Revisa tu perfil.
+        detalles: null
+    AsignaturaNoHabilitada:
+      summary: Camila, en el semestre 2, declara Programación Orientada a Objetos, del semestre 2
+      value:
+        codigo: asignatura_no_habilitada
+        mensaje: Solo puedes declarar asignaturas de la malla de tu carrera que estén en semestres anteriores al que cursas (2).
+        detalles: null
+    ActivoInvalido:
+      summary: activo como texto, por ejemplo "no"
+      value:
+        codigo: activo_invalido
+        mensaje: Indica activo como true o false.
+        detalles: null
+    AsignaturaYaDeclarada:
+      summary: Camila declara otra vez Base de Datos, que ya tiene activa
+      value:
+        codigo: asignatura_ya_declarada
+        mensaje: 'Ya declaraste esa asignatura: puedes cambiar su tarifa en tu lista.'
         detalles: null
 
   schemas:
@@ -1105,6 +1583,97 @@ components:
           format: date-time
           description: ISO 8601 con la zona. Tiene que quedar posterior al inicio.
 
+    Perfil:
+      type: object
+      description: Una asignatura que el usuario declaró que puede enseñar, con su tarifa (`perfil_tutor`, HU-14).
+      required: [id, asignatura, tarifa, descripcion, activo, creado_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador de la asignatura declarada. Es el que pide `PATCH /perfiles/{perfil_id}`.
+        asignatura:
+          $ref: '#/components/schemas/AsignaturaDeclarada'
+        tarifa:
+          type: integer
+          minimum: 0
+          maximum: 99999999
+          description: En pesos chilenos. 0 es una tutoría gratuita (RN-05).
+        descripcion:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Lo que ofrece en esa asignatura. Puede venir en null.
+        activo:
+          type: boolean
+          description: false si el usuario la desactivó. Desactivada, no sale en la búsqueda ni en su perfil público.
+        creado_en:
+          type: string
+          format: date-time
+          description: Cuándo la declaró por primera vez. En ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+
+    AsignaturaDeclarada:
+      type: object
+      description: La asignatura, de la copia de lectura de Catálogo (`asignatura_ref`).
+      required: [asignatura_id, sigla, nombre]
+      properties:
+        asignatura_id:
+          type: string
+          format: uuid
+        sigla:
+          type: string
+          maxLength: 15
+        nombre:
+          type: string
+          maxLength: 150
+
+    NuevoPerfil:
+      type: object
+      description: La asignatura que se declara. Otros campos se ignoran.
+      required: [asignatura_id, tarifa]
+      properties:
+        asignatura_id:
+          type: string
+          format: uuid
+          description: El `id` de la asignatura en Catálogo, como lo entrega `GET /api/catalog/v1/carreras/{id}/asignaturas`.
+        tarifa:
+          type: integer
+          minimum: 0
+          maximum: 99999999
+          description: En pesos chilenos, sin decimales. 0 es una tutoría gratuita.
+        descripcion:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Opcional. Se guarda sin los espacios de los lados; vacía queda en null.
+
+    CambioDePerfil:
+      type: object
+      description: Lo que cambia; lo que no viene se conserva. Otros campos se ignoran.
+      properties:
+        tarifa:
+          type: integer
+          minimum: 0
+          maximum: 99999999
+          description: En pesos chilenos, sin decimales. No cambia el monto de las reservas ya creadas (A-04).
+        descripcion:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: null la borra.
+        activo:
+          type: boolean
+          description: false la desactiva; true la reactiva, revisando otra vez RN-01.
+
+    CopiaRefrescada:
+      type: object
+      description: Resultado de `POST /yo/refrescar` (HU-41).
+      required: [actualizada]
+      properties:
+        actualizada:
+          type: boolean
+          description: true si el usuario tenía copia en Tutorías y quedó al día; false si todavía no tiene copia.
+
     Estado:
       type: object
       description: Estado del servicio y de su base (HU-01).
@@ -1137,6 +1706,12 @@ components:
           token_vencido y authentication_failed (401); no_es_tutor (403);
           not_found (404); bloque_solapado, bloque_con_solicitudes y
           bloque_con_reserva_confirmada (409), y claves_no_configuradas (503).
+        - Con las asignaturas del tutor y la copia del usuario (HU-14 y
+          HU-41) se suman usuario_requerido, tarifa_invalida,
+          descripcion_invalida, activo_invalido, perfil_incompleto,
+          carrera_no_valida y asignatura_no_habilitada (400); cuenta_inactiva
+          (403); asignatura_ya_declarada (409), y servicio_no_disponible
+          (503). asignatura_invalida también sale al declarar una asignatura.
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.

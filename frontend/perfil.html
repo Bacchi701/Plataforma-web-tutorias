@@ -119,6 +119,51 @@
         </button>
     </form>
 
+    <!-- ASIGNATURAS QUE ENSEÑO (HU-14): js/mis-asignaturas.js la muestra con sesión -->
+    <section class="profile-card mis-asig hidden" id="misAsignaturas" aria-labelledby="tituloMisAsignaturas">
+        <h2 id="tituloMisAsignaturas">Asignaturas que enseño</h2>
+        <p class="profile-text">
+            Ofrece tutorías de las asignaturas de tu malla que ya cursaste, las de los semestres anteriores al que cursas. Cada una aparece en la búsqueda con su tarifa.
+        </p>
+
+        <div class="login-message" id="mensajeAsignaturas" role="status" aria-live="polite"></div>
+
+        <p class="profile-status hidden" id="avisoAsignaturas"></p>
+
+        <form class="mis-asig-formulario hidden" id="formAsignatura" novalidate>
+            <div class="profile-field">
+                <label for="asignaturaNueva" class="profile-label">Asignatura</label>
+                <select id="asignaturaNueva" class="profile-input" required>
+                    <option value="">Elige una asignatura</option>
+                </select>
+            </div>
+
+            <div class="profile-field">
+                <label for="tarifaNueva" class="profile-label">Tarifa por tutoría, en pesos</label>
+                <input type="text" id="tarifaNueva" class="profile-input" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="Por ejemplo, 5.000" required aria-describedby="tarifaAyuda">
+                <small class="profile-hint" id="tarifaAyuda">Escribe 0 si la tutoría es gratuita.</small>
+            </div>
+
+            <div class="profile-field">
+                <label for="descripcionNueva" class="profile-label">Descripción (opcional)</label>
+                <textarea id="descripcionNueva" class="profile-input mis-asig-texto" rows="3" maxlength="500" aria-describedby="descripcionAyuda"></textarea>
+                <small class="profile-hint" id="descripcionAyuda">Cuenta cómo ayudas, en hasta 500 caracteres.</small>
+            </div>
+
+            <button type="submit" class="profile-button" id="botonDeclarar">
+                Agregar asignatura
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            </button>
+        </form>
+
+        <ul class="mis-asig-lista hidden" id="listaMisAsignaturas" aria-label="Asignaturas que declaraste"></ul>
+
+        <p class="mis-asig-siguiente hidden" id="siguientePaso">
+            <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+            <span>Ya puedes publicar tus horarios en <a href="disponibilidad.html">Mi disponibilidad</a>.</span>
+        </p>
+    </section>
+
 </section>
 
 </main>
@@ -168,5 +213,6 @@
 
 <script src="js/sesion.js"></script>
 <script src="js/perfil.js"></script>
+<script src="js/mis-asignaturas.js"></script>
 </body>
 </html>
