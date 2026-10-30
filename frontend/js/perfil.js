@@ -9,20 +9,8 @@
 const CATALOGO = "/api/catalog/v1";
 const NIVEL_MAXIMO = 12;
 
-// El encabezado (sesion.js) y esta pagina piden la sesion al mismo tiempo, y
-// dos /refresh simultaneos gastan la misma renovacion: el segundo recibe 401 y
-// su parte de la pagina se queda sin sesion. Mientras haya una renovacion en
-// curso, las demas llamadas esperan esa misma respuesta.
-const renovarSinCompartir = Sesion.renovar;
-let renovacionEnCurso = null;
-Sesion.renovar = function () {
-    if (!renovacionEnCurso) {
-        renovacionEnCurso = renovarSinCompartir.call(Sesion).finally(() => {
-            renovacionEnCurso = null;
-        });
-    }
-    return renovacionEnCurso;
-};
+// El encabezado (sesion.js) y esta pagina piden la sesion al mismo tiempo: la
+// renovacion se comparte en Sesion.renovar (sesion.js).
 
 document.addEventListener("DOMContentLoaded", () => {
     llenarNiveles();
