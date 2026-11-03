@@ -66,7 +66,7 @@ de semestres anteriores al que cursa.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Lenguajes            | Python 3.12 en el backend; JavaScript, HTML y CSS en el frontend                                                                      |
 | Backend              | Django 5.2 y Django REST Framework 3.16, servidos con Gunicorn                                                                        |
-| Frontend             | HTML, CSS y JavaScript sin framework, servidos por el gateway en `/app/` (la alternativa que dejó prevista AD-12, en lugar del plan con React y Vite) |
+| Frontend             | HTML, CSS y JavaScript sin framework, servidos por el gateway en `/app/` (la alternativa que dejó prevista AD-12, en lugar del plan con React y Vite; el profesor la aceptó el 21-10) |
 | Base de datos        | PostgreSQL 16, una base independiente por microservicio                                                                               |
 | API Gateway          | Nginx 1.27                                                                                                                            |
 | Autenticación        | Tokens JWT firmados con RS256: los emite Identidad, y Tutorías los verifica con la clave pública (HU-05 y HU-17)                     |
@@ -261,36 +261,54 @@ evaluaciones, y Francisco en Tutorías e infraestructura. Con tres integrantes,
 los roles de Scrum Master y Product Owner se concentran en el líder, y así
 queda escrito.
 
-Para equilibrar la carga en el sprint 3, Francisco tomó la búsqueda de
-tutores (HU-20), que es de Tutorías, y Bryan, las mejoras que salieron de la
-revisión de la plataforma con el equipo (HU-38 a HU-41). Las excepciones
-quedan registradas en Jira.
+Hubo excepciones a ese reparto. Por la reasignación del 30-09, la primera
+versión de HU-06, HU-07, HU-08, HU-09 y HU-12 la hizo Bryan (PR #10, #6, #7, #12
+y #9), y Francisco agregó a la de HU-12 la columna `area`, su filtro y la
+paginación (sus commits del 08-10, dentro del PR #9). En el Sprint 3, para
+equilibrar la carga, Francisco tomó la búsqueda de tutores (HU-20), que es de
+Tutorías, como excepción registrada el 21-10. Damaris hizo la parte de Tutorías
+del criterio 1 de HU-17, que es de Bryan: la verificación del token (PR #15,
+registrada en SCRUM-43). Bryan hizo las mejoras que salieron de la revisión de
+la plataforma con el equipo (HU-38 a HU-41). La declaración de asignaturas
+(HU-14) está en Jira a nombre de Francisco; la implementó Bryan en el PR #21.
+HU-30 y HU-34 están a nombre de Bryan en Jira: la replanificación del 25-09 propuso el cambio «a acordar con el equipo», y no hay un acuerdo escrito.
 
 ## Metodología de trabajo del equipo: Scrum
 
 El equipo trabaja con Scrum, adaptado a tres personas.
 
-- **Sprints de dos semanas.** Cuatro sprints, del 21 de septiembre al 8 de
-  noviembre de 2026 (el último dura una semana), precedidos por una semana de
-  planificación y una de cimientos. El 25 de septiembre el profesor fijó el
-  8 de noviembre como límite del desarrollo, y el plan pasó de cinco sprints a
-  cuatro.
+- **Sprints de dos semanas.** Cuatro sprints, del 21-09 al 08-11 (el último
+  dura una semana), precedidos por una semana de planificación y una de
+  cimientos. El 25-09 el profesor fijó el 08-11 como límite del desarrollo, y
+  el plan pasó de cinco sprints a cuatro.
 - **Product Backlog.** El alcance se priorizó con MoSCoW. El bloque Must, que
   es el MVP, se descompuso en 37 historias de usuario (13 de ellas técnicas),
   estimadas en horas (355 h en total) y agrupadas en nueve épicas. Los Should
   entran de a uno, y solo si la velocidad medida deja espacio.
-- **Cierre de sprint** (90 minutos, cada dos semanas): Sprint Review, en la que
-  cada dueño de servicio demuestra lo suyo funcionando; retrospectiva; reporte
-  al docente; y Sprint Planning del sprint siguiente, sobre las horas que cada
-  integrante declara. Al abrir cada sprint se congelan los contratos de la API
-  que ese sprint va a usar.
-- **Seguimiento en Jira.** Desde el sprint 2, por pedido del profesor, el
+- **Cierre de sprint.** El plan prevé, cada dos semanas, un cierre de 90
+  minutos: Sprint Review, en la que cada dueño de servicio demuestra lo suyo
+  funcionando; retrospectiva; reporte al docente, y Sprint Planning del sprint
+  siguiente, sobre las horas que cada integrante declara. También prevé
+  congelar, al abrir cada sprint, los contratos de la API que ese sprint va a
+  usar. Lo que consta: la Sprint Review del Sprint 1 y la planificación del
+  Sprint 2, previstas para el 05-10, no se hicieron; la retrospectiva del
+  Sprint 1, convocada para la misma llamada, la hizo Bryan solo (S1_7 y
+  evidencia A21 del informe de avance). De las Sprint Review y las
+  retrospectivas de los Sprints 2 y 3 no hay registro. El Sprint 3 se planificó
+  en Jira el 23-10, y el Sprint 4, el 02-11.
+- **Seguimiento en Jira.** Desde el Sprint 2, por pedido del profesor, el
   backlog, el sprint y el Daily están en Jira (proyecto «Tutorias», clave
-  SCRUM). El Daily es escrito: cada integrante deja un comentario por día en
-  la tarea del Daily de cada sprint (SCRUM-51 en el sprint 2 y SCRUM-69 en el
-  sprint 3), con lo que hizo, lo que hará y sus bloqueos. Al cierre de cada
-  sprint se comparan las horas planificadas con las trabajadas y con las
-  historias terminadas.
+  SCRUM). El Daily es escrito: la regla es que cada integrante deje un
+  comentario por día en la tarea del Daily de cada sprint (SCRUM-51 en el
+  Sprint 2, SCRUM-69 en el Sprint 3 y SCRUM-78 en el Sprint 4), con lo que
+  hizo, lo que hará y sus bloqueos. En el Sprint 2 constan cinco reportes: dos
+  comentarios en SCRUM-51 (Damaris, 07-10; Bryan, 09-10) y tres tareas sueltas
+  de Damaris (SCRUM-64, 65 y 66, del 05 y el 07-10). En el Sprint 3 no hay
+  ninguno. En el Sprint 4, SCRUM-78 tiene el de Bryan del 02-11. En Jira, las
+  horas de cada historia son la estimación, y las horas trabajadas no se
+  registran. Las planillas de cada sprint (S1_2 a S4_2, en el Listado de
+  documentos) usan esa estimación para comparar las horas comprometidas con
+  las de las historias terminadas.
 - **Definición de Listo (Definition of Done).** Una historia está terminada
   cuando cumple su criterio de aceptación sobre el sistema levantado, tiene
   pruebas automáticas de sus reglas de negocio, la integración continua está
@@ -298,29 +316,30 @@ El equipo trabaja con Scrum, adaptado a tres personas.
   real, el sistema se levanta desde un clon limpio y la historia está fusionada
   a `develop`.
 
-| Etapa         | Fechas                           | Objetivo                                                                        |
-| ------------- | -------------------------------- | ------------------------------------------------------------------------------- |
-| Planificación | 7 al 13 de septiembre            | Cinco pilares de planificación, repositorio y primeras maquetas                 |
-| Cimientos     | 14 al 20 de septiembre           | El sistema completo se levanta con un comando                                   |
-| Sprint 1      | 21 de septiembre al 4 de octubre | Registro, verificación de correo e inicio de sesión, sobre la base del frontend |
-| Sprint 2      | 5 al 18 de octubre               | Cerrar lo abierto del sprint 1; perfil, catálogo cargado, declaración de asignaturas y disponibilidad |
-| Sprint 3      | 19 de octubre al 1 de noviembre  | El flujo de reservas: declarar asignaturas, solicitar, confirmar o rechazar y pago simulado, más 3 a 5 carreras reales |
-| Sprint 4      | 2 al 8 de noviembre              | Lo que queda del MVP: cancelación con reembolso, cierre y expiración automáticos, evaluaciones, avisos por correo, panel de administración, sistema visual y pruebas de extremo a extremo; el desarrollo se congela el 8 de noviembre |
-| Cierre        | 9 al 21 de noviembre             | Informe final y ensayo de la demostración                                       |
+| Etapa         | Fechas         | Objetivo                                                                        |
+| ------------- | -------------- | ------------------------------------------------------------------------------- |
+| Planificación | 07 al 13-09    | Cinco pilares de planificación, repositorio y primeras maquetas                 |
+| Cimientos     | 14 al 20-09    | El sistema completo se levanta con un comando                                   |
+| Sprint 1      | 21-09 al 04-10 | Registro, verificación de correo e inicio de sesión, sobre la base del frontend |
+| Sprint 2      | 05 al 18-10    | Cerrar lo abierto del Sprint 1 (PR #5 a #12), el contrato de Identidad (HU-03) y la carga del catálogo; si alcanzaba, perfil y declaración de asignaturas |
+| Sprint 3      | 19-10 al 01-11 | El flujo de reservas: declarar asignaturas, solicitar, confirmar o rechazar y pago simulado, más 3 a 5 carreras reales |
+| Sprint 4      | 02 al 08-11    | Lo que queda del MVP: solicitar, confirmar o rechazar una tutoría con avisos por correo, pago simulado, cancelación con reembolso, cierre y expiración automáticos, evaluaciones, panel de administración, carreras reales, sistema visual y pruebas de extremo a extremo; el desarrollo se congela el 08-11 |
+| Cierre        | 09 al 21-11    | Informe final y ensayo de la demostración                                       |
 
-El 23 de octubre el sprint 3 se reenfocó en el flujo de reservas, y lo demás
-pasó al sprint 4. En la semana del 26 de octubre el equipo revisó la
-plataforma funcionando y agregó siete historias al backlog (HU-38 a HU-44); las
-cuatro primeras entraron al sprint 3. Si lo que queda del MVP no alcanza a
-terminarse en el sprint 4, se aplica el orden de recorte del Pilar 1
-(sección 8.3).
+El 23-10 el Sprint 3 se reenfocó en el flujo de reservas, y lo demás pasó al
+Sprint 4. En la semana del 26-10 el equipo revisó la plataforma funcionando y
+agregó siete historias al backlog (HU-38 a HU-44); las cuatro primeras
+entraron al Sprint 3. Si lo que queda del MVP no alcanza a terminarse en el
+Sprint 4, se aplica el orden de recorte del Pilar 1 (sección 8.3).
 
-**Flujo en Git (GitFlow reducido).** `main` guarda la última versión
-presentable y recibe `develop` al cierre de cada sprint, con su etiqueta (v0.1,
-v0.2, v0.3 y v1.0). `develop` integra el trabajo del sprint. Cada historia nace de
-`develop` en una rama corta (por ejemplo, `feat/HU-04-registro-usuario`) y
-vuelve por Pull Request, con la integración continua en verde y la aprobación
-de otro integrante.
+**Flujo en Git (GitFlow reducido).** `develop` integra el trabajo del sprint.
+Cada historia nace de `develop` en una rama corta (por ejemplo,
+`feat/HU-04-registro-usuario`) y vuelve por Pull Request, con la integración
+continua en verde y la aprobación de otro integrante. Según el plan, `main`
+guarda la última versión presentable y recibe `develop` al cierre de cada
+sprint, con su etiqueta: v0.1 el 04-10, v0.2 el 18-10, v0.3 el 01-11 y v1.0 el
+08-11. Al 02-11 no se ha hecho: `main` sigue en el prototipo del 12-09
+(`b8a21f3`), sin ninguna fusión de `develop`, y no hay etiquetas.
 
 ## Arquitectura de la solución
 
@@ -439,7 +458,11 @@ del 30 de septiembre y la columna `area` de HU-12), están en
 Fase 1/              evidencias de la Fase 1 del Capstone (grupales e individuales)
 Fase 2/              evidencias de la Fase 2: individuales, grupales y del proyecto
 .github/workflows/   canal de integración continua
-docs/                planificación, diagramas, contratos OpenAPI, decisiones y evidencia
+docs/planificacion/  los cinco pilares, el anexo A (modelo de datos) y la idea base del proyecto
+docs/diagramas/      diagramas con su fuente: entidad-relación de las cuatro bases, componentes (UML), estados de la reserva, cronograma, carta Gantt y mapa de historias
+docs/api/            contratos OpenAPI de Identidad y Tutorías
+docs/adr/            dónde están las decisiones de arquitectura (Pilar 2 y anexo A)
+docs/evidencia/      presentación de la sesión del 30-10
 infra/nginx/         configuración del gateway y página de estado
 infra/postgres/      reservada para scripts de inicialización de PostgreSQL (hoy vacía)
 services/            identity, catalog, tutoring y payments, cada uno con su Dockerfile
@@ -448,42 +471,64 @@ keys/                clave pública de firma de tokens (la privada no se version
 scripts/             levantar la demo, cargar los datos de ejemplo y probar las restricciones
 frontend/            páginas del frontend (HTML, CSS y JavaScript), servidas en /app/
 docker-compose.yml   levanta el sistema completo
+pyproject.toml       configuración de ruff y black
+requirements-dev.txt herramientas de prueba y de estilo (pytest, pytest-django, pytest-cov, black y ruff)
 .env.example         variables de entorno de ejemplo, sin secretos
 ```
 
 ## Estado del desarrollo
 
-Al 29 de octubre de 2026, en el sprint 3:
+Al 02-11-2026, al abrir el Sprint 4, con `develop` en `078995a` (PR #26). Los
+estados son los de Jira, donde hay 44 historias (HU-01 a HU-44) con 389 h
+estimadas: 16 Finalizadas (139 h), 4 En curso (36 h), 1 En revisión (14 h) y
+23 en Tareas por hacer (200 h). Aparte está SCRUM-70, sin estimar.
 
-- **En `develop`:** los cimientos (HU-01) y el correo de desarrollo (HU-02);
-  el contrato de Identidad (HU-03); el registro con verificación del correo
+- **Finalizadas:** los cimientos (HU-01) y el correo de desarrollo (HU-02); el
+  contrato de Identidad (HU-03); el registro con verificación del correo
   (HU-04), el inicio y cierre de sesión (HU-05) y sus pantallas (HU-09); las
-  páginas servidas en `/app/` (HU-06); los modelos de Catálogo (HU-07),
-  Tutorías (HU-08) y Pagos (HU-23); el perfil con carrera, nivel y sede
-  (HU-10); la API de Catálogo (HU-12); los bloques de disponibilidad (HU-15);
-  la verificación del token en Tutorías (HU-17); la búsqueda de tutores
-  (HU-20) y sus pantallas (HU-18; solicitar desde el perfil llega con HU-21),
-  y los datos de ejemplo con los scripts de
-  la demo.
-- **Con los PR del 29-10:** declarar desde «Mi perfil» las asignaturas que se
-  enseñan, con su tarifa (HU-14), y que el nombre editado llegue a la búsqueda
-  (HU-41); los tutores de cada asignatura y la búsqueda de tutores por nombre
-  y por evaluación (HU-40); los pasos del inicio con su detalle y las etiquetas
-  de asignaturas en el perfil del tutor (HU-38 y HU-39), y la sesión que se
-  renueva una sola vez por página.
-- **Sprint 3, pendiente:** solicitar una tutoría (HU-21), confirmarla o
-  rechazarla (HU-22) y el pago simulado (HU-23 y HU-24), más el cargador del
-  catálogo desde CSV (HU-07) y de 3 a 5 carreras reales (HU-13).
-- **Backlog nuevo:** el buzón de avisos (HU-42) y recuperar la contraseña
-  (HU-43), si queda capacidad en el sprint 4, y ofrecer asignaturas
-  aprobadas con evidencia (HU-44), que se decide con el equipo.
-- **Pendiente:** las versiones de `main` (v0.1 y v0.2), que no se publicaron
-  al cierre de los sprints 1 y 2.
-- **Alcance:** desde el 5 de octubre, de forma provisoria, el panel de
-  administración se limita a consultar y desactivar usuarios (escalón 3 del
-  plan de recorte). El pago con Mercado Pago en modo de prueba queda en el
-  backlog, solo si sobra tiempo.
-- **Más adelante:** el programador de tareas llega con HU-37, en el sprint 4.
+  páginas servidas en `/app/` (HU-06); el modelo de Tutorías (HU-08); el
+  perfil con carrera, nivel y sede (HU-10); declarar desde «Mi perfil» las
+  asignaturas que se enseñan, con su tarifa (HU-14), y que el nombre editado
+  llegue a la búsqueda (HU-41); los bloques de disponibilidad (HU-15); la
+  búsqueda de tutores (HU-20), con los tutores de cada asignatura y la
+  búsqueda por nombre y por evaluación (HU-40), y los pasos del inicio y las
+  etiquetas del tutor (HU-38 y HU-39). En `develop` están también los datos
+  de ejemplo con los scripts de la demo (PR #16), la sesión que se renueva una
+  sola vez por página (PR #23) y el menú ☰ en pantallas chicas (PR #24).
+- **En `develop`, con criterios pendientes:** el modelo de Catálogo, sin la
+  carga desde CSV (HU-07, En curso); la API pública de Catálogo, sin su
+  contrato ni las rutas internas (HU-12, En revisión); la verificación del
+  token en Tutorías, sin la de Pagos, las llamadas internas a Identidad, los
+  avisos ni las pruebas de integración de Identidad (HU-17, En curso); las
+  pantallas de búsqueda, sin solicitar una tutoría desde el perfil del tutor
+  (HU-18, En curso), y el modelo de Pagos, sin el servicio (HU-23, En curso).
+  Las cinco están en el Sprint 4. De HU-12, el contrato
+  está en el plan del Sprint 4, y el criterio 4 (las rutas internas) sigue en
+  Jira; desde el PR #21, Tutorías valida RN-01 con la malla pública, y el
+  Sprint 4 deja ese criterio sujeto a decisión.
+- **Sprint 3 (19-10 al 01-11), cerrado en Jira el 02-11:** el flujo de
+  reservas no alcanzó. Solicitar una tutoría (HU-21), confirmarla o
+  rechazarla (HU-22), el pago simulado (HU-23 y HU-24), la carga desde CSV
+  (HU-07) y las carreras reales (HU-13) pasaron al Sprint 4.
+- **Sprint 4 (02 al 08-11), activo:** 24 historias y 220 h en Jira (Bryan
+  61 h, Francisco 103 h y Damaris 56 h), con la meta «MVP completo antes del
+  congelamiento del 8-11: reservas con avisos, pago simulado, cancelación y
+  cierre automático, evaluaciones, administración, carreras reales y pruebas
+  de punta a punta». El 08-11 se congela el desarrollo. El programador de
+  tareas (HU-37) tiene su rama, `feat/HU-37-programador`, y su Pull Request,
+  abierto el 02-11.
+- **Fuera de los sprints:** el ensayo de la demostración y la documentación
+  final (HU-32), después del 08-11; el buzón de avisos (HU-42) y recuperar la
+  contraseña (HU-43), que son Should y entran si queda capacidad en el
+  Sprint 4, y ofrecer asignaturas aprobadas con evidencia (HU-44), que es
+  Could y se decide con el equipo. El pago con Mercado Pago en modo de prueba
+  (SCRUM-70, RF-18, Could) queda en el backlog, solo si sobra tiempo.
+- **Panel de administración:** el 05-10, el panel quedó de forma provisoria
+  en consultar y desactivar usuarios (escalón 3 del recorte). La planificación
+  del Sprint 4, del 02-11, incluye HU-33 completa.
+- **Versiones en `main`:** v0.1, v0.2 y v0.3 no se publicaron al cierre de
+  los Sprints 1, 2 y 3. `main` sigue en el prototipo del 12-09 (`b8a21f3`) y
+  no hay etiquetas.
 
 ## Comandos del día a día
 
@@ -548,10 +593,19 @@ usuarios sin permisos cruzados.
 
 | Documento                                                                       | Dónde está                                                |
 | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Planificación en cinco pilares: alcance, arquitectura, equipo, tiempo y calidad | [`docs/planificacion/`](docs/planificacion/)              |
-| Modelo de datos detallado (anexo A del Pilar 2)                                 | [`docs/planificacion/`](docs/planificacion/)              |
-| Diagramas entidad-relación de las cuatro bases                                  | [`docs/diagramas/`](docs/diagramas/)                      |
-| Contratos OpenAPI por servicio                                                  | [`docs/api/`](docs/api/), se agregan al abrir cada sprint |
+| Planificación en cinco pilares: alcance (Pilar 1, v1.8), arquitectura (Pilar 2, v1.8), equipo (Pilar 3, v1.8), tiempo (Pilar 4, v2.0) y calidad (Pilar 5, v1.6) | [`docs/planificacion/`](docs/planificacion/)              |
+| Modelo de datos detallado (anexo A del Pilar 2, v1.6)                           | [`docs/planificacion/`](docs/planificacion/)              |
+| Decisiones de arquitectura: AD-01 a AD-15 y las tomadas después del 25-09      | [`docs/adr/README.md`](docs/adr/README.md)                |
+| Diagramas entidad-relación de las cuatro bases, con su fuente en Mermaid (`.mmd`) | [`docs/diagramas/`](docs/diagramas/)                      |
+| Diagrama UML de componentes (figura 1 del Pilar 2), con su fuente en Graphviz (`06_componentes.dot`) | [`docs/diagramas/06_componentes.png`](docs/diagramas/06_componentes.png) |
+| Estados de la reserva (figura 2 del Pilar 2), con su fuente en Graphviz (`10_estados_reserva.dot`) | [`docs/diagramas/10_estados_reserva.png`](docs/diagramas/10_estados_reserva.png) |
+| Calendario de la replanificación del 25-09 (figura 4 del Pilar 4), con su fuente en Python (`07_cronograma.py`) | [`docs/diagramas/07_cronograma.png`](docs/diagramas/07_cronograma.png) |
+| Carta Gantt de las 44 historias y SCRUM-70 (figura 5 del Pilar 4), con su fuente en Python (`08_carta_gantt.py`) y sus datos (`08_carta_gantt.csv`) | [`docs/diagramas/08_carta_gantt.png`](docs/diagramas/08_carta_gantt.png) |
+| Mapa de historias al 02-11 (figura 2 del documento 10 del Listado), con su fuente en Python (`11_story_map.py`) y sus datos (`11_story_map.csv`) | [`docs/diagramas/11_story_map.png`](docs/diagramas/11_story_map.png) |
+| Contratos OpenAPI de Identidad y Tutorías (los de Catálogo y Pagos los agregan HU-12 y HU-23, en el Sprint 4) | [`docs/api/`](docs/api/), al día con cada PR que cambia una API |
+| Presentación de la sesión del 30-10 con el profesor                             | [`docs/evidencia/`](docs/evidencia/)                      |
+| Videos de la plataforma funcionando, del 16-10 y del 30-10                      | [`Fase 2/Evidencias Proyecto/Evidencias de sistema/Aplicación/`](Fase%202/Evidencias%20Proyecto/Evidencias%20de%20sistema/Aplicaci%C3%B3n/) |
+| Revisión de normalización del modelo (30-09) y diagramas entidad-relación      | [`Fase 2/Evidencias Proyecto/Evidencias de sistema/Base de datos/`](Fase%202/Evidencias%20Proyecto/Evidencias%20de%20sistema/Base%20de%20datos/) |
 | Evidencias de la Fase 1 del Capstone                                            | [`Fase 1/`](Fase%201/)                                    |
-| Evidencias de la Fase 2: Listado de documentos, informe de avance y modelo de datos | [`Fase 2/`](Fase%202/)                                    |
+| Evidencias de la Fase 2: Listado de documentos (00 a 08 y 10, v1.1; 09, con datos al 02-11-2026; 11, plantilla v0.2; 12, v1.2), artefactos de los cuatro sprints e informe de avance | [`Fase 2/`](Fase%202/)                                    |
 | Backlog priorizado, sprints y Daily                                             | Jira, proyecto «Tutorias» (clave SCRUM), con acceso por invitación |
