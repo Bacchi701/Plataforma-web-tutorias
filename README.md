@@ -100,9 +100,10 @@ docker compose up -d --build
 ```
 
 `docker-compose.yml` construye cada servicio desde su
-`services/<servicio>/Dockerfile` y levanta diez contenedores: el gateway, los
-cuatro servicios, sus cuatro bases de datos y la bandeja de correo de
-desarrollo. La primera vez tarda entre 3 y 6 minutos porque construye las
+`services/<servicio>/Dockerfile` y levanta once contenedores: el gateway, los
+cuatro servicios, sus cuatro bases de datos, la bandeja de correo de
+desarrollo y el programador de tareas, que usa la imagen de Tutorías (HU-37).
+La primera vez tarda entre 3 y 6 minutos porque construye las
 imágenes. Las siguientes, menos de un minuto.
 
 ### Comprobar que está arriba
@@ -246,6 +247,23 @@ no relee el `.env`), y la prueba se envía con
 `docker compose exec identity python manage.py enviar_correo_prueba --para tu.casilla@duocuc.cl`.
 Esas claves nunca se suben al repositorio.
 
+### Programador de tareas
+
+El contenedor `tut_programador` usa la imagen de Tutorías y no publica
+puertos. Al arrancar, y después cada 300 segundos, corre
+`sincronizar_copias` (HU-19) y después `cerrar_y_expirar` (HU-29), cada uno en
+su propio proceso: si uno falla, el otro corre igual. Mientras esas historias
+no lleguen, su registro muestra «Unknown command» para los dos y sigue con el
+ciclo siguiente. Cada comando deja su fila en la tabla `ejecucion_tarea` de
+`tutoring_db`; el programador no escribe en ella.
+
+```bash
+docker compose logs -f programador                                # lo que corrió y cómo terminó
+docker compose exec programador python manage.py cerrar_y_expirar # correr un comando a mano, por ejemplo antes de mostrar algo en la demo
+docker compose up -d --build                                      # después de cambiar el código de Tutorías: vuelve a crear el programador con la imagen nueva
+docker compose up -d --force-recreate programador                 # si no lo volvió a crear
+```
+
 ## Integrantes del equipo con sus roles
 
 | Integrante       | Autor en Git  | Rol en Scrum                                                    | Responsabilidades                                                                                                                                                                                                                                                   |
@@ -369,8 +387,8 @@ flowchart TB
 ```
 
 El diagrama muestra el MVP completo. Las páginas del frontend las sirve el
-propio gateway en `/app/` (la alternativa de AD-12), y el programador de tareas llega
-con HU-37. Las flechas continuas son el tráfico del cliente, que siempre entra
+propio gateway en `/app/` (la alternativa de AD-12), y el programador de tareas es
+el contenedor `tut_programador` (HU-37). Las flechas continuas son el tráfico del cliente, que siempre entra
 por el gateway, y el acceso de cada servicio a su propia base. Las punteadas
 son llamadas internas por la red privada:
 
@@ -490,6 +508,7 @@ Al 29 de octubre de 2026, en el sprint 3:
 ```bash
 docker compose ps                  # qué hay levantado y cómo está
 docker compose logs -f identity    # seguir los registros de un servicio
+docker compose logs -f programador # ver qué comandos corrió el programador y cómo terminaron
 docker compose restart identity    # reiniciar uno (no relee el .env)
 docker compose down                # apagar, conservando los datos
 docker compose down -v             # apagar y BORRAR las cuatro bases
