@@ -17,8 +17,10 @@ from . import llamadas
 from .llamadas import (
     CuentaInactiva,
     ServicioNoDisponible,
+    _pedir,
     datos_del_usuario,
     malla_cursada,
+    usuario_por_id,
 )
 
 USUARIO_ID = uuid.uuid4()
@@ -284,3 +286,176 @@ def test_si_catalogo_falla_responde_503(red, falla):
         malla_cursada(CARRERA_ID, 2)
 
     assert "servicio de Catálogo" in str(error.value.detail)
+
+
+# ---------------------------------------------------- Llamadas internas (F1)
+
+
+def usuario_interno(**cambios):
+    return {
+        "id": str(USUARIO_ID),
+        "nombre": "Camila",
+        "apellido": "Soto",
+        "carrera_id": str(CARRERA_ID),
+        "nivel": 3,
+        "sede_id": str(SEDE_ID),
+        "activo": True,
+        **cambios,
+    }
+
+
+def test_pedir_con_post_hacia_ruta_interna_agrega_clave_y_cuerpo_json(red, settings):
+    settings.CLAVE_SERVICIO = "clave-secreta-interna"
+    red.respuesta = Respuesta({"ok": True}, status=200)
+
+    url = "http://identity:8000/api/identity/v1/internal/avisos"
+    cuerpo = {"destinatario": "test@duocuc.cl"}
+    estado, respuesta = _pedir("Identidad", url, metodo="POST", cuerpo=cuerpo)
+
+    assert estado == 200
+    assert respuesta == {"ok": True}
+    [peticion] = red.peticiones
+    assert peticion.full_url == url
+    assert peticion.get_method() == "POST"
+    assert peticion.data == json.dumps(cuerpo).encode("utf-8")
+    assert peticion.get_header("Content-type") == "application/json"
+    assert peticion.get_header("Accept") == "application/json"
+    assert peticion.get_header("X-clave-servicio") == "clave-secreta-interna"
+
+
+def test_pedir_2xx_sin_cuerpo_devuelve_none(red, settings):
+    settings.CLAVE_SERVICIO = "clave-secreta-interna"
+    red.respuesta = Respuesta(b"", status=204)
+
+    url = "http://identity:8000/api/identity/v1/internal/accion"
+    estado, respuesta = _pedir("Identidad", url, metodo="POST")
+
+    assert estado == 204
+    assert respuesta is None
+
+
+def test_rutas_publicas_no_llevan_clave_de_servicio(red, settings):
+    settings.CLAVE_SERVICIO = "clave-secreta-interna"
+    red.respuesta = Respuesta(yo())
+
+    datos_del_usuario(AUTORIZACION)
+
+    [peticion_yo] = red.peticiones
+    assert peticion_yo.get_header("X-clave-servicio") is None
+
+    red.peticiones.clear()
+    red.respuesta = Respuesta(malla((1, [PRIMERO])))
+
+    malla_cursada(CARRERA_ID, 1)
+
+    [peticion_malla] = red.peticiones
+    assert peticion_malla.get_header("X-clave-servicio") is None
+
+
+def test_clave_de_servicio_se_lee_en_cada_llamada(red, settings):
+    settings.CLAVE_SERVICIO = "primera-clave"
+    red.respuesta = Respuesta({"ok": 1})
+    _pedir("Identidad", "http://identity:8000/api/identity/v1/internal/test")
+    assert red.peticiones[0].get_header("X-clave-servicio") == "primera-clave"
+
+    settings.CLAVE_SERVICIO = "segunda-clave"
+    red.respuesta = Respuesta({"ok": 2})
+    _pedir("Identidad", "http://identity:8000/api/identity/v1/internal/test")
+    assert red.peticiones[1].get_header("X-clave-servicio") == "segunda-clave"
+
+
+def test_usuario_por_id_con_200_devuelve_diccionario_completo(red, settings):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = Respuesta(usuario_interno())
+
+    datos = usuario_por_id(USUARIO_ID)
+
+    assert datos == {
+        "id": USUARIO_ID,
+        "nombre": "Camila",
+        "apellido": "Soto",
+        "carrera_id": CARRERA_ID,
+        "nivel": 3,
+        "sede_id": SEDE_ID,
+        "activo": True,
+    }
+    [peticion] = red.peticiones
+    assert peticion.full_url == (
+        f"http://identity:8000/api/identity/v1/internal/usuarios/{USUARIO_ID}"
+    )
+    assert peticion.get_header("X-clave-servicio") == "clave-de-prueba"
+    assert peticion.get_header("Authorization") is None
+
+
+def test_usuario_por_id_cuenta_desactivada_llega_con_activo_false(red, settings):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = Respuesta(usuario_interno(activo=False))
+
+    datos = usuario_por_id(USUARIO_ID)
+
+    assert datos["activo"] is False
+
+
+def test_usuario_por_id_inexistente_devuelve_none(red, settings):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = error_http(
+        404,
+        {
+            "codigo": "usuario_no_encontrado",
+            "mensaje": "El usuario no existe.",
+            "detalles": None,
+        },
+    )
+
+    resultado = usuario_por_id(USUARIO_ID)
+
+    assert resultado is None
+
+
+@pytest.mark.parametrize(
+    "falla_404",
+    [
+        error_http(404, {"codigo": "ruta_no_encontrada", "mensaje": "x"}),
+        error_http(404, b"<!DOCTYPE html><title>Not Found</title>"),
+    ],
+    ids=["ruta_no_encontrada", "html_404"],
+)
+def test_usuario_por_id_404_sin_codigo_conocido_lanza_503_y_loguea_revisa_clave(
+    red, settings, falla_404, caplog
+):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = falla_404
+
+    with pytest.raises(ServicioNoDisponible) as error:
+        usuario_por_id(USUARIO_ID)
+
+    assert error.value.status_code == 503
+    assert "revisa CLAVE_SERVICIO" in caplog.text
+
+
+FALLAS_USUARIO_POR_ID = {
+    "error_500": error_http(500, b"<h1>Server Error (500)</h1>"),
+    "error_503": error_http(503, {"codigo": "x", "mensaje": "x"}),
+    "no_conecta_a_tiempo": urllib.error.URLError(TimeoutError("timed out")),
+    "no_contesta_a_tiempo": TimeoutError("timed out"),
+    "corta_la_conexion": ConnectionResetError(104, "reset"),
+    "no_es_json": Respuesta(b"<html>gateway</html>"),
+    "otra_forma_id": Respuesta(usuario_interno(id="no-es-uuid")),
+    "otra_forma_activo": Respuesta(usuario_interno(activo="si")),
+}
+
+
+@pytest.mark.parametrize(
+    "falla",
+    list(FALLAS_USUARIO_POR_ID.values()),
+    ids=list(FALLAS_USUARIO_POR_ID),
+)
+def test_usuario_por_id_fallas_lanzan_503_con_mensaje_identidad(red, settings, falla):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = falla
+
+    with pytest.raises(ServicioNoDisponible) as error:
+        usuario_por_id(USUARIO_ID)
+
+    assert error.value.status_code == 503
+    assert "servicio de Identidad" in str(error.value.detail)
