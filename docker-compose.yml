@@ -3,9 +3,9 @@ name: plataforma-tutorias
 # ---------------------------------------------------------------
 # Plataforma de Tutorias entre Estudiantes
 #
-# Diez contenedores: el gateway, cuatro servicios, cuatro bases (HU-01)
-# y la bandeja de correo de desarrollo (HU-02).
-# El programador de tareas entra con HU-37. El frontend (HU-06) lo sirve el gateway en /app/.
+# Once contenedores: el gateway, cuatro servicios, cuatro bases (HU-01),
+# la bandeja de correo de desarrollo (HU-02) y el programador de tareas (HU-37).
+# El frontend (HU-06) lo sirve el gateway en /app/.
 # ---------------------------------------------------------------
 
 # Las cuatro bases son identicas salvo el nombre, el usuario y la clave, asi que se define una vez y se reutiliza con "<<"
@@ -129,10 +129,13 @@ services:
   # ---------- Tutorias ----------
   tutoring:
     build: ./services/tutoring
+    # Es el nombre que Compose ya le daba (proyecto plataforma-tutorias,
+    # servicio tutoring); queda fijo porque el programador usa esta imagen.
+    image: plataforma-tutorias-tutoring
     container_name: tut_tutoring
     restart: unless-stopped
     networks: [interna]
-    environment:
+    environment: &entorno-tutorias
       NOMBRE_SERVICIO: tutoring
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: ${DJANGO_DEBUG}
@@ -164,6 +167,29 @@ services:
       POSTGRES_PASSWORD: ${TUTORING_DB_PASSWORD}
     volumes:
       - datos_tutoring:/var/lib/postgresql/data
+
+  # ---------- Programador de tareas (HU-37, AD-10) ----------
+  # Al arrancar y despues cada 300 segundos ejecuta los comandos de Tutorias.
+  # No atiende peticiones: no publica puertos ni tiene healthcheck.
+  programador:
+    image: plataforma-tutorias-tutoring
+    # La imagen la construye tutoring y no esta en ningun registro: no se intenta descargar.
+    pull_policy: never
+    container_name: tut_programador
+    restart: unless-stopped
+    # Un init de Docker recibe la senal de apagado y se la pasa al comando; sin el,
+    # Python corre como PID 1, la ignora y docker compose stop espera 10 segundos.
+    init: true
+    networks: [interna]
+    # Las mismas variables de tutoring, con otro NOMBRE_SERVICIO.
+    environment:
+      <<: *entorno-tutorias
+      NOMBRE_SERVICIO: programador
+    # Reemplaza entrada.sh: no aplica migraciones ni levanta gunicorn. Las migraciones
+    # las aplica tutoring, y por eso el programador espera a que tutoring este healthy.
+    entrypoint: ["python", "manage.py", "programador"]
+    depends_on:
+      tutoring: { condition: service_healthy }
 
   # ---------- Pagos ----------
   payments:

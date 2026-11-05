@@ -130,6 +130,20 @@ jobs:
             echo "    $servicio responde 200"
           done
 
+      # HU-37: el programador corre su primer ciclo y sigue arriba. Antes de HU-19 y
+      # HU-29 los dos comandos responden «Unknown command» y el ciclo igual termina.
+      - name: Comprobar que el programador corre su primer ciclo
+        run: |
+          for intento in $(seq 1 30); do
+            docker compose logs programador | grep -q "ciclo terminado" && break
+            sleep 2
+          done
+          docker compose logs programador | grep -q "ciclo terminado" || {
+            echo "::error::el programador no termino su primer ciclo en 60 segundos"
+            exit 1
+          }
+          test "$(docker inspect -f '{{.State.Running}}' tut_programador)" = "true"
+
       # HU-02: Identidad envia un correo y la bandeja de Mailpit lo muestra.
       - name: Comprobar que la bandeja recibe los correos de Identidad
         run: |
