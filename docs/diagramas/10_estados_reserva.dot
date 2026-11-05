@@ -1,0 +1,56 @@
+// Figura 2 del Pilar 2 v1.8: ciclo de vida de una reserva de tutoría.
+// Rehace la figura de la v1.7 con un cambio de contenido: RECHAZADA incluye la eliminación del
+// bloque por el tutor (M-06 del anexo A, HU-15), en su caja y en el rótulo de su flecha.
+// Se genera con Graphviz, con las posiciones fijas de este archivo:
+//   neato -n2 -Tpng -Gdpi=144 10_estados_reserva.dot -o 10_estados_reserva.png
+digraph estados_reserva {
+  graph [splines=line, outputorder=edgesfirst, pad=0, bgcolor="white"];
+  node [fontname="Carlito", fixedsize=true, penwidth=1.6];
+  edge [penwidth=2.2, arrowsize=0.9];
+
+  esq1 [shape=point, style=invis, width=0.01, pos="0,0!"];
+  esq2 [shape=point, style=invis, width=0.01, pos="1008.0,505.0!"];
+
+  // Título
+  titulo [shape=plaintext, width=11.1111, height=0.4167, pos="500.0,481.5!", label=<<FONT POINT-SIZE="24" COLOR="#1F4E79"><B>Ciclo de vida de una reserva de tutoría</B></FONT>>];
+  subtitulo [shape=plaintext, width=11.1111, height=0.2500, pos="500.0,454.0!", label=<<FONT POINT-SIZE="13" COLOR="#555555">El estado del pago es un atributo independiente: no participa de estas transiciones</FONT>>];
+
+  // Estados del recorrido principal
+  SOLICITADA [shape=box, style="rounded,filled", fillcolor="#DEEAF6", color="#1F4E79", width=2.2917, height=0.9583, pos="135.0,352.0!", label=<<FONT POINT-SIZE="14" COLOR="#111111"><B>SOLICITADA</B></FONT><BR/><BR/><FONT POINT-SIZE="11.5" COLOR="#333333">el estudiante pide un bloque</FONT>>];
+  CONFIRMADA [shape=box, style="rounded,filled", fillcolor="#DEEAF6", color="#1F4E79", width=2.2917, height=0.9583, pos="385.0,352.0!", label=<<FONT POINT-SIZE="14" COLOR="#111111"><B>CONFIRMADA</B></FONT><BR/><BR/><FONT POINT-SIZE="11.5" COLOR="#333333">el tutor acepta y el bloque<BR/>queda ocupado</FONT>>];
+  REALIZADA [shape=box, style="rounded,filled", fillcolor="#DEEAF6", color="#1F4E79", width=2.2917, height=0.9583, pos="635.0,352.0!", label=<<FONT POINT-SIZE="14" COLOR="#111111"><B>REALIZADA</B></FONT><BR/><BR/><FONT POINT-SIZE="11.5" COLOR="#333333">pasó la hora de la sesión</FONT>>];
+  EVALUADA [shape=box, style="rounded,filled", fillcolor="#DEEAF6", color="#1F4E79", width=2.2917, height=0.9583, pos="885.0,352.0!", label=<<FONT POINT-SIZE="14" COLOR="#111111"><B>EVALUADA</B></FONT><BR/><BR/><FONT POINT-SIZE="11.5" COLOR="#333333">el estudiante califica</FONT>>];
+  // Estados terminales de salida
+  RECHAZADA [shape=box, style="rounded,filled", fillcolor="#FBE9E7", color="#C0504D", width=2.7778, height=0.8958, pos="120.0,172.5!", label=<<FONT POINT-SIZE="14" COLOR="#111111"><B>RECHAZADA</B></FONT><BR/><BR/><FONT POINT-SIZE="11.5" COLOR="#333333">el tutor no acepta o elimina<BR/>el bloque, o gana otra solicitud</FONT>>];
+  EXPIRADA [shape=box, style="rounded,filled", fillcolor="#FBE9E7", color="#C0504D", width=2.7778, height=0.8958, pos="360.0,172.5!", label=<<FONT POINT-SIZE="14" COLOR="#111111"><B>EXPIRADA</B></FONT><BR/><BR/><FONT POINT-SIZE="11.5" COLOR="#333333">llegó la hora del bloque<BR/>sin respuesta</FONT>>];
+  CANCELADA [shape=box, style="rounded,filled", fillcolor="#FBE9E7", color="#C0504D", width=3.3333, height=0.8958, pos="620.0,172.5!", label=<<FONT POINT-SIZE="14" COLOR="#111111"><B>CANCELADA</B></FONT><BR/><BR/><FONT POINT-SIZE="11.5" COLOR="#333333">antes del inicio de la sesión</FONT>>];
+
+  // Puntos de salida sobre el borde inferior de SOLICITADA y de CONFIRMADA
+  s_rech [shape=point, width=0.01, style=invis, pos="120.0,317.5!"];
+  s_exp [shape=point, width=0.01, style=invis, pos="170.0,317.5!"];
+  s_canc [shape=point, width=0.01, style=invis, pos="205.0,319.5!"];
+  c_canc [shape=point, width=0.01, style=invis, pos="440.0,316.5!"];
+
+  // Transiciones
+  SOLICITADA -> CONFIRMADA [color="#1F4E79"];
+  CONFIRMADA -> REALIZADA [color="#1F4E79"];
+  REALIZADA -> EVALUADA [color="#1F4E79"];
+  s_rech -> RECHAZADA [color="#C0504D"];
+  s_exp -> EXPIRADA [color="#C0504D"];
+  s_canc -> CANCELADA [color="#C0504D"];
+  c_canc -> CANCELADA [color="#C0504D"];
+
+  // Rótulos de las transiciones
+  r1 [shape=plaintext, width=0.8333, height=0.4167, pos="260.0,364.5!", label=<<FONT POINT-SIZE="11.5" COLOR="#555555">el tutor<BR/>acepta</FONT>>];
+  r2 [shape=plaintext, width=1.1528, height=0.4167, pos="510.0,369.5!", label=<<FONT POINT-SIZE="11.5" COLOR="#555555">el programador<BR/>cierra la reserva</FONT>>];
+  r3 [shape=plaintext, width=0.8333, height=0.4167, pos="760.0,364.5!", label=<<FONT POINT-SIZE="11.5" COLOR="#555555">califica el<BR/>estudiante</FONT>>];
+  r4 [shape=plaintext, width=1.2500, height=0.4167, pos="167.5,261.0!", label=<<FONT POINT-SIZE="11.5" COLOR="#555555">el tutor rechaza o<BR/>elimina el bloque</FONT>>];
+  r5 [shape=plaintext, width=0.9722, height=0.4167, pos="227.5,225.0!", label=<<FONT POINT-SIZE="11.5" COLOR="#555555">pasó la hora<BR/>sin respuesta</FONT>>];
+  r6 [shape=plaintext, width=0.9722, height=0.4167, pos="370.0,237.0!", label=<<FONT POINT-SIZE="11.5" COLOR="#555555">el estudiante<BR/>retira</FONT>>];
+  r7 [shape=plaintext, width=0.9722, height=0.4167, pos="570.0,279.0!", label=<<FONT POINT-SIZE="11.5" COLOR="#555555">cualquiera<BR/>de las partes</FONT>>];
+
+  pie [shape=plaintext, width=11.8056, height=0.2500, pos="500.0,114.0!", label=<<FONT POINT-SIZE="12.5" COLOR="#555555"><I>Estados terminales: RECHAZADA, EXPIRADA, CANCELADA y EVALUADA no admiten transiciones de salida.</I></FONT>>];
+
+  por_que [shape=plaintext, width=5.6944, height=1.2222, pos="235.0,54.0!", label=<<TABLE BORDER="1" COLOR="#D6E2EE" BGCOLOR="#FAFBFC" CELLBORDER="0" CELLSPACING="0" FIXEDSIZE="TRUE" WIDTH="410" HEIGHT="88" CELLPADDING="2"><TR><TD WIDTH="22" ROWSPAN="2"> </TD><TD ALIGN="LEFT" VALIGN="BOTTOM" HEIGHT="22"><FONT POINT-SIZE="13" COLOR="#1F4E79"><B>Por qué se diseña así</B></FONT></TD></TR><TR><TD ALIGN="LEFT" VALIGN="TOP" BALIGN="LEFT"><FONT POINT-SIZE="11.5" COLOR="#111111">Incluir el pago dentro de la máquina de estados obligaría a rehacer<BR ALIGN="LEFT"/>el agendamiento completo si el requisito cambia. La expiración y el<BR ALIGN="LEFT"/>cierre por hora los ejecuta el programador, no una acción del usuario.<BR ALIGN="LEFT"/></FONT></TD></TR></TABLE>>];
+  pago [shape=plaintext, width=6.8056, height=1.2222, pos="725.0,54.0!", label=<<TABLE BORDER="1" COLOR="#E8C9A8" BGCOLOR="#FFF8F0" CELLBORDER="0" CELLSPACING="0" FIXEDSIZE="TRUE" WIDTH="490" HEIGHT="88" CELLPADDING="2"><TR><TD WIDTH="22" ROWSPAN="2"> </TD><TD ALIGN="LEFT" VALIGN="BOTTOM" HEIGHT="22"><FONT POINT-SIZE="13" COLOR="#C55A11"><B>Atributo separado:  estado_pago</B></FONT></TD></TR><TR><TD ALIGN="LEFT" VALIGN="TOP" BALIGN="LEFT"><FONT POINT-SIZE="11.5" COLOR="#111111">NULO  ·  PENDIENTE  ·  PAGADO  ·  FALLIDO  ·  REEMBOLSADO<BR ALIGN="LEFT"/>Lo actualiza Pagos por un endpoint interno. Si se elimina el<BR ALIGN="LEFT"/>sistema de pagos queda siempre en NULO y el ciclo de vida<BR ALIGN="LEFT"/>de arriba no cambia ni una sola transición.<BR ALIGN="LEFT"/></FONT></TD></TR></TABLE>>];
+}

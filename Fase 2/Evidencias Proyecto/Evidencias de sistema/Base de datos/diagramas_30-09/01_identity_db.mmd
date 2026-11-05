@@ -1,0 +1,56 @@
+%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 1 de 5
+%% identity_db — Servicio de Identidad · 4 tablas
+%% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
+%% Modelo IMPLEMENTADO el 30-09-2026 (migraciones de la semana 8). Difiere del anexo A
+%% en lo que dejo la revision de 3FN: ver la presentacion de normalizacion.
+%% Toda clave foránea de este diagrama es real dentro de identity_db.
+%% Las referencias a otras bases (carrera_id, sede_id) son identificadores sueltos, sin FK: AD-08.
+erDiagram
+    usuario {
+        uuid id PK "gen_random_uuid · viaja como sub del JWT"
+        varchar email UK "150 · único por lower(email) · CHECK dominio duocuc.cl"
+        varchar password_hash "128 · Argon2 o PBKDF2 · nunca sale del servicio"
+        varchar nombre "80 · se copia a tutoring_db.usuario_ref"
+        varchar apellido "80 · se copia a tutoring_db.usuario_ref"
+        uuid carrera_id "NULL · referencia lógica a catalog_db.carrera"
+        smallint nivel "NULL · CHECK 1 a 12 · no se copia (A-11) · el programador lo lee para revalidar RN-01 (A-13)"
+        uuid sede_id "NULL · referencia lógica a catalog_db.sede (A-07)"
+        boolean email_verificado "DEFAULT false · sin verificar no inicia sesión · RN-08"
+        boolean activo "DEFAULT true · desactivar revoca los refresh_token · CA7"
+        boolean es_admin "DEFAULT false · único origen de la marca del token · AD-09"
+        timestamptz creado_en "DEFAULT now"
+        timestamptz actualizado_en "DEFAULT now · detecta copias de lectura desfasadas"
+    }
+
+    token_verificacion {
+        bigserial id PK "interna · no cruza fronteras"
+        uuid usuario_id FK "ON DELETE CASCADE"
+        varchar token_hash UK "64 · sha256 del token enviado por correo (A-12)"
+        timestamptz expira_en "creado_en más 24 horas · CHECK posterior a creado_en"
+        timestamptz usado_en "NULL · un solo uso · CA1"
+        timestamptz creado_en "DEFAULT now"
+    }
+
+    refresh_token {
+        bigserial id PK "interna · no cruza fronteras"
+        uuid usuario_id FK "ON DELETE CASCADE"
+        varchar token_hash UK "64 · nunca se guarda el token en claro · RNF-01"
+        timestamptz expira_en "creado_en más 7 días · CHECK posterior a creado_en"
+        timestamptz revocado_en "NULL · logout, rotación o cuenta desactivada"
+        timestamptz creado_en "DEFAULT now"
+    }
+
+    aviso_correo {
+        bigserial id PK "registro de lo enviado · RF-09 · nueva en A-08"
+        uuid usuario_id FK "destinatario · ON DELETE CASCADE"
+        varchar plantilla "40 · CHECK sobre las seis plantillas de la sección 8"
+        varchar asunto "150"
+        uuid referencia_id "NULL · reserva que originó el aviso · da idempotencia"
+        varchar estado "10 · ENVIADO o FALLIDO"
+        varchar error "300 · NULL · mensaje del servidor de correo"
+        timestamptz enviado_en "DEFAULT now"
+    }
+
+    usuario ||--o{ token_verificacion : "solicita verificación de"
+    usuario ||--o{ refresh_token : "abre sesión con"
+    usuario ||--o{ aviso_correo : "recibe"
