@@ -72,3 +72,8 @@ def test_el_semestre_va_de_1_a_12(carrera):
 
     with pytest.raises(IntegrityError), transaction.atomic():
         MallaAsignatura.objects.create(malla=malla, asignatura=asignatura, semestre=13)
+
+
+@pytest.mark.django_db
+def test_catalog_db_tiene_la_extension_unaccent():
+    assert consultar("SELECT 1 FROM pg_extension WHERE extname = 'unaccent'")
