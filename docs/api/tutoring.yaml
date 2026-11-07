@@ -105,6 +105,8 @@ tags:
     description: Las asignaturas que el usuario declara que puede enseñar, con su tarifa (HU-14). Con sesión.
   - name: Copia del usuario
     description: La copia de los datos del usuario que guarda Tutorías, `usuario_ref` (HU-41). Con sesión.
+  - name: Evaluaciones
+    description: Evaluación de una tutoría realizada y recálculo de la reputación del tutor (HU-25, RN-03 y RN-06).
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -177,7 +179,20 @@ paths:
             minimum: 1
             maximum: 5
           example: 4
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: |
             Los tutores, en orden. Con `asignatura`, cada elemento es un
@@ -350,7 +365,20 @@ paths:
             format: uuid
             pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
           example: 10000000-0000-4000-8000-000000000001
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: El perfil público del tutor.
           content:
@@ -477,7 +505,20 @@ paths:
         - No pagina.
       security:
         - tokenAcceso: []
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: Los bloques, del más próximo al más lejano. La lista puede venir vacía.
           content:
@@ -553,7 +594,20 @@ paths:
                 value:
                   inicio_en: '2026-10-22T18:00:00-03:00'
                   fin_en: '2026-10-22T19:00:00-03:00'
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '201':
           description: Bloque publicado. Queda LIBRE y sale en «Mis bloques» y en el perfil público del tutor.
           content:
@@ -623,7 +677,20 @@ paths:
                 summary: Alargarlo hasta las 20:00, hora de Chile, sin cambiar el inicio
                 value:
                   fin_en: '2026-10-22T23:00:00.000Z'
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: Bloque cambiado. Sigue LIBRE y sin solicitudes.
           content:
@@ -683,7 +750,20 @@ paths:
         - tokenAcceso: []
       parameters:
         - $ref: '#/components/parameters/BloqueId'
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '204':
           description: Bloque eliminado. La respuesta no trae cuerpo.
         '401':
@@ -727,7 +807,20 @@ paths:
             type: string
             format: uuid
           example: 10000000-0000-4000-8000-000000000004
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: Sus asignaturas declaradas, por sigla. La lista puede venir vacía.
           content:
@@ -834,7 +927,20 @@ paths:
                 value:
                   asignatura_id: 40000000-0000-4000-8000-000000000001
                   tarifa: 4000
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: La asignatura estaba declarada y desactivada. Queda activa otra vez, con la tarifa y la descripción nuevas, y el mismo `id`.
           content:
@@ -918,7 +1024,20 @@ paths:
                 summary: Dejar de enseñarla por ahora
                 value:
                   activo: false
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: La asignatura declarada, con los cambios.
           content:
@@ -984,7 +1103,20 @@ paths:
         - No toca la reputación. No lleva cuerpo.
       security:
         - tokenAcceso: []
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: Lo que pasó con la copia.
           content:
@@ -1007,6 +1139,169 @@ paths:
         '503':
           $ref: '#/components/responses/SinOtroServicio'
 
+  /reservas/{reserva_id}/evaluacion:
+    post:
+      tags: [Evaluaciones]
+      operationId: evaluarTutoria
+      summary: Evaluar una tutoría realizada
+      description: |
+        Registra la evaluación de una tutoría realizada y recalcula la
+        reputación del tutor en la misma transacción (HU-25, RN-03 y RN-06).
+
+        - Primero valida el cuerpo, sin tocar la base: `calificacion` es un
+          entero de 1 a 5 (400 `calificacion_invalida`, en JSON `true` y
+          `false` no cuentan como enteros) y `comentario`, si viene, es un
+          texto de hasta 500 caracteres después de quitar los espacios de los
+          lados y sin caracteres nulos ni sustitutos UTF-16 (400
+          `comentario_invalido`). Vacío o en blanco se guarda como `null`.
+        - En una transacción bloquea la reserva (`SELECT … FOR UPDATE`) y
+          revisa, en este orden:
+          1. Si la reserva no existe o el usuario del token no es ni el
+             solicitante ni el tutor: 404 `reserva_no_encontrada` (los dos
+             casos responden igual, para no revelar que existe).
+          2. Si el usuario del token es el tutor del bloque: 403
+             `solo_el_solicitante`.
+          3. Si la reserva ya está en `EVALUADA` o ya tiene fila en
+             `evaluacion`: 409 `reserva_ya_evaluada`.
+          4. Si la reserva no está en `REALIZADA`: 409 `reserva_no_realizada`.
+          5. Si `fin_en` del bloque todavía no pasó: 409
+             `tutoria_no_terminada`.
+        - Crea la evaluación, pasa la reserva a `EVALUADA` con `cerrada_en` en
+          el instante actual y recalcula `reputacion_promedio` (redondeado a 2
+          decimales con `ROUND_HALF_UP`) y `reputacion_total` en `usuario_ref`
+          contando solo las evaluaciones con `retirada_en IS NULL`, sin tocar
+          `actualizado_en`.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevaEvaluacion'
+            examples:
+              con_comentario:
+                summary: Calificación de 5 con comentario
+                value:
+                  calificacion: 5
+                  comentario: Explicó claro y con ejercicios parecidos a los del certamen.
+              sin_comentario:
+                summary: Calificación sin comentario
+                value:
+                  calificacion: 4
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
+        '201':
+          description: Evaluación registrada, reserva en EVALUADA y reputación del tutor al día.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluacionRegistrada'
+              example:
+                id: 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d
+                reserva_id: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+                calificacion: 5
+                comentario: Explicó claro y con ejercicios parecidos a los del certamen.
+                creada_en: '2026-11-05T19:30:00Z'
+        '400':
+          description: |
+            La calificación o el comentario no sirven (`calificacion_invalida`
+            o `comentario_invalido`), o el cuerpo no es JSON válido
+            (`parse_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                calificacion_invalida:
+                  summary: Calificación fuera de 1 a 5 o no entera
+                  value:
+                    codigo: calificacion_invalida
+                    mensaje: La nota tiene que ser un número entero de 1 a 5.
+                    detalles: null
+                comentario_largo:
+                  summary: Comentario de más de 500 caracteres
+                  value:
+                    codigo: comentario_invalido
+                    mensaje: El comentario puede tener hasta 500 caracteres.
+                    detalles: null
+                comentario_caracteres:
+                  summary: Comentario con carácter nulo o sustituto UTF-16
+                  value:
+                    codigo: comentario_invalido
+                    mensaje: El comentario tiene caracteres que no se pueden guardar.
+                    detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          description: El usuario del token es el tutor de esa reserva, no quien la solicitó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: solo_el_solicitante
+                mensaje: Solo quien pidió la tutoría puede evaluarla.
+                detalles: null
+        '404':
+          description: |
+            La reserva no existe o es de otras personas (`reserva_no_encontrada`).
+            Si `reserva_id` no es un uuid en minúsculas, la ruta no existe y
+            responde Django con su página 404 en HTML.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_no_encontrada
+                mensaje: No encontramos esa tutoría.
+                detalles: null
+        '409':
+          description: |
+            La reserva no se puede evaluar: ya fue evaluada
+            (`reserva_ya_evaluada`), no está en estado REALIZADA
+            (`reserva_no_realizada`) o su bloque todavía no termina
+            (`tutoria_no_terminada`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                reserva_ya_evaluada:
+                  summary: Ya tenía evaluación
+                  value:
+                    codigo: reserva_ya_evaluada
+                    mensaje: Ya evaluaste esta tutoría.
+                    detalles: null
+                reserva_no_realizada:
+                  summary: La reserva sigue CONFIRMADA, SOLICITADA, CANCELADA, RECHAZADA o en INASISTENCIA
+                  value:
+                    codigo: reserva_no_realizada
+                    mensaje: Solo se puede evaluar una tutoría realizada.
+                    detalles: null
+                tutoria_no_terminada:
+                  summary: El bloque todavía no termina
+                  value:
+                    codigo: tutoria_no_terminada
+                    mensaje: Podrás evaluarla cuando termine la tutoría.
+                    detalles: null
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
   /estado:
     get:
       tags: [Estado]
@@ -1023,7 +1318,20 @@ paths:
       security:
         - tokenAcceso: []
         - {}
-      responses:
+        ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+  responses:
         '200':
           description: El servicio y su base responden.
           content:
@@ -1092,6 +1400,19 @@ components:
         format: uuid
         pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       example: 7d1c2b3a-4e5f-4a6b-9c8d-0e1f2a3b4c5d
+
+    ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
 
   responses:
     TokenNoValido:
@@ -1533,8 +1854,9 @@ components:
     Reputacion:
       type: object
       description: |
-        Reputación del tutor: el dato que guarda `usuario_ref` (RN-06). La
-        búsqueda y el perfil la leen tal cual, sin recalcularla.
+        Reputación del tutor: el dato que guarda `usuario_ref` (RN-06). Se
+        recalcula al registrar o retirar una evaluación (HU-25); la búsqueda
+        y el perfil la leen tal cual, sin recalcularla.
       required: [promedio, total]
       properties:
         promedio:
@@ -1809,6 +2131,46 @@ components:
         actualizada:
           type: boolean
           description: true si el usuario tenía copia en Tutorías y quedó al día; false si todavía no tiene copia.
+
+    NuevaEvaluacion:
+      type: object
+      description: Datos para evaluar una tutoría realizada (HU-25). Otros campos se ignoran.
+      required: [calificacion]
+      properties:
+        calificacion:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Nota entera de 1 a 5 estrellas.
+        comentario:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Opcional, hasta 500 caracteres sin contar los espacios de los lados. Vacío o en blanco se guarda como null.
+
+    EvaluacionRegistrada:
+      type: object
+      description: Evaluación recién creada para una reserva (HU-25).
+      required: [id, reserva_id, calificacion, comentario, creada_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reserva_id:
+          type: string
+          format: uuid
+        calificacion:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comentario:
+          type: string
+          maxLength: 500
+          nullable: true
+        creada_en:
+          type: string
+          format: date-time
+          description: Cuándo se registró la evaluación, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
 
     Estado:
       type: object

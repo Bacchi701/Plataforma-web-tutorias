@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import bloques, busqueda, copias, perfiles
+from . import bloques, busqueda, copias, evaluaciones, perfiles
 
 urlpatterns = [
     path("tutores", busqueda.buscar_tutores, name="tutores"),
@@ -10,4 +10,9 @@ urlpatterns = [
     path("perfiles", perfiles.declarar_o_listar, name="perfiles"),
     path("perfiles/<uuid:perfil_id>", perfiles.un_perfil, name="perfil"),
     path("yo/refrescar", copias.refrescar, name="refrescar"),
+    path(
+        "reservas/<uuid:reserva_id>/evaluacion",
+        evaluaciones.evaluar,
+        name="evaluacion",
+    ),
 ]
