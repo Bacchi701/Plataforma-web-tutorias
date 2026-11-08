@@ -100,3 +100,29 @@ def test_areas_lista_las_disponibles(client, carrera):
     respuesta = client.get(f"{BASE}/areas")
     assert respuesta.status_code == 200
     assert "Informática" in respuesta.json()
+
+
+@pytest.mark.django_db
+def test_busqueda_no_distingue_tildes_ni_mayusculas(client, carrera):
+    Asignatura.objects.create(sigla="MAT2201", nombre="Matematica General")
+    Asignatura.objects.filter(sigla="PRO1101").update(area="Informática")
+
+    for termino in ("programacion", "PROGRAMACIÓN", "programación"):
+        datos = client.get(f"{BASE}/asignaturas", {"buscar": termino}).json()
+        assert [a["sigla"] for a in datos] == ["PRO1101"]
+
+    con_tilde = client.get(f"{BASE}/asignaturas", {"buscar": "matemática"}).json()
+    assert [a["sigla"] for a in con_tilde] == ["MAT2201"]
+
+    por_sigla = client.get(f"{BASE}/asignaturas", {"buscar": "bdd1"}).json()
+    assert [a["sigla"] for a in por_sigla] == ["BDD1101"]
+
+    con_area = client.get(
+        f"{BASE}/asignaturas", {"buscar": "programacion", "area": "Informática"}
+    ).json()
+    assert [a["sigla"] for a in con_area] == ["PRO1101"]
+
+    otra_area = client.get(
+        f"{BASE}/asignaturas", {"buscar": "programacion", "area": "Otra"}
+    ).json()
+    assert otra_area == []

@@ -1,11 +1,14 @@
-%% Pilar 2 · Anexo A v1.3 — Modelo de datos · Diagrama 2 de 5
+%% Pilar 2 · Anexo A v1.6 — Modelo de datos · Diagrama 2 de 5
 %% catalog_db — Servicio de Catálogo académico · 8 tablas
 %% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
-%% Modelo IMPLEMENTADO el 30-09-2026 (migraciones de la semana 8). Difiere del anexo A
-%% en lo que dejo la revision de 3FN: ver la presentacion de normalizacion.
+%% Es el modelo implementado: las migraciones del 01-10-2026, con la revisión de normalización
+%% del 30-09-2026, y la columna asignatura.area, que llegó con el PR #9 (HU-12).
+%% Coincide con el anexo A v1.6.
+%% Los DEFAULT y los ON DELETE los aplica Django, no la base (anexo A, sección 2).
 %% La asignatura es transversal entre carreras; malla_asignatura es la que le da un
 %% semestre dentro de un plan de estudios, y eso es lo que hace verificable RN-01.
-%% sede e importacion_catalogo no tienen relación dentro de esta base: se consumen desde fuera.
+%% sede no tiene relación dentro de esta base: se consume desde fuera (GET /sedes).
+%% importacion_catalogo solo se relaciona con importacion_error.
 erDiagram
     carrera {
         uuid id PK "cruza a identity_db y a tutoring_db"
@@ -29,6 +32,7 @@ erDiagram
         uuid id PK "cruza a tutoring_db.asignatura_ref"
         varchar sigla UK "15 · transversal entre carreras · clave natural del CSV"
         varchar nombre "150 · GIN trigram sobre upper(sigla) y upper(nombre) · RNF-02"
+        varchar area "100 · NULL · área de conocimiento · filtro de GET /asignaturas?area="
         smallint creditos "NULL · CHECK entre 1 y 30"
         boolean activa "DEFAULT true"
         timestamptz creada_en "DEFAULT now"

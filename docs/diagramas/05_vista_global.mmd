@@ -1,8 +1,8 @@
-%% Pilar 2 · Anexo A v1.5 — Modelo de datos · Diagrama 5 de 5
+%% Pilar 2 · Anexo A v1.6 — Modelo de datos · Diagrama 5 de 5
 %% Vista global: las entidades que participan de una frontera entre servicios, con algunas de su base como contexto.
 %% Los trece ajustes A-01 a A-13 quedaron aprobados el 14-09-2026.
 %% Es el modelo implementado: las migraciones del 01-10-2026, con la revisión de normalización
-%% del 30-09-2026. Coincide con el anexo A v1.5.
+%% del 30-09-2026. Coincide con el anexo A v1.6.
 %% Línea continua = clave foránea real dentro de una misma base.
 %% Línea punteada = referencia lógica entre servicios: ninguna base la garantiza.
 %% El prefijo del nombre indica la base: identidad_, catalogo_, tutorias_, pagos_.
@@ -104,4 +104,4 @@ erDiagram
     tutorias_usuario_ref }o..o| catalogo_carrera : "carrera_id copiado · el nombre se pide a Catálogo (M-01)"
     tutorias_usuario_ref }o..o| catalogo_sede : "sede_id copiado · el nombre se pide a Catálogo (M-01)"
     tutorias_reserva ||..o| pagos_pago : "llamadas 3 y 4 · sin integridad referencial"
-    tutorias_reserva |o..o{ identidad_aviso_correo : "llamada 2 · Tutorías pide el correo"
+    tutorias_reserva |o..o{ identidad_aviso_correo : "llamada 2 · Tutorías pide el aviso por correo"

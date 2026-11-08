@@ -71,5 +71,7 @@ JWT_EMISOR = "identity"
 # Direcciones dentro de la red de Docker (tutorias/llamadas.py). Tutorias pide
 # GET /yo a Identidad con el mismo token de la peticion, y la malla de una
 # carrera a Catalogo, que es publica: ninguna de las dos necesita una clave.
+# CLAVE_SERVICIO es para las rutas /internal (Pilar 2, seccion 5.4).
 URL_IDENTIDAD = os.environ.get("URL_IDENTIDAD", "http://identity:8000")
 URL_CATALOGO = os.environ.get("URL_CATALOGO", "http://catalog:8000")
+CLAVE_SERVICIO = os.environ.get("CLAVE_SERVICIO", "")
