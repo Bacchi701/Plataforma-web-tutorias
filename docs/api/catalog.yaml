@@ -1,0 +1,730 @@
+openapi: 3.0.3
+
+info:
+  title: Catálogo académico · Plataforma de Tutorías entre Estudiantes
+  version: 0.1.0
+  description: |
+    Contrato de la API pública de Catálogo (Pilar 2, sección 4.2; HU-12):
+    carreras, sedes, asignaturas, la malla vigente por semestre, las áreas y
+    `/estado`.
+
+    - Todas las rutas pasan por el gateway, con el prefijo `/api/catalog/v1/`,
+      que va en `servers`.
+    - Un cambio a lo publicado se acuerda entre los tres antes de implementarse
+      (acuerdo A4) y se anota en «Cambios», al final de esta descripción.
+
+    **Sin sesión.** Catálogo no pide ni lee el token; sus rutas responden igual
+    con y sin la cabecera `Authorization`.
+
+    **Rutas internas.** Las rutas `/internal` no son parte de este contrato: el
+    gateway no las enruta y desde fuera responden 404.
+
+    **Formato de error (Pilar 2, sección 11).** Toda respuesta de error trae
+    `codigo`, `mensaje` y `detalles` (ver el esquema `Error`, el mismo de
+    Identidad y Tutorías). No lo traen el 503 de `/estado`, que responde con su
+    propio esquema, ni la página 404 de Django cuando la ruta no existe.
+
+    **Datos.**
+    - Los identificadores van como texto (`uuid`).
+    - `vigente_desde` va como fecha `AAAA-MM-DD`.
+    - El `area` de una asignatura viene `""` cuando no tiene.
+    - `creditos` puede venir `null`.
+    - Solo salen carreras, sedes y asignaturas activas.
+
+    **Cambios**
+    - 0.1.0: primera versión (HU-12, criterio 5), con las rutas que llegaron con
+      el PR #9 y la búsqueda sin distinguir tildes (SCRUM-56).
+
+servers:
+  - url: http://localhost:8080/api/catalog/v1
+    description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Catálogo. La API se llama siempre a través de él.
+
+tags:
+  - name: Carreras
+    description: Carreras activas, detalle con su malla vigente y asignaturas agrupadas por semestre (HU-12).
+  - name: Asignaturas
+    description: Búsqueda global de asignaturas activas sin distinguir tildes (HU-12, SCRUM-56) y listado de áreas.
+  - name: Sedes
+    description: Sedes activas de referencia (HU-12).
+  - name: Estado
+    description: Estado del servicio y de su base (HU-01).
+
+paths:
+
+  /carreras:
+    get:
+      tags: [Carreras]
+      operationId: listarCarreras
+      summary: Listar las carreras activas
+      description: |
+        Devuelve las carreras activas ordenadas alfabéticamente por `nombre`
+        (HU-12, criterio 1). Las carreras desactivadas no salen.
+      responses:
+        '200':
+          description: Lista de carreras activas, ordenadas por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Carrera'
+              example:
+                - id: 20000000-0000-4000-8000-000000000002
+                  codigo: ANA-PROG
+                  nombre: Analista Programador Computacional
+                  escuela: Informática y Telecomunicaciones
+                - id: 20000000-0000-4000-8000-000000000003
+                  codigo: ING-ADM
+                  nombre: Ingeniería en Administración
+                  escuela: Administración y Negocios
+                - id: 20000000-0000-4000-8000-000000000001
+                  codigo: ING-INFO
+                  nombre: Ingeniería en Informática
+                  escuela: Informática y Telecomunicaciones
+
+  /carreras/{carrera_id}:
+    get:
+      tags: [Carreras]
+      operationId: verCarrera
+      summary: Detalle de una carrera activa y su malla vigente
+      description: |
+        Devuelve los datos de una carrera activa junto con su `malla_vigente`
+        (o `null` si no tiene malla vigente). Si la carrera no existe o está
+        desactivada, responde 404 `not_found`.
+      parameters:
+        - $ref: '#/components/parameters/CarreraId'
+      responses:
+        '200':
+          description: Datos de la carrera activa y su malla vigente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetalleCarrera'
+              example:
+                id: 20000000-0000-4000-8000-000000000001
+                codigo: ING-INFO
+                nombre: Ingeniería en Informática
+                escuela: Informática y Telecomunicaciones
+                malla_vigente:
+                  version: '2024'
+                  vigente_desde: '2024-03-01'
+        '404':
+          description: |
+            No existe una carrera activa con ese identificador (no existe o está
+            desactivada).
+
+            Si `carrera_id` no es un uuid en minúsculas y con guiones, la ruta
+            no existe y responde Django con su página 404 en `text/html`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: not_found
+                mensaje: No existe una carrera activa con ese identificador.
+                detalles: null
+            text/html:
+              schema:
+                type: string
+              examples:
+                ruta_inexistente:
+                  summary: GET /carreras/abc con DJANGO_DEBUG=1 (recortada)
+                  value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/catalog/v1/carreras/abc</title>...</html>'
+
+  /carreras/{carrera_id}/asignaturas:
+    get:
+      tags: [Carreras]
+      operationId: listarAsignaturasDeCarrera
+      summary: Malla vigente de una carrera agrupada por semestre
+      description: |
+        Devuelve la malla vigente de la carrera con sus asignaturas activas
+        agrupadas por semestre, en orden ascendente de semestre y de sigla
+        (HU-12, criterio 3). Si la carrera no tiene malla vigente, `malla` viene
+        en `null` y `semestres` viene vacía (`[]`).
+      parameters:
+        - $ref: '#/components/parameters/CarreraId'
+      responses:
+        '200':
+          description: Malla vigente de la carrera agrupada por semestre.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MallaPorSemestre'
+              examples:
+                con_malla_vigente:
+                  summary: Ingeniería en Informática (malla 2024, recortada a 2 semestres)
+                  value:
+                    carrera:
+                      id: 20000000-0000-4000-8000-000000000001
+                      codigo: ING-INFO
+                      nombre: Ingeniería en Informática
+                      escuela: Informática y Telecomunicaciones
+                    malla:
+                      version: '2024'
+                      vigente_desde: '2024-03-01'
+                    semestres:
+                      - semestre: 1
+                        asignaturas:
+                          - id: 40000000-0000-4000-8000-000000000006
+                            sigla: BDD1101
+                            nombre: Base de Datos
+                            area: ''
+                            creditos: 6
+                          - id: 40000000-0000-4000-8000-000000000003
+                            sigla: ETI1101
+                            nombre: Ética para el Trabajo
+                            area: ''
+                            creditos: 3
+                          - id: 40000000-0000-4000-8000-000000000001
+                            sigla: MAT1101
+                            nombre: Matemática Aplicada
+                            area: ''
+                            creditos: 6
+                          - id: 40000000-0000-4000-8000-000000000005
+                            sigla: PRO1101
+                            nombre: Programación de Algoritmos
+                            area: ''
+                            creditos: 8
+                      - semestre: 2
+                        asignaturas:
+                          - id: 40000000-0000-4000-8000-000000000004
+                            sigla: EST2101
+                            nombre: Estadística Descriptiva
+                            area: ''
+                            creditos: 5
+                          - id: 40000000-0000-4000-8000-000000000002
+                            sigla: ING1101
+                            nombre: Inglés Elemental
+                            area: ''
+                            creditos: 4
+                          - id: 40000000-0000-4000-8000-000000000007
+                            sigla: PRO2101
+                            nombre: Programación Orientada a Objetos
+                            area: ''
+                            creditos: 8
+                          - id: 40000000-0000-4000-8000-000000000010
+                            sigla: RED1101
+                            nombre: Fundamentos de Redes
+                            area: ''
+                            creditos: 5
+                sin_malla_vigente:
+                  summary: Carrera activa sin malla vigente
+                  value:
+                    carrera:
+                      id: 20000000-0000-4000-8000-000000000099
+                      codigo: SIN-MALLA
+                      nombre: Carrera sin malla vigente
+                      escuela: Escuela de prueba
+                    malla: null
+                    semestres: []
+        '404':
+          description: |
+            No existe una carrera activa con ese identificador (no existe o está
+            desactivada).
+
+            Si `carrera_id` no es un uuid en minúsculas y con guiones, la ruta
+            no existe y responde Django con su página 404 en `text/html`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: not_found
+                mensaje: No existe una carrera activa con ese identificador.
+                detalles: null
+            text/html:
+              schema:
+                type: string
+              examples:
+                ruta_inexistente:
+                  summary: GET /carreras/abc/asignaturas con DJANGO_DEBUG=1 (recortada)
+                  value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/catalog/v1/carreras/abc/asignaturas</title>...</html>'
+
+  /asignaturas:
+    get:
+      tags: [Asignaturas]
+      operationId: buscarAsignaturas
+      summary: Buscar asignaturas activas por texto o área
+      description: |
+        Busca asignaturas activas por coincidencia parcial en `sigla` o en
+        `nombre`, sin distinguir mayúsculas ni tildes (`unaccent`, HU-12
+        criterio 2 y SCRUM-56), y opcionalmente filtra por `area` exacta.
+
+        - Siempre devuelve los resultados ordenados por `sigla`.
+        - El tamaño de página por defecto es 48 (`MAXIMO_RESULTADOS`), con tope
+          entre 1 y 200. Un valor que no es número vuelve al valor por defecto y
+          uno fuera de rango se lleva al borde (también sin paginado).
+        - Sin `paginado=1` ni `formato=paginado`, responde una lista de
+          `Asignatura`; con cualquiera de esos dos parámetros, responde el
+          objeto `BusquedaPaginada`.
+        - En ambos modos incluye las cabeceras `X-Total-Count`,
+          `X-Total-Pages`, `X-Current-Page` y `X-Per-Page`.
+      parameters:
+        - name: buscar
+          in: query
+          required: false
+          description: Texto parcial para buscar en la sigla o en el nombre, sin distinguir mayúsculas ni tildes.
+          schema:
+            type: string
+          example: programacion
+        - name: area
+          in: query
+          required: false
+          description: Filtra por coincidencia exacta del área de conocimiento.
+          schema:
+            type: string
+        - name: pagina
+          in: query
+          required: false
+          description: Número de página (desde 1). Alias `page`.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page
+          in: query
+          required: false
+          description: Alias de `pagina`.
+          schema:
+            type: integer
+            minimum: 1
+        - name: limite
+          in: query
+          required: false
+          description: Cantidad máxima de resultados por página (de 1 a 200; por defecto 48). Alias `limit`.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 48
+        - name: limit
+          in: query
+          required: false
+          description: Alias de `limite`.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: paginado
+          in: query
+          required: false
+          description: Si vale `1`, devuelve el objeto `BusquedaPaginada` en lugar de la lista plana.
+          schema:
+            type: string
+            enum: ['1']
+        - name: formato
+          in: query
+          required: false
+          description: Si vale `paginado`, devuelve el objeto `BusquedaPaginada` en lugar de la lista plana.
+          schema:
+            type: string
+            enum: [paginado]
+      responses:
+        '200':
+          description: Lista de asignaturas o página de resultados con metadatos de paginación.
+          headers:
+            X-Total-Count:
+              description: Total de asignaturas activas que coinciden con el filtro.
+              schema:
+                type: string
+              example: '3'
+            X-Total-Pages:
+              description: Total de páginas disponibles con el límite aplicado.
+              schema:
+                type: string
+              example: '1'
+            X-Current-Page:
+              description: Página devuelta en esta respuesta.
+              schema:
+                type: string
+              example: '1'
+            X-Per-Page:
+              description: Límite de resultados por página aplicado.
+              schema:
+                type: string
+              example: '48'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Asignatura'
+                  - $ref: '#/components/schemas/BusquedaPaginada'
+              examples:
+                busqueda_sin_tildes:
+                  summary: GET /asignaturas?buscar=programacion (lista plana)
+                  description: Con los datos de ejemplo, buscar «programacion» sin tilde encuentra las tres asignaturas que llevan «Programación».
+                  value:
+                    - id: 40000000-0000-4000-8000-000000000009
+                      sigla: BDD2101
+                      nombre: Programación de Base de Datos
+                      area: ''
+                      creditos: 6
+                    - id: 40000000-0000-4000-8000-000000000005
+                      sigla: PRO1101
+                      nombre: Programación de Algoritmos
+                      area: ''
+                      creditos: 8
+                    - id: 40000000-0000-4000-8000-000000000007
+                      sigla: PRO2101
+                      nombre: Programación Orientada a Objetos
+                      area: ''
+                      creditos: 8
+                busqueda_paginada:
+                  summary: GET /asignaturas?buscar=programacion&paginado=1 (objeto paginado)
+                  value:
+                    total: 3
+                    pagina: 1
+                    total_paginas: 1
+                    limite: 48
+                    resultados:
+                      - id: 40000000-0000-4000-8000-000000000009
+                        sigla: BDD2101
+                        nombre: Programación de Base de Datos
+                        area: ''
+                        creditos: 6
+                      - id: 40000000-0000-4000-8000-000000000005
+                        sigla: PRO1101
+                        nombre: Programación de Algoritmos
+                        area: ''
+                        creditos: 8
+                      - id: 40000000-0000-4000-8000-000000000007
+                        sigla: PRO2101
+                        nombre: Programación Orientada a Objetos
+                        area: ''
+                        creditos: 8
+
+  /areas:
+    get:
+      tags: [Asignaturas]
+      operationId: listarAreas
+      summary: Listar las áreas de conocimiento disponibles
+      description: |
+        Devuelve la lista de valores distintos y no vacíos de `area` entre las
+        asignaturas activas, ordenados alfabéticamente.
+      responses:
+        '200':
+          description: Lista ordenada de áreas de conocimiento.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              examples:
+                datos_demo:
+                  summary: Con los datos de ejemplo (sin áreas asignadas)
+                  value: []
+                con_areas:
+                  summary: Con áreas cargadas en el catálogo
+                  value:
+                    - Informática
+                    - Matemáticas
+
+  /sedes:
+    get:
+      tags: [Sedes]
+      operationId: listarSedes
+      summary: Listar las sedes activas
+      description: |
+        Devuelve las sedes activas ordenadas alfabéticamente por `nombre`
+        (HU-12, criterio 1).
+      responses:
+        '200':
+          description: Lista de sedes activas, ordenadas por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sede'
+              example:
+                - id: 30000000-0000-4000-8000-000000000001
+                  codigo: ALAMEDA
+                  nombre: Alameda
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000002
+                  codigo: ANTONIO-VARAS
+                  nombre: Antonio Varas
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000010
+                  codigo: CONCEPCION
+                  nombre: Concepción
+                  region: Biobío
+                - id: 30000000-0000-4000-8000-000000000003
+                  codigo: MAIPU
+                  nombre: Maipú
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000005
+                  codigo: PLAZA-NORTE
+                  nombre: Plaza Norte
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000004
+                  codigo: PLAZA-OESTE
+                  nombre: Plaza Oeste
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000007
+                  codigo: PUENTE-ALTO
+                  nombre: Puente Alto
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000006
+                  codigo: SAN-BERNARDO
+                  nombre: San Bernardo
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000011
+                  codigo: SAN-JOAQUIN
+                  nombre: San Joaquín
+                  region: Metropolitana
+                - id: 30000000-0000-4000-8000-000000000009
+                  codigo: VALPARAISO
+                  nombre: Valparaíso
+                  region: Valparaíso
+                - id: 30000000-0000-4000-8000-000000000008
+                  codigo: VINA-DEL-MAR
+                  nombre: Viña del Mar
+                  region: Valparaíso
+
+  /estado:
+    get:
+      tags: [Estado]
+      operationId: estadoCatalogo
+      summary: Estado del servicio y de su base
+      description: |
+        Dice si el servicio está arriba y puede leer su base, que prueba con un
+        `SELECT 1` (HU-01). Lo consultan la integración continua y la
+        verificación de salud del contenedor en `docker-compose.yml`.
+
+        Si la base no responde, responde 503 con el mismo esquema y `estado` en
+        `degradado`.
+      responses:
+        '200':
+          description: El servicio y su base responden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: catalog
+                estado: ok
+                base_de_datos: ok
+                version: 0.1.0
+        '503':
+          description: El servicio arrancó, pero no puede leer su base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: catalog
+                estado: degradado
+                base_de_datos: sin conexion
+                version: 0.1.0
+
+components:
+
+  parameters:
+    CarreraId:
+      name: carrera_id
+      in: path
+      required: true
+      description: |
+        Identificador de la carrera, el `id` que entrega `GET /carreras`: un
+        uuid en minúsculas y con guiones. Con otra forma la ruta no existe (ver
+        la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 20000000-0000-4000-8000-000000000001
+
+  schemas:
+
+    Carrera:
+      type: object
+      description: Una carrera activa del catálogo académico.
+      required: [id, codigo, nombre, escuela]
+      properties:
+        id:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+          maxLength: 20
+        nombre:
+          type: string
+          maxLength: 150
+        escuela:
+          type: string
+          maxLength: 120
+
+    DetalleCarrera:
+      type: object
+      description: Una carrera activa con su malla vigente.
+      required: [id, codigo, nombre, escuela, malla_vigente]
+      properties:
+        id:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+          maxLength: 20
+        nombre:
+          type: string
+          maxLength: 150
+        escuela:
+          type: string
+          maxLength: 120
+        malla_vigente:
+          $ref: '#/components/schemas/Malla'
+
+    Malla:
+      type: object
+      nullable: true
+      description: Versión vigente del plan de estudios de una carrera. Viene en null si la carrera no tiene malla vigente.
+      required: [version, vigente_desde]
+      properties:
+        version:
+          type: string
+          maxLength: 20
+        vigente_desde:
+          type: string
+          format: date
+          description: Fecha desde la que rige el plan, en formato AAAA-MM-DD.
+
+    MallaPorSemestre:
+      type: object
+      description: Malla vigente de una carrera con sus asignaturas activas agrupadas por semestre.
+      required: [carrera, malla, semestres]
+      properties:
+        carrera:
+          $ref: '#/components/schemas/Carrera'
+        malla:
+          $ref: '#/components/schemas/Malla'
+        semestres:
+          type: array
+          items:
+            $ref: '#/components/schemas/Semestre'
+
+    Semestre:
+      type: object
+      description: Asignaturas activas de un semestre de la malla vigente.
+      required: [semestre, asignaturas]
+      properties:
+        semestre:
+          type: integer
+          minimum: 1
+          maximum: 12
+        asignaturas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asignatura'
+
+    Asignatura:
+      type: object
+      description: Asignatura activa del catálogo académico.
+      required: [id, sigla, nombre, area, creditos]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sigla:
+          type: string
+          maxLength: 15
+        nombre:
+          type: string
+          maxLength: 150
+        area:
+          type: string
+          maxLength: 100
+          description: Área de conocimiento. Viene como cadena vacía ("") cuando la asignatura no tiene área.
+        creditos:
+          type: integer
+          minimum: 1
+          maximum: 30
+          nullable: true
+
+    BusquedaPaginada:
+      type: object
+      description: Respuesta paginada de la búsqueda de asignaturas cuando se envía `paginado=1` o `formato=paginado`.
+      required: [total, pagina, total_paginas, limite, resultados]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        pagina:
+          type: integer
+          minimum: 1
+        total_paginas:
+          type: integer
+          minimum: 1
+        limite:
+          type: integer
+          minimum: 1
+          maximum: 200
+        resultados:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asignatura'
+
+    Sede:
+      type: object
+      description: Sede activa de referencia.
+      required: [id, codigo, nombre, region]
+      properties:
+        id:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+          maxLength: 20
+        nombre:
+          type: string
+          maxLength: 120
+        region:
+          type: string
+          maxLength: 80
+          nullable: true
+
+    Estado:
+      type: object
+      description: Estado del servicio y de su base (HU-01).
+      required: [servicio, estado, base_de_datos, version]
+      properties:
+        servicio:
+          type: string
+          description: El valor de la variable de entorno `NOMBRE_SERVICIO`, que en Docker Compose es `catalog`. Sin la variable, `desconocido`.
+        estado:
+          type: string
+          enum: [ok, degradado]
+          description: ok si la base responde; degradado si no.
+        base_de_datos:
+          type: string
+          enum: [ok, sin conexion]
+        version:
+          type: string
+          description: La versión del servicio que tiene escrita la vista, hoy 0.1.0.
+
+    Error:
+      type: object
+      description: |
+        Formato único de error de la API (Pilar 2, sección 11), el mismo de
+        Identidad y Tutorías.
+
+        - En las rutas públicas de este contrato: `not_found` (404) cuando no
+          existe una carrera activa con ese identificador.
+        - Del framework (Django REST Framework): `method_not_allowed` (405) si
+          se usa un método HTTP que la ruta no acepta.
+      required: [codigo, mensaje, detalles]
+      properties:
+        codigo:
+          type: string
+        mensaje:
+          type: string
+        detalles:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: array
+            items:
+              type: string

@@ -97,7 +97,7 @@ def asignaturas_de_carrera(request, carrera_id):
 
 @api_view(["GET"])
 def buscar_asignaturas(request):
-    """GET /asignaturas?buscar=&pagina=&limite= con búsqueda global y paginación."""
+    """GET /asignaturas?buscar=&pagina=&limite= sin distinguir tildes (SCRUM-56)."""
     texto = request.query_params.get("buscar", "").strip()
     area = request.query_params.get("area", "").strip()
 
@@ -122,7 +122,7 @@ def buscar_asignaturas(request):
         asignaturas = asignaturas.filter(area=area)
     if texto:
         asignaturas = asignaturas.filter(
-            Q(sigla__icontains=texto) | Q(nombre__icontains=texto)
+            Q(sigla__unaccent__icontains=texto) | Q(nombre__unaccent__icontains=texto)
         )
 
     total = asignaturas.count()
