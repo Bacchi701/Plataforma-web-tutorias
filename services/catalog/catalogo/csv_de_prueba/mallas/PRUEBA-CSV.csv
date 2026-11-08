@@ -1,0 +1,5 @@
+semestre,sigla,nombre,creditos,area
+1,PRU1101,Asignatura de prueba uno,6,Área de prueba
+1,PRU1102,Asignatura de prueba dos,,
+2,PRU2101,Asignatura de prueba tres,4,Área de prueba
+13,PRU9901,Asignatura con semestre inválido,4,
