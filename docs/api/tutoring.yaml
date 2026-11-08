@@ -29,10 +29,11 @@ info:
     - Las rutas de disponibilidad, las de `/perfiles`, `/yo/refrescar` y
       `/reservas/{reserva_id}/evaluacion` piden el token: sin él responden 401
       (`not_authenticated`).
-    - `/estado`, `/tutores` y `/tutores/{usuario_id}` no piden token. Pero si
-      la petición trae uno que no sirve (vencido, inválido o con la cabecera
-      mal formada), responden 401 igual, porque Tutorías revisa el token
-      antes de llegar a la ruta.
+    - `/estado`, `/tutores`, `/tutores/{usuario_id}` y
+      `/tutores/{usuario_id}/evaluaciones` no piden token. Pero si la
+      petición trae uno que no sirve (vencido, inválido o con la cabecera mal
+      formada), responden 401 igual, porque Tutorías revisa el token antes de
+      llegar a la ruta.
     - Si Tutorías no encuentra la clave pública, toda petición con token
       responde 503 `claves_no_configuradas` (ver
       `components/responses/ClavesNoConfiguradas`). Está en las rutas que
@@ -60,6 +61,9 @@ info:
     - La evaluación (`POST /reservas/{reserva_id}/evaluacion`) sale de
       tutoring_db, sin llamar a otros servicios. Al guardarla se recalcula la
       reputación del tutor en `usuario_ref` (RN-06), en la misma transacción.
+    - Las evaluaciones visibles de un tutor
+      (`GET /tutores/{usuario_id}/evaluaciones`) salen de tutoring_db, sin
+      llamar a otros servicios. Esa ruta no recalcula la reputación.
     - Ninguna respuesta trae el correo de nadie (RNF-07).
     - Los identificadores van como texto. La carrera y la sede van como
       identificador de Catálogo: el nombre se toma de
@@ -101,7 +105,10 @@ info:
       con sesión, con la etiqueta Evaluaciones, el parámetro `ReservaId`, los
       esquemas `NuevaEvaluacion` y `EvaluacionRegistrada` y sus códigos de
       error (ver el esquema `Error`). La reputación del tutor se recalcula al
-      evaluar.
+      evaluar. Agrega también `GET /tutores/{usuario_id}/evaluaciones`, sin
+      sesión y con la misma etiqueta: las evaluaciones visibles de un tutor,
+      hasta 100, con el esquema `EvaluacionPublica` del perfil público y su
+      mismo 404.
 
 servers:
   - url: http://localhost:8080/api/tutoring/v1
@@ -468,6 +475,100 @@ paths:
                 ruta_inexistente:
                   summary: GET /tutores/abc con DJANGO_DEBUG=1 (recortada)
                   value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/tutoring/v1/tutores/abc</title>...</html>'
+        '401':
+          $ref: '#/components/responses/TokenNoValido'
+
+  /tutores/{usuario_id}/evaluaciones:
+    get:
+      tags: [Evaluaciones]
+      operationId: verEvaluacionesDeTutor
+      summary: Evaluaciones visibles de un tutor
+      description: |
+        La nota, el comentario, la fecha y la asignatura de cada evaluación
+        visible del tutor (HU-25, criterio 4). Es pública: no pide token.
+
+        - Son las de las reservas sobre bloques del tutor, sin las que retiró
+          el administrador (`retirada_en` nulo, CA7), de la más nueva a la más
+          antigua, hasta 100. Pueden ser de cualquier asignatura, también de
+          una que ya no tutorea.
+        - Cada una tiene el formato de `evaluaciones` en
+          `GET /tutores/{usuario_id}` (esquema `EvaluacionPublica`): no trae
+          datos de quien evaluó ni ningún correo (RNF-07). `creada_en` va en
+          UTC con `Z`, y con fracción de segundo si la hora guardada la tiene,
+          como en el perfil.
+        - El tutor tiene que estar activo, como en `GET /tutores/{usuario_id}`:
+          si no, responde el mismo 404. Si está activo y no tiene evaluaciones
+          visibles, responde 200 con la lista vacía.
+        - No recalcula la reputación: el promedio y la cantidad están en
+          `GET /tutores/{usuario_id}`.
+      security:
+        - tokenAcceso: []
+        - {}
+      parameters:
+        - name: usuario_id
+          in: path
+          required: true
+          description: |
+            Identificador del tutor, el `usuario_id` que entrega la búsqueda:
+            un uuid en minúsculas y con guiones. Con otra forma la ruta no
+            existe (ver la respuesta 404).
+          schema:
+            type: string
+            format: uuid
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          example: 10000000-0000-4000-8000-000000000001
+      responses:
+        '200':
+          description: Las evaluaciones visibles, de la más nueva a la más antigua. La lista puede venir vacía.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/EvaluacionPublica'
+              examples:
+                valentina:
+                  summary: Valentina Soto, con una evaluación visible
+                  description: Datos de ejemplo de `data/seeds/demo`. Tiene otra evaluación, de 1, que retiró el administrador y no sale.
+                  value:
+                    - calificacion: 5
+                      comentario: Explicó la normalización con ejemplos claros. Muy recomendable.
+                      creada_en: '2026-09-22T13:00:00Z'
+                      asignatura:
+                        sigla: BDD1101
+                        nombre: Base de Datos
+                matias:
+                  summary: Matías Fuentes, todavía sin evaluaciones
+                  description: Mismos datos de ejemplo. Su perfil está activo, así que responde 200 con la lista vacía.
+                  value: []
+        '404':
+          description: |
+            No hay un tutor activo con ese identificador: el usuario no está
+            en Tutorías, su cuenta está desactivada (RN-08) o no tiene
+            perfiles activos. Los tres casos responden lo mismo (`not_found`),
+            como `GET /tutores/{usuario_id}`, aunque el usuario tenga
+            evaluaciones.
+
+            Si `usuario_id` no es un uuid en minúsculas, la ruta no existe y
+            responde Django con su página 404, en HTML y sin el formato de
+            error de la API. Con `DJANGO_DEBUG=1`, el valor de `.env.example`,
+            es la página de depuración de Django.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: not_found
+                mensaje: No existe un tutor activo con ese identificador.
+                detalles: null
+            text/html:
+              schema:
+                type: string
+              examples:
+                ruta_inexistente:
+                  summary: GET /tutores/abc/evaluaciones con DJANGO_DEBUG=1 (recortada)
+                  value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/tutoring/v1/tutores/abc/evaluaciones</title>...</html>'
         '401':
           $ref: '#/components/responses/TokenNoValido'
 

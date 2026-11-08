@@ -1,15 +1,19 @@
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .bloques import instante_json
-from .models import EstadoReserva, Evaluacion, Reserva
+from .busqueda import evaluacion_json
+from .models import EstadoReserva, Evaluacion, PerfilTutor, Reserva
 from .reputacion import recalcular_reputacion
 
 MAXIMO_COMENTARIO = 500
 RESTRICCION_EVALUACION_UNICA = "evaluacion_reserva_id_key"
+# GET /tutores/<id>/evaluaciones: las mas nuevas, hasta este tope.
+MAXIMO_EVALUACIONES_DEL_TUTOR = 100
 
 
 def respuesta_error(estado, codigo, mensaje):
@@ -169,3 +173,32 @@ def evaluar(peticion, reserva_id):
         recalcular_reputacion(reserva.bloque.usuario_id)
 
     return Response(evaluacion_registrada_json(evaluacion), status=201)
+
+
+@api_view(["GET"])
+def del_tutor(peticion, usuario_id):
+    """Evaluaciones visibles de un tutor (HU-25, criterio 4). No pide sesion.
+
+    Cada una con evaluacion_json de busqueda.py, el formato del perfil publico:
+    sin datos de quien evaluo. No recalcula la reputacion: esta en
+    GET /tutores/<id>.
+    """
+    # El mismo 404 que perfil_publico: el usuario no esta en Tutorias, su
+    # cuenta esta desactivada (RN-08) o no tiene perfiles activos.
+    tutor_activo = PerfilTutor.objects.filter(
+        usuario_id=usuario_id, activo=True, usuario__activo=True
+    ).exists()
+    if not tutor_activo:
+        raise NotFound("No existe un tutor activo con ese identificador.")
+
+    # El tutor evaluado es el dueno del bloque de la reserva (3FN). Las
+    # retiradas por el administrador no salen (CA7). Una sola consulta:
+    # select_related trae la reserva y su asignatura.
+    evaluaciones = (
+        Evaluacion.objects.filter(
+            reserva__bloque__usuario_id=usuario_id, retirada_en__isnull=True
+        )
+        .select_related("reserva__asignatura")
+        .order_by("-creada_en", "id")[:MAXIMO_EVALUACIONES_DEL_TUTOR]
+    )
+    return Response([evaluacion_json(evaluacion) for evaluacion in evaluaciones])

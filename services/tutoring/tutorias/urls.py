@@ -5,6 +5,11 @@ from . import bloques, busqueda, copias, evaluaciones, perfiles
 urlpatterns = [
     path("tutores", busqueda.buscar_tutores, name="tutores"),
     path("tutores/<uuid:usuario_id>", busqueda.perfil_publico, name="tutor"),
+    path(
+        "tutores/<uuid:usuario_id>/evaluaciones",
+        evaluaciones.del_tutor,
+        name="tutor-evaluaciones",
+    ),
     path("disponibilidad", bloques.mis_bloques, name="bloques"),
     path("disponibilidad/<uuid:bloque_id>", bloques.un_bloque, name="bloque"),
     path("perfiles", perfiles.declarar_o_listar, name="perfiles"),
