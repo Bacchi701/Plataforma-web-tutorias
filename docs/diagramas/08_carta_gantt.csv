@@ -1,0 +1,46 @@
+grupo,id,resumen_jira,responsable_jira,horas,sprint_barra,sprint_jira,estado_jira,fusion,pr,tipo_fusion,fuente
+Cimientos,HU-01,Sistema levantable con un comando,Bryan,18,Cimientos,sin sprint (antes del tablero),Finalizada,2026-09-21 17:22,#1,completa,git 92853cb
+Sprint 1,HU-02,Correo de desarrollo (Mailpit),Bryan,3,Sprint 1,sin sprint (antes del tablero),Finalizada,2026-09-25 12:16,#2,completa,git 239e40c
+Sprint 1,HU-03,Contrato OpenAPI de Identidad,Bryan,4,Sprint 1,Sprint 2,Finalizada,2026-10-21 13:41,#14,completa,git fe3dbc5
+Sprint 1,HU-04,Registro y verificación del correo,Bryan,10,Sprint 1,Sprint 2,Finalizada,2026-10-21 13:46,#5,completa,git cca3c47
+Sprint 1,HU-05,"Inicio, renovación y cierre de sesión",Bryan,8,Sprint 1,Sprint 2,Finalizada,2026-10-21 13:49,#11,completa,git 357b910
+Sprint 1,HU-06,Base del frontend,Francisco,14,Sprint 1,Sprint 3,Finalizada,2026-10-22 21:19,#10,completa,git c5f1763
+Sprint 1,HU-07,Modelo del catálogo y carga desde CSV,Francisco,8,Sprint 1,Sprint 4,En curso,2026-10-22 17:00,#6,parcial,git d32db25 (solo el modelo)
+Sprint 1,HU-08,Modelo de Tutorías y perfiles de tutor,Damaris,12,Sprint 1,Sprint 2,Finalizada,2026-10-09 12:47,#7,completa,git bc4d8d5
+Sprint 1,HU-09,Pantallas de registro e inicio de sesión,Damaris,12,Sprint 1,Sprint 3,Finalizada,2026-10-22 21:43,#12,completa,git d1f6a08
+Sprint 2,HU-10,"Perfil con carrera, nivel y sede",Bryan,12,Sprint 2,Sprint 3,Finalizada,2026-10-23 02:46,#18,completa,git 1dbc9d2
+Sprint 2,HU-11,Pruebas de Identidad y contratos del Sprint 2,Bryan,8,Sprint 2,Sprint 4,Tareas por hacer,,,,
+Sprint 2,HU-12,"Carreras, sedes, asignaturas y mallas (API)",Francisco,14,Sprint 2,Sprint 4,En revisión,2026-10-22 20:46,#9,parcial,git a7e6f85 (API pública)
+Sprint 2,HU-13,Carga de 3 a 5 carreras,Francisco,12,Sprint 2,Sprint 4,Tareas por hacer,,,,
+Sprint 2,HU-14,Declarar asignaturas con tarifa (RN-01),Francisco,14,Sprint 2,Sprint 3,Finalizada,2026-10-29 22:15,#21,completa,git dbd9091
+Sprint 2,HU-15,Bloques de disponibilidad,Damaris,12,Sprint 2,Sprint 3,Finalizada,2026-10-23 03:18,#20,completa,git 4628f2e
+Sprint 2,HU-16,Avisos por correo,Bryan,10,Sprint 2,Sprint 4,Tareas por hacer,,,,
+Sprint 2,HU-19,Sincronización de copias de lectura,Francisco,10,Sprint 2,Sprint 4,Tareas por hacer,,,,
+Sprint 2,HU-21,Solicitar una tutoría,Damaris,8,Sprint 2,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-17,Integración de Identidad y sus pruebas,Bryan,4,Sprint 3,Sprint 4,En curso,2026-10-22 20:29,#15,parcial,git 8dc5829 (parte de Tutorías)
+Sprint 3,HU-18,Pantallas de búsqueda y resultados,Francisco,12,Sprint 3,Sprint 4,En curso,2026-10-23 09:16,#19,parcial,git c4cffaa (falta el criterio 3)
+Sprint 3,HU-20,Búsqueda de tutores con reputación,Francisco,10,Sprint 3,Sprint 3,Finalizada,2026-10-22 21:11,#17,completa,git 2b23b31
+Sprint 3,HU-22,Confirmar o rechazar una solicitud,Damaris,12,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-23,Pagos simulados (servicio),Bryan,12,Sprint 3,Sprint 4,En curso,2026-10-22 19:53,#8,parcial,git 71a8457 (solo el modelo)
+Sprint 3,HU-24,Pantalla de pago y estado del pago,Bryan,4,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-25,Evaluación y reputación,Francisco,14,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-26,Historial y pantalla de evaluación,Francisco,8,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-27,Pruebas de evaluaciones y reputación,Francisco,6,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-28,"Cancelación, retiro y expiración",Damaris,12,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-29,Cierre automático y expiración (programador),Damaris,6,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-30,Mis reservas y solicitudes recibidas,Bryan,6,Sprint 3,Sprint 4,Tareas por hacer,,,,
+Sprint 3,HU-37,Contenedor programador,Bryan,3,Sprint 3,Sprint 4,Tareas por hacer,,,,PR abierto el 02-11 (sin fusionar)
+Sprint 4,HU-31,Administración de usuarios (Identidad),Bryan,6,Sprint 4,Sprint 4,Tareas por hacer,,,,
+Sprint 4,HU-33,Panel de administración,Francisco,19,Sprint 4,Sprint 4,Tareas por hacer,,,,
+Sprint 4,HU-34,Pruebas de extremo a extremo,Bryan,8,Sprint 4,Sprint 4,Tareas por hacer,,,,
+Sprint 4,HU-35,Sistema visual y revisión en teléfono,Damaris,8,Sprint 4,Sprint 4,Tareas por hacer,,,,
+Sprint 4,HU-36,Pruebas de Tutorías y corrección de errores,Damaris,10,Sprint 4,Sprint 4,Tareas por hacer,,,,
+Semanas 14 y 15,HU-32,Ensayo de la demostración y documentación final,Bryan,6,Semanas 14 y 15,sin sprint,Tareas por hacer,,,,
+Nuevas del 23-10 y el 29-10,HU-38,Pasos del inicio con su detalle,Bryan,2,Sprint 3,Sprint 3,Finalizada,2026-10-29 23:47,#24,completa,git 811e36c
+Nuevas del 23-10 y el 29-10,HU-39,Etiquetas con las asignaturas del tutor,Bryan,1,Sprint 3,Sprint 3,Finalizada,2026-10-29 23:47,#24,completa,git 811e36c
+Nuevas del 23-10 y el 29-10,HU-40,Tutores de cada asignatura y búsqueda por tutor,Bryan,5,Sprint 3,Sprint 3,Finalizada,2026-10-29 22:16,#22,completa,git 04b829f
+Nuevas del 23-10 y el 29-10,HU-41,El nombre editado en Mi perfil llega a la búsqueda,Bryan,2,Sprint 3,Sprint 3,Finalizada,2026-10-29 22:15,#21,completa,git dbd9091
+Nuevas del 23-10 y el 29-10,HU-42,Buzón de avisos en la plataforma,,10,,sin sprint (Should),Tareas por hacer,,,,
+Nuevas del 23-10 y el 29-10,HU-43,Recuperar la contraseña,,6,,sin sprint (Should),Tareas por hacer,,,,
+Nuevas del 23-10 y el 29-10,HU-44,Declarar asignaturas cursadas con evidencia,,8,,sin sprint (Could),Tareas por hacer,,,,
+Nuevas del 23-10 y el 29-10,SCRUM-70,Pago con Mercado Pago en modo de prueba (RF-18),,,,sin sprint (Could),Tareas por hacer,,,,

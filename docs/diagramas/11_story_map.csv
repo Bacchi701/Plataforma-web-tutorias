@@ -1,0 +1,52 @@
+franja,actividad,id,titulo,tipo
+Sprint 1,Base del sistema,HU-01,Un comando levanta todo,finalizada
+Sprint 1,Base del sistema,HU-02,Correo de desarrollo,finalizada
+Sprint 2,1. Crear cuenta y entrar,HU-03,Contrato de Identidad,finalizada
+Sprint 2,1. Crear cuenta y entrar,HU-04,Registro y verificación,finalizada
+Sprint 2,1. Crear cuenta y entrar,HU-05,Inicio y cierre de sesión,finalizada
+Sprint 2,3. Ofrecer tutorías,HU-08,Modelo de Tutorías,finalizada
+Sprint 3,Base del sistema,HU-06,Base del frontend,finalizada
+Sprint 3,1. Crear cuenta y entrar,HU-09,Pantallas de acceso,finalizada
+Sprint 3,2. Completar el perfil,HU-10,Perfil,finalizada
+Sprint 3,2. Completar el perfil,HU-41,Nombre editado en la búsqueda,finalizada
+Sprint 3,3. Ofrecer tutorías,HU-14,Declarar asignaturas,finalizada
+Sprint 3,3. Ofrecer tutorías,HU-15,Disponibilidad,finalizada
+Sprint 3,4. Buscar un tutor,HU-20,Búsqueda de tutores,finalizada
+Sprint 3,4. Buscar un tutor,HU-40,Búsqueda por asignatura y tutor,finalizada
+Sprint 3,,HU-38,Pasos del inicio con su detalle,finalizada
+Sprint 3,,HU-39,Etiquetas con las asignaturas del tutor,finalizada
+Sprint 4,Base del sistema,HU-11,Pruebas y contratos S2,tecnica
+Sprint 4,Base del sistema,HU-34,Pruebas de extremo a extremo,tecnica
+Sprint 4,Base del sistema,HU-35,Revisión en teléfono,usuario
+Sprint 4,Base del sistema,HU-36,Pruebas de Tutorías,tecnica
+Sprint 4,2. Completar el perfil,HU-07,Modelo del catálogo,tecnica
+Sprint 4,2. Completar el perfil,HU-12,API del catálogo,usuario
+Sprint 4,2. Completar el perfil,HU-13,Carga de carreras,usuario
+Sprint 4,4. Buscar un tutor,HU-18,Pantallas de búsqueda,usuario
+Sprint 4,4. Buscar un tutor,HU-19,Sincronización,tecnica
+Sprint 4,5. Solicitar y coordinar,HU-21,Solicitar tutoría,usuario
+Sprint 4,5. Solicitar y coordinar,HU-16,Avisos por correo,usuario
+Sprint 4,5. Solicitar y coordinar,HU-22,Confirmar o rechazar,usuario
+Sprint 4,5. Solicitar y coordinar,HU-17,Integración de Identidad,tecnica
+Sprint 4,5. Solicitar y coordinar,HU-30,Mis reservas,usuario
+Sprint 4,6. Pagar,HU-23,Servicio de pagos,usuario
+Sprint 4,6. Pagar,HU-24,Pantalla de pago,usuario
+Sprint 4,7. Cancelar o cerrar,HU-37,Programador,tecnica
+Sprint 4,7. Cancelar o cerrar,HU-28,Cancelar y expirar,usuario
+Sprint 4,7. Cancelar o cerrar,HU-29,Cierre automático,usuario
+Sprint 4,8. Evaluar,HU-25,Evaluar y reputación,usuario
+Sprint 4,8. Evaluar,HU-26,Historial,usuario
+Sprint 4,8. Evaluar,HU-27,Pruebas de evaluaciones,tecnica
+Sprint 4,9. Administrar,HU-31,Admin. de usuarios,usuario
+Sprint 4,9. Administrar,HU-33,Panel de administración,usuario
+Semanas 14 y 15,Base del sistema,HU-32,Ensayo y documentos,tecnica
+Fuera del MVP,1. Crear cuenta y entrar,AD-14,Inicio de sesión institucional,candidato
+Fuera del MVP,1. Crear cuenta y entrar,HU-43,Recuperar la contraseña (Should),candidato
+Fuera del MVP,3. Ofrecer tutorías,HU-44,Asignaturas con evidencia (Could),candidato
+Fuera del MVP,4. Buscar un tutor,RF-17,Filtros avanzados,candidato
+Fuera del MVP,5. Solicitar y coordinar,RF-14,Recordatorios,candidato
+Fuera del MVP,5. Solicitar y coordinar,HU-42,Buzón de avisos (Should),candidato
+Fuera del MVP,6. Pagar,RF-18,Pasarela real (SCRUM-70),candidato
+Fuera del MVP,7. Cancelar o cerrar,RF-15,Plazos y reprogramación,candidato
+Fuera del MVP,9. Administrar,RF-16,Importar mallas,candidato
+Fuera del MVP,9. Administrar,RF-19,Métricas,candidato

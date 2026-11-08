@@ -1,0 +1,95 @@
+// Diagrama de componentes (UML) de la Plataforma de Tutorías entre Estudiantes.
+// Estado: develop 078995a (30-10-2026) y plan del Sprint 4 (02-11-2026).
+// En negro, lo implementado. En gris y con borde discontinuo, lo planificado en el Sprint 4.
+// Notación UML: el círculo es una interfaz que ofrece el componente unido a él con una
+// línea continua; la flecha discontinua es una dependencia «usa», de quien la necesita
+// a la interfaz. Las aristas hacia arriba se escriben al revés con dir=back para que
+// Graphviz respete las filas.
+// Se genera con Graphviz:
+//   dot -Tpng -Gdpi=200 06_componentes.dot -o 06_componentes.png
+//   dot -Tsvg 06_componentes.dot -o 06_componentes.svg
+digraph componentes {
+  graph [rankdir=TB, fontname="DejaVu Sans", fontsize=11, nodesep=0.18, ranksep=0.42,
+         splines=true, pad=0.2,
+         label="Componentes · develop 078995a (30-10-2026) y plan del Sprint 4 (02-11-2026)\nNegro: implementado. Gris y borde discontinuo: planificado en el Sprint 4.\nCírculo: interfaz que ofrece el componente unido a él. Flecha discontinua: dependencia «usa».\nSolo publican puertos el gateway (8080) y la bandeja de Mailpit (127.0.0.1:8025).",
+         labelloc=b, labeljust=c];
+  node  [fontname="DejaVu Sans", fontsize=11, margin="0.08,0.04"];
+  edge  [fontname="DejaVu Sans", fontsize=10, style=dashed, arrowhead=vee, arrowsize=0.7];
+
+  subgraph cluster_navegador {
+    label="Navegador del usuario"; fontsize=11; style=rounded; color="#555555";
+    frontend [shape=component, label="Frontend web\n«HTML, CSS y JavaScript\nsin framework» (AD-12)"];
+  }
+
+  i_http [shape=circle, width=0.14, fixedsize=true, label=""];
+  gateway [shape=component, label="Gateway «Nginx 1.27»\nsirve las páginas en /app/,\nenruta /api/<servicio>/v1/\ny responde 404 a /internal"];
+  mailpit [shape=component, label="Mailpit «correo de\ndesarrollo» (AD-11)"];
+
+  subgraph cluster_interna {
+    label="Red interna (internal: true): servicios y bases de datos, sin puertos publicados"; fontsize=11; style="rounded,dashed"; color="#555555";
+
+    i_smtp [shape=circle, width=0.14, fixedsize=true, label=""];
+    i_id   [shape=circle, width=0.14, fixedsize=true, label=""];
+    i_cat  [shape=circle, width=0.14, fixedsize=true, label=""];
+    i_tut  [shape=circle, width=0.14, fixedsize=true, label=""];
+    i_pag  [shape=circle, width=0.14, fixedsize=true, label=""];
+
+    identity [shape=component, label="Identidad\n«Django 5.2 + DRF»\nregistro, verificación,\nsesión (JWT) y perfil"];
+    catalog  [shape=component, label="Catálogo\n«Django 5.2 + DRF»\ncarreras, sedes,\nmallas y asignaturas"];
+    tutoring [shape=component, label="Tutorías\n«Django 5.2 + DRF»\nperfiles de tutor,\nbloques y búsqueda"];
+    payments [shape=component, label="Pagos\n«Django 5.2 + DRF»\nal 02-11,\nsolo el modelo"];
+
+    identity_db [shape=cylinder, label="identity_db\n«PostgreSQL 16»"];
+    catalog_db  [shape=cylinder, label="catalog_db\n«PostgreSQL 16»"];
+    tutoring_db [shape=cylinder, label="tutoring_db\n«PostgreSQL 16»"];
+    payment_db  [shape=cylinder, label="payment_db\n«PostgreSQL 16»"];
+
+    programador [shape=component, style=dashed, color="#808080", fontcolor="#606060",
+                 label="Programador (HU-37)\n«imagen de Tutorías»\ncada 300 s: sincronizar_copias\n(HU-19) y cerrar_y_expirar (HU-29)"];
+
+    nota [shape=note, fontsize=10, color="#808080", fontcolor="#505050", label="Planificado en el Sprint 4, por rutas /internal\lcon una clave de servicio:\l(a) Tutorías pide a Identidad datos de usuarios\l     por lotes y el envío de avisos (HU-16, HU-19).\l(b) Pagos consulta la reserva y avisa el estado\l     del pago a Tutorías (HU-23).\l(c) Tutorías pide el reembolso a Pagos (HU-28).\l"];
+    { rank=same; programador; nota; }
+    programador -> nota [style=invis];
+
+    { rank=same; i_smtp; i_id; i_tut; i_cat; i_pag; }
+    { rank=same; identity; tutoring; catalog; payments; }
+    { rank=same; identity_db; tutoring_db; catalog_db; payment_db; }
+    i_smtp -> i_id -> i_tut -> i_cat -> i_pag [style=invis];
+    identity -> tutoring -> catalog -> payments [style=invis];
+    identity_db -> tutoring_db -> catalog_db -> payment_db [style=invis];
+  }
+
+  { rank=same; mailpit; gateway; }
+  mailpit -> gateway [style=invis];
+
+  // Interfaces ofrecidas (línea continua, sin flecha)
+  i_http -> gateway  [style=solid, arrowhead=none, weight=8, label=" HTTP :8080"];
+  mailpit -> i_smtp  [style=solid, arrowhead=none, weight=8, label=" SMTP :1025"];
+  i_id   -> identity [style=solid, arrowhead=none, weight=8, label=" /api/identity/v1"];
+  i_cat  -> catalog  [style=solid, arrowhead=none, weight=8, label=" /api/catalog/v1"];
+  i_tut  -> tutoring [style=solid, arrowhead=none, weight=8, label=" /api/tutoring/v1"];
+  i_pag  -> payments [style=solid, arrowhead=none, weight=8, label=" /api/payments/v1"];
+
+  // Dependencias implementadas
+  frontend -> i_http [weight=8];
+  gateway -> i_id;
+  gateway -> i_cat;
+  gateway -> i_tut;
+  gateway -> i_pag;
+  i_smtp -> identity [dir=back, arrowtail=vee, label=" correo"];
+  i_id   -> tutoring [dir=back, arrowtail=vee, label=" GET /yo con el\n token del usuario"];
+  i_cat  -> tutoring [dir=back, arrowtail=vee, label=" malla pública\n (RN-01)"];
+  identity -> identity_db [weight=8];
+  catalog  -> catalog_db  [weight=8];
+  tutoring -> tutoring_db [weight=8];
+  payments -> payment_db  [weight=8];
+
+  // Dependencias planificadas en el Sprint 4
+  i_id  -> tutoring [dir=back, arrowtail=vee, color="#808080", fontcolor="#606060",
+                     label=" (a)"];
+  i_tut -> payments [dir=back, arrowtail=vee, color="#808080", fontcolor="#606060",
+                     label=" (b)"];
+  i_pag -> tutoring [dir=back, arrowtail=vee, color="#808080", fontcolor="#606060",
+                     label=" (c)"];
+  tutoring_db -> programador [dir=back, arrowtail=vee, color="#808080"];
+}
