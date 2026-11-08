@@ -1,13 +1,15 @@
 import threading
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from uuid import UUID
 
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from django.db import connections
+from django.db import IntegrityError, connection, connections
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone as tz
 from rest_framework.test import APIClient
 
@@ -727,3 +729,423 @@ def test_concurrencia_dos_reservas_del_mismo_tutor_cuentan_las_dos(
         Decimal("4.50"),
         2,
     )
+
+
+# ----------------------------------- HU-27, criterio 1: lo que faltaba (parte 2)
+
+
+def evaluacion_sin_revision_previa(**forzados):
+    """Hace de Evaluacion dentro de tutorias/evaluaciones.py.
+
+    Su revision previa no ve la evaluacion que ya existe, como si las dos
+    llegaran a la vez, y su create es el de verdad: el INSERT llega a la base,
+    que es la que decide. forzados cambia campos de ese INSERT.
+    """
+
+    def crear(**campos):
+        return Evaluacion.objects.create(**{**campos, **forzados})
+
+    return SimpleNamespace(
+        objects=SimpleNamespace(
+            filter=lambda **condiciones: Evaluacion.objects.none(), create=crear
+        )
+    )
+
+
+@pytest.mark.django_db
+class TestReglasDeEvaluar:
+    def test_la_misma_reserva_se_evalua_recien_cuando_termina_el_bloque(
+        self, cliente_autenticado
+    ):
+        # Solo despues de bloque.fin_en, sin margen: un minuto antes, 409; un
+        # minuto despues, 201.
+        ahora = tz.now()
+        reserva = crear_reserva(
+            inicio_en=ahora - timedelta(minutes=59),
+            fin_en=ahora + timedelta(minutes=1),
+        )
+        antes = foto(reserva)
+        cliente = cliente_autenticado(ID_SOLICITANTE)
+
+        respuesta = cliente.post(
+            url_evaluacion(reserva.id), {"calificacion": 4}, format="json"
+        )
+
+        assert respuesta.status_code == 409
+        assert respuesta.json()["codigo"] == "tutoria_no_terminada"
+        assert foto(reserva) == antes
+
+        BloqueDisponibilidad.objects.filter(pk=reserva.bloque_id).update(
+            inicio_en=ahora - timedelta(minutes=61),
+            fin_en=ahora - timedelta(minutes=1),
+        )
+        respuesta = cliente.post(
+            url_evaluacion(reserva.id), {"calificacion": 4}, format="json"
+        )
+
+        assert respuesta.status_code == 201
+        reserva.refresh_from_db()
+        assert reserva.estado == EstadoReserva.EVALUADA
+
+    def test_una_reserva_realizada_que_ya_tiene_evaluacion_responde_409(
+        self, cliente_autenticado
+    ):
+        # Una sola vez, aunque la reserva siga REALIZADA (por ejemplo, si la
+        # evaluacion se cargo a mano): cuenta la fila de evaluacion.
+        reserva = crear_reserva()
+        Evaluacion.objects.create(reserva=reserva, calificacion=5)
+        antes = foto(reserva)
+
+        with CaptureQueriesContext(connection) as consultas:
+            respuesta = cliente_autenticado(ID_SOLICITANTE).post(
+                url_evaluacion(reserva.id), {"calificacion": 1}, format="json"
+            )
+
+        assert respuesta.status_code == 409
+        assert respuesta.json() == {
+            "codigo": "reserva_ya_evaluada",
+            "mensaje": "Ya evaluaste esta tutoría.",
+            "detalles": None,
+        }
+        assert foto(reserva) == antes
+        # Lo corto la revision previa: ni siquiera se intento el INSERT.
+        assert not any(
+            'INSERT INTO "evaluacion"' in consulta["sql"]
+            for consulta in consultas.captured_queries
+        )
+
+    def test_si_la_base_rechaza_la_evaluacion_repetida_responde_409(
+        self, cliente_autenticado, monkeypatch
+    ):
+        # La ultima defensa es la restriccion unica de evaluacion.reserva_id.
+        # Si RESTRICCION_EVALUACION_UNICA no fuera su nombre real, saldria 500.
+        reserva = crear_reserva()
+        Evaluacion.objects.create(reserva=reserva, calificacion=5)
+        antes = foto(reserva)
+        monkeypatch.setattr(
+            "tutorias.evaluaciones.Evaluacion", evaluacion_sin_revision_previa()
+        )
+
+        respuesta = cliente_autenticado(ID_SOLICITANTE).post(
+            url_evaluacion(reserva.id), {"calificacion": 1}, format="json"
+        )
+
+        assert respuesta.status_code == 409
+        assert respuesta.json()["codigo"] == "reserva_ya_evaluada"
+        assert foto(reserva) == antes
+
+    @pytest.mark.parametrize("forzada", [9, None])
+    def test_otro_rechazo_de_la_base_no_se_disfraza_de_evaluacion_repetida(
+        self, cliente_autenticado, monkeypatch, forzada
+    ):
+        # Una nota que la base no acepta no es una evaluacion repetida: el error
+        # sigue su camino y no queda nada escrito. Con 9 la rechaza
+        # ck_evaluacion_calificacion; con None, el NOT NULL, que en PostgreSQL 16
+        # llega sin nombre de restriccion (el respaldo de es_evaluacion_duplicada).
+        reserva = crear_reserva()
+        antes = foto(reserva)
+        monkeypatch.setattr(
+            "tutorias.evaluaciones.Evaluacion",
+            evaluacion_sin_revision_previa(calificacion=forzada),
+        )
+
+        with pytest.raises(IntegrityError):
+            cliente_autenticado(ID_SOLICITANTE).post(
+                url_evaluacion(reserva.id), {"calificacion": 4}, format="json"
+            )
+
+        assert foto(reserva) == antes
+
+    @pytest.mark.parametrize("cuerpo", [[{"calificacion": 5}], 5])
+    def test_un_cuerpo_que_no_es_un_objeto_json_responde_400(
+        self, cliente_autenticado, cuerpo
+    ):
+        reserva = crear_reserva()
+        antes = foto(reserva)
+
+        respuesta = cliente_autenticado(ID_SOLICITANTE).post(
+            url_evaluacion(reserva.id), cuerpo, format="json"
+        )
+
+        assert respuesta.status_code == 400
+        assert respuesta.json()["codigo"] == "calificacion_invalida"
+        assert foto(reserva) == antes
+
+
+# ------------------------------ GET /tutores/<id>/evaluaciones (HU-25, criterio 4)
+
+# Los bloques de estas pruebas se cuentan en dias hacia atras desde ayer a
+# mediodia (UTC): cada evaluacion del mismo tutor va en otro dia, porque dos
+# bloques del mismo tutor no se pueden solapar (ex_bloque_sin_solape).
+AYER = (tz.now() - timedelta(days=1)).replace(
+    hour=12, minute=0, second=0, microsecond=0
+)
+ID_DESACTIVADO = UUID("10000000-0000-4000-8000-000000000006")
+ID_SIN_PERFIL_ACTIVO = UUID("10000000-0000-4000-8000-000000000007")
+NO_ES_TUTOR_ACTIVO = {
+    "codigo": "not_found",
+    "mensaje": "No existe un tutor activo con ese identificador.",
+    "detalles": None,
+}
+
+
+def url_perfil(usuario_id):
+    return f"/api/tutoring/v1/tutores/{usuario_id}"
+
+
+def url_del_tutor(usuario_id):
+    return f"/api/tutoring/v1/tutores/{usuario_id}/evaluaciones"
+
+
+def con_perfil(tutor_id, activo=True):
+    """El tutor con un perfil en Base de Datos.
+
+    Sin un perfil activo, GET /tutores/<id> y GET /tutores/<id>/evaluaciones
+    responden 404.
+    """
+    PerfilTutor.objects.create(
+        usuario=asegurar_usuario_ref(tutor_id),
+        asignatura=crear_asignatura(),
+        tarifa=Decimal("4500"),
+        activo=activo,
+    )
+
+
+def evaluacion_de(
+    tutor_id,
+    dias,
+    calificacion=5,
+    comentario=None,
+    asignatura_id=ID_ASIGNATURA,
+    retirada=False,
+):
+    """Evaluacion de una reserva EVALUADA sobre un bloque del tutor.
+
+    El bloque es de una hora, tantos dias antes de AYER. La evaluacion se crea
+    media hora despues de que termina, y si va retirada, la retiro el
+    administrador (ck_evaluacion_retiro pide las dos columnas).
+    """
+    inicio = AYER - timedelta(days=dias)
+    reserva = crear_reserva(
+        tutor_id=tutor_id,
+        estado=EstadoReserva.EVALUADA,
+        inicio_en=inicio,
+        fin_en=inicio + timedelta(hours=1),
+        asignatura_id=asignatura_id,
+    )
+    return Evaluacion.objects.create(
+        reserva=reserva,
+        calificacion=calificacion,
+        comentario=comentario,
+        creada_en=inicio + timedelta(minutes=90),
+        retirada_en=AYER if retirada else None,
+        retirada_por_usuario_id=ID_ADMIN if retirada else None,
+    )
+
+
+def fecha(texto):
+    """Fecha de la respuesta: ISO 8601 y con zona horaria."""
+    valor = datetime.fromisoformat(texto)
+    assert valor.tzinfo is not None
+    return valor
+
+
+def claves(valor):
+    """Todas las claves de un JSON, a cualquier profundidad."""
+    if isinstance(valor, dict):
+        for clave, contenido in valor.items():
+            yield clave
+            yield from claves(contenido)
+    elif isinstance(valor, list):
+        for elemento in valor:
+            yield from claves(elemento)
+
+
+def consultas_de(url, evaluaciones):
+    """Cuantas consultas hace GET url, que tiene que traer esas evaluaciones."""
+    with CaptureQueriesContext(connection) as consultas:
+        respuesta = APIClient().get(url)
+    assert respuesta.status_code == 200
+    assert len(respuesta.json()) == evaluaciones
+    return len(consultas)
+
+
+@pytest.mark.django_db
+class TestEvaluacionesDelTutor:
+    def test_trae_las_visibles_del_tutor_de_la_mas_nueva_a_la_mas_antigua(self):
+        con_perfil(ID_TUTOR)
+        con_perfil(ID_AJENO)
+        crear_asignatura(ID_ASIGNATURA_REDES, "RED1101", "Fundamentos de Redes")
+        vieja = evaluacion_de(ID_TUTOR, 10, calificacion=3, comentario="Clara.")
+        sin_comentario = evaluacion_de(ID_TUTOR, 7, calificacion=4)
+        nueva = evaluacion_de(
+            ID_TUTOR,
+            5,
+            comentario="Explicó las subredes con ejemplos.",
+            asignatura_id=ID_ASIGNATURA_REDES,
+        )
+        # No salen la retirada por el administrador (CA7) ni la de otro tutor.
+        evaluacion_de(ID_TUTOR, 6, calificacion=1, retirada=True)
+        evaluacion_de(ID_AJENO, 4, calificacion=2)
+
+        respuesta = APIClient().get(url_del_tutor(ID_TUTOR))
+
+        assert respuesta.status_code == 200
+        cuerpo = respuesta.json()
+        assert [e["calificacion"] for e in cuerpo] == [5, 4, 3]
+        assert [fecha(e["creada_en"]) for e in cuerpo] == [
+            nueva.creada_en,
+            sin_comentario.creada_en,
+            vieja.creada_en,
+        ]
+        assert set(cuerpo[0]) == {
+            "calificacion",
+            "comentario",
+            "creada_en",
+            "asignatura",
+        }
+        assert cuerpo[0]["comentario"] == "Explicó las subredes con ejemplos."
+        assert cuerpo[0]["asignatura"] == {
+            "sigla": "RED1101",
+            "nombre": "Fundamentos de Redes",
+        }
+        assert cuerpo[1]["comentario"] is None
+        assert cuerpo[2]["asignatura"] == {
+            "sigla": "BDD1101",
+            "nombre": "Base de Datos",
+        }
+
+        # Nada de quien evaluo: ni su id, ni su nombre, ni un correo.
+        prohibidas = ("usuario", "solicitante", "email", "correo")
+        assert [c for c in claves(cuerpo) if any(p in c for p in prohibidas)] == []
+        texto = respuesta.content.decode()
+        assert str(ID_SOLICITANTE) not in texto
+        assert "Camila" not in texto
+
+    def test_un_tutor_sin_evaluaciones_responde_una_lista_vacia(self):
+        con_perfil(ID_TUTOR)
+
+        respuesta = APIClient().get(url_del_tutor(ID_TUTOR))
+
+        assert respuesta.status_code == 200
+        assert respuesta.json() == []
+
+    def test_responde_el_mismo_404_que_el_perfil_si_no_es_un_tutor_activo(self):
+        # Los dos tienen una evaluacion visible, y aun asi responden 404.
+        con_perfil(ID_DESACTIVADO)
+        evaluacion_de(ID_DESACTIVADO, 1)
+        UsuarioRef.objects.filter(pk=ID_DESACTIVADO).update(activo=False)
+        con_perfil(ID_SIN_PERFIL_ACTIVO, activo=False)
+        evaluacion_de(ID_SIN_PERFIL_ACTIVO, 1)
+
+        casos = {
+            "no existe": ID_INEXISTENTE,
+            "cuenta desactivada (RN-08)": ID_DESACTIVADO,
+            "sin perfiles activos": ID_SIN_PERFIL_ACTIVO,
+        }
+        for caso, usuario_id in casos.items():
+            respuesta = APIClient().get(url_del_tutor(usuario_id))
+            perfil = APIClient().get(url_perfil(usuario_id))
+            assert respuesta.status_code == 404, caso
+            assert respuesta.json() == NO_ES_TUTOR_ACTIVO, caso
+            assert perfil.status_code == 404, caso
+            assert perfil.json() == respuesta.json(), caso
+
+    def test_hace_las_mismas_consultas_con_una_y_con_tres_evaluaciones(self):
+        con_perfil(ID_TUTOR)
+        crear_asignatura(ID_ASIGNATURA_REDES, "RED1101", "Fundamentos de Redes")
+        evaluacion_de(ID_TUTOR, 1)
+        con_una = consultas_de(url_del_tutor(ID_TUTOR), evaluaciones=1)
+
+        evaluacion_de(ID_TUTOR, 2, asignatura_id=ID_ASIGNATURA_REDES)
+        evaluacion_de(ID_TUTOR, 3)
+        con_tres = consultas_de(url_del_tutor(ID_TUTOR), evaluaciones=3)
+
+        # Una para el 404 y otra para la lista, sin una por evaluacion.
+        assert con_una == con_tres == 2
+
+    def test_no_pide_token_y_con_un_token_invalido_responde_401(
+        self, cliente_autenticado
+    ):
+        con_perfil(ID_TUTOR)
+        evaluacion_de(ID_TUTOR, 1)
+        url = url_del_tutor(ID_TUTOR)
+
+        sin_token = APIClient().get(url)
+        con_token = cliente_autenticado(ID_SOLICITANTE).get(url)
+        token_invalido = APIClient().get(
+            url, HTTP_AUTHORIZATION="Bearer no-es-un-token"
+        )
+
+        assert sin_token.status_code == 200
+        assert len(sin_token.json()) == 1
+        assert con_token.status_code == 200
+        assert con_token.json() == sin_token.json()
+        assert token_invalido.status_code == 401
+        assert token_invalido.json()["codigo"] == "token_invalido"
+
+    def test_trae_hasta_100_evaluaciones_las_mas_nuevas(self):
+        con_perfil(ID_TUTOR)
+        evaluaciones = [evaluacion_de(ID_TUTOR, dias) for dias in range(1, 102)]
+
+        cuerpo = APIClient().get(url_del_tutor(ID_TUTOR)).json()
+
+        # Son 101 visibles: queda fuera la mas antigua.
+        assert len(cuerpo) == 100
+        assert [fecha(e["creada_en"]) for e in cuerpo] == [
+            e.creada_en for e in evaluaciones[:100]
+        ]
+
+
+# ------------------------------------------ HU-27, criterio 2: de punta a punta
+
+
+@pytest.mark.django_db
+def test_de_punta_a_punta_evaluar_y_retirar_cambian_la_reputacion_y_las_listas(
+    cliente_autenticado,
+):
+    con_perfil(ID_TUTOR)
+    ahora = tz.now().replace(microsecond=0)
+    anterior = crear_reserva(
+        inicio_en=ahora - timedelta(hours=8), fin_en=ahora - timedelta(hours=7)
+    )
+    reserva = crear_reserva(
+        solicitante_id=ID_OTRO_ESTUDIANTE,
+        inicio_en=ahora - timedelta(hours=4),
+        fin_en=ahora - timedelta(hours=3),
+    )
+    publico = APIClient()
+
+    # La reputacion anterior: una evaluacion de 5.
+    primera = cliente_autenticado(ID_SOLICITANTE).post(
+        url_evaluacion(anterior.id), {"calificacion": 5}, format="json"
+    )
+    assert primera.status_code == 201
+    perfil = publico.get(url_perfil(ID_TUTOR)).json()
+    assert perfil["reputacion"] == {"promedio": 5.0, "total": 1}
+
+    # Otro estudiante evalua con 3: la reputacion nueva sale en el perfil.
+    respuesta = cliente_autenticado(ID_OTRO_ESTUDIANTE).post(
+        url_evaluacion(reserva.id),
+        {"calificacion": 3, "comentario": "Faltó tiempo para los ejercicios."},
+        format="json",
+    )
+    assert respuesta.status_code == 201
+    perfil = publico.get(url_perfil(ID_TUTOR)).json()
+    assert perfil["reputacion"] == {"promedio": 4.0, "total": 2}
+    assert [e["calificacion"] for e in perfil["evaluaciones"]] == [3, 5]
+    lista = publico.get(url_del_tutor(ID_TUTOR)).json()
+    assert [e["calificacion"] for e in lista] == [3, 5]
+    assert lista[0]["comentario"] == "Faltó tiempo para los ejercicios."
+
+    # Lo que va a hacer HU-33: retirar esa evaluacion en la base y recalcular.
+    Evaluacion.objects.filter(reserva=reserva).update(
+        retirada_en=tz.now(), retirada_por_usuario_id=ID_ADMIN
+    )
+    assert recalcular_reputacion(ID_TUTOR) == (Decimal("5.00"), 1)
+
+    perfil = publico.get(url_perfil(ID_TUTOR)).json()
+    assert perfil["reputacion"] == {"promedio": 5.0, "total": 1}
+    assert [e["calificacion"] for e in perfil["evaluaciones"]] == [5]
+    lista = publico.get(url_del_tutor(ID_TUTOR)).json()
+    assert [e["calificacion"] for e in lista] == [5]
