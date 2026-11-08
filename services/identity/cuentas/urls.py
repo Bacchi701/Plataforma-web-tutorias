@@ -14,4 +14,5 @@ urlpatterns = [
         internas.un_usuario,
         name="interna-usuario",
     ),
+    path("internal/usuarios", internas.varios_usuarios, name="interna-usuarios"),
 ]

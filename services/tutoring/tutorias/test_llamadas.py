@@ -57,17 +57,23 @@ def error_http(codigo, cuerpo):
 
 
 class Red:
-    """Hace de la red: cada prueba fija la respuesta y ve que se pidio."""
+    """Hace de la red: cada prueba fija la respuesta y ve que se pidio.
+
+    Para las pruebas de varias peticiones, respuestas es una cola: abrir
+    entrega (o lanza) la primera. Vacia, usa respuesta, como antes.
+    """
 
     def __init__(self):
         self.respuesta = None
+        self.respuestas = []
         self.peticiones = []
 
     def abrir(self, peticion):
         self.peticiones.append(peticion)
-        if isinstance(self.respuesta, BaseException):
-            raise self.respuesta
-        return self.respuesta
+        respuesta = self.respuestas.pop(0) if self.respuestas else self.respuesta
+        if isinstance(respuesta, BaseException):
+            raise respuesta
+        return respuesta
 
 
 @pytest.fixture
@@ -459,3 +465,213 @@ def test_usuario_por_id_fallas_lanzan_503_con_mensaje_identidad(red, settings, f
 
     assert error.value.status_code == 503
     assert "servicio de Identidad" in str(error.value.detail)
+
+
+# ----------------------------------------- Varios usuarios y asignaturas (HU-19)
+
+OTRO_ID = uuid.uuid4()
+ASIGNATURAS = "http://catalog:8000/api/catalog/v1/asignaturas?paginado=1&limite=200"
+
+
+def test_usuarios_por_ids_pide_la_ruta_interna_con_los_ids_y_la_clave(red, settings):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    diego = usuario_interno(
+        id=str(OTRO_ID),
+        nombre="Diego",
+        carrera_id=None,
+        nivel=None,
+        sede_id=None,
+        activo=False,
+    )
+    red.respuesta = Respuesta([usuario_interno(), diego])
+
+    datos = llamadas.usuarios_por_ids([USUARIO_ID, OTRO_ID])
+
+    assert datos == {
+        USUARIO_ID: {
+            "id": USUARIO_ID,
+            "nombre": "Camila",
+            "apellido": "Soto",
+            "carrera_id": CARRERA_ID,
+            "nivel": 3,
+            "sede_id": SEDE_ID,
+            "activo": True,
+        },
+        OTRO_ID: {
+            "id": OTRO_ID,
+            "nombre": "Diego",
+            "apellido": "Soto",
+            "carrera_id": None,
+            "nivel": None,
+            "sede_id": None,
+            "activo": False,
+        },
+    }
+    [peticion] = red.peticiones
+    assert peticion.full_url == (
+        "http://identity:8000/api/identity/v1/internal/usuarios"
+        f"?ids={USUARIO_ID},{OTRO_ID}"
+    )
+    assert peticion.get_method() == "GET"
+    assert peticion.get_header("X-clave-servicio") == "clave-de-prueba"
+    assert peticion.get_header("Authorization") is None
+
+
+def test_usuarios_por_ids_con_una_lista_vacia_devuelve_vacio(red, settings):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = Respuesta([])
+
+    assert llamadas.usuarios_por_ids([USUARIO_ID]) == {}
+    assert len(red.peticiones) == 1
+
+
+def test_usuarios_por_ids_sin_ids_no_llama_a_identidad(red):
+    assert llamadas.usuarios_por_ids([]) == {}
+    assert red.peticiones == []
+
+
+@pytest.mark.parametrize(
+    "falla_404",
+    [
+        error_http(404, {"codigo": "ruta_no_encontrada", "mensaje": "x"}),
+        error_http(404, {"codigo": "usuario_no_encontrado", "mensaje": "x"}),
+        error_http(404, b"<!DOCTYPE html><title>Not Found</title>"),
+    ],
+    ids=["ruta_no_encontrada", "usuario_no_encontrado", "html_404"],
+)
+def test_usuarios_por_ids_con_404_lanza_503_y_loguea_revisa_clave(
+    red, settings, falla_404, caplog
+):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = falla_404
+
+    with pytest.raises(ServicioNoDisponible) as error:
+        llamadas.usuarios_por_ids([USUARIO_ID])
+
+    assert error.value.status_code == 503
+    assert "servicio de Identidad" in str(error.value.detail)
+    assert "revisa CLAVE_SERVICIO" in caplog.text
+
+
+FALLAS_USUARIOS_POR_IDS = {
+    "error_500": error_http(500, b"<h1>Server Error (500)</h1>"),
+    "error_400": error_http(400, {"codigo": "ids_invalidos", "mensaje": "x"}),
+    "no_conecta": urllib.error.URLError(ConnectionRefusedError(111, "refused")),
+    "no_contesta_a_tiempo": TimeoutError("timed out"),
+    "no_es_una_lista": Respuesta(usuario_interno()),
+    "otra_forma_activo": Respuesta([usuario_interno(activo="si")]),
+    "otra_forma_id": Respuesta([usuario_interno(), usuario_interno(id="x")]),
+}
+
+
+@pytest.mark.parametrize(
+    "falla",
+    list(FALLAS_USUARIOS_POR_IDS.values()),
+    ids=list(FALLAS_USUARIOS_POR_IDS),
+)
+def test_usuarios_por_ids_si_identidad_falla_responde_503(red, settings, falla):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuesta = falla
+
+    with pytest.raises(ServicioNoDisponible) as error:
+        llamadas.usuarios_por_ids([USUARIO_ID])
+
+    assert error.value.status_code == 503
+    assert "servicio de Identidad" in str(error.value.detail)
+
+
+def pagina(numero, total_paginas, *asignaturas, total=None):
+    """GET /asignaturas?paginado=1 de Catalogo (catalogo/vistas.py)."""
+    return {
+        "total": len(asignaturas) if total is None else total,
+        "pagina": numero,
+        "total_paginas": total_paginas,
+        "limite": 200,
+        "resultados": [
+            {**asignatura, "area": "", "creditos": 6} for asignatura in asignaturas
+        ],
+    }
+
+
+def test_asignaturas_del_catalogo_pide_las_paginas_y_las_junta(red, settings):
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    red.respuestas = [
+        Respuesta(pagina(1, 2, PRIMERO, SEGUNDO, total=3)),
+        Respuesta(pagina(2, 2, TERCERO, total=3)),
+    ]
+
+    asignaturas = llamadas.asignaturas_del_catalogo()
+
+    assert asignaturas == {
+        uuid.UUID(PRIMERO["id"]): {"sigla": "PGY1101", "nombre": "Programación"},
+        uuid.UUID(SEGUNDO["id"]): {"sigla": "BDY1101", "nombre": "Base de Datos"},
+        uuid.UUID(TERCERO["id"]): {
+            "sigla": "POO1101",
+            "nombre": "Orientación a Objetos",
+        },
+    }
+    assert [peticion.full_url for peticion in red.peticiones] == [
+        f"{ASIGNATURAS}&pagina=1",
+        f"{ASIGNATURAS}&pagina=2",
+    ]
+    # Es la ruta publica de Catalogo: no lleva la clave de servicio.
+    for peticion in red.peticiones:
+        assert peticion.get_header("X-clave-servicio") is None
+        assert peticion.get_method() == "GET"
+
+
+def test_asignaturas_del_catalogo_lee_hasta_50_paginas(red):
+    red.respuestas = [Respuesta(pagina(numero, 60)) for numero in range(1, 61)]
+    red.respuestas[0] = Respuesta(pagina(1, 60, PRIMERO))
+
+    asignaturas = llamadas.asignaturas_del_catalogo()
+
+    assert len(red.peticiones) == 50
+    assert red.peticiones[-1].full_url == f"{ASIGNATURAS}&pagina=50"
+    assert list(asignaturas) == [uuid.UUID(PRIMERO["id"])]
+
+
+@pytest.mark.parametrize(
+    "falla",
+    [
+        error_http(500, b"<h1>Server Error (500)</h1>"),
+        error_http(404, b"<!DOCTYPE html><title>Not Found</title>"),
+        urllib.error.URLError(TimeoutError("timed out")),
+        TimeoutError("timed out"),
+        Respuesta([PRIMERO, SEGUNDO]),
+        Respuesta({**pagina(1, 1, PRIMERO), "total_paginas": "1"}),
+        Respuesta({**pagina(1, 1, PRIMERO), "resultados": None}),
+        Respuesta(pagina(1, 1, {"id": "x", "sigla": "PGY1101", "nombre": "P"})),
+        Respuesta(pagina(1, 1, {**PRIMERO, "nombre": None})),
+    ],
+    ids=[
+        "error_500",
+        "ruta_que_no_existe",
+        "no_conecta_a_tiempo",
+        "no_contesta_a_tiempo",
+        "sin_paginar",
+        "total_paginas_como_texto",
+        "sin_resultados",
+        "asignatura_sin_uuid",
+        "asignatura_sin_nombre",
+    ],
+)
+def test_si_catalogo_falla_al_listar_las_asignaturas_responde_503(red, falla):
+    red.respuesta = falla
+
+    with pytest.raises(ServicioNoDisponible) as error:
+        llamadas.asignaturas_del_catalogo()
+
+    assert "servicio de Catálogo" in str(error.value.detail)
+
+
+def test_si_falla_la_segunda_pagina_no_devuelve_una_lista_a_medias(red):
+    red.respuestas = [
+        Respuesta(pagina(1, 2, PRIMERO)),
+        error_http(500, b"<h1>Server Error (500)</h1>"),
+    ]
+
+    with pytest.raises(ServicioNoDisponible):
+        llamadas.asignaturas_del_catalogo()
+
+    assert len(red.peticiones) == 2
