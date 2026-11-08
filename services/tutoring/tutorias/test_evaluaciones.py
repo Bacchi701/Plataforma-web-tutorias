@@ -30,8 +30,11 @@ ID_TUTOR = UUID("10000000-0000-4000-8000-000000000001")
 ID_SOLICITANTE = UUID("10000000-0000-4000-8000-000000000002")
 ID_AJENO = UUID("10000000-0000-4000-8000-000000000003")
 ID_INEXISTENTE = UUID("99999999-9999-4999-8999-999999999999")
+ID_OTRO_ESTUDIANTE = UUID("10000000-0000-4000-8000-000000000004")
+ID_ADMIN = UUID("10000000-0000-4000-8000-000000000008")
 
 ID_ASIGNATURA = UUID("40000000-0000-4000-8000-000000000006")
+ID_ASIGNATURA_REDES = UUID("40000000-0000-4000-8000-000000000010")
 ID_SEDE = UUID("20000000-0000-4000-8000-000000000001")
 
 
@@ -87,7 +90,7 @@ def asegurar_usuario_ref(
     reputacion_promedio=Decimal("0.00"),
     reputacion_total=0,
 ):
-    usuario, _ = UsuarioRef.objects.update_or_create(
+    usuario, _ = UsuarioRef.objects.get_or_create(
         usuario_id=usuario_id,
         defaults={
             "nombre": nombre,
@@ -118,6 +121,7 @@ def crear_reserva(
     estado=EstadoReserva.REALIZADA,
     inicio_en=None,
     fin_en=None,
+    asignatura_id=ID_ASIGNATURA,
 ):
     asegurar_usuario_ref(tutor_id, nombre="Diego", apellido="Rojas")
     asegurar_usuario_ref(solicitante_id, nombre="Camila", apellido="Soto")
@@ -140,13 +144,27 @@ def crear_reserva(
     return Reserva.objects.create(
         bloque=bloque,
         solicitante_usuario_id=solicitante_id,
-        asignatura_id=ID_ASIGNATURA,
+        asignatura_id=asignatura_id,
         modalidad=Modalidad.EN_LINEA if confirmada else None,
         lugar_o_enlace="https://meet.example.com/bdd" if confirmada else None,
         monto=Decimal("4500"),
         estado=estado,
         confirmada_en=(inicio_en - timedelta(hours=1)) if confirmada else None,
-        cerrada_en=fin_en if estado == EstadoReserva.REALIZADA else None,
+        # HU-29 deja la REALIZADA sin cerrada_en: lo escribe la evaluacion.
+        cerrada_en=None,
+    )
+
+
+def foto(reserva):
+    """Lo que un rechazo no puede cambiar: reserva, evaluaciones y reputacion."""
+    reserva.refresh_from_db()
+    tutor = UsuarioRef.objects.get(pk=reserva.bloque.usuario_id)
+    return (
+        reserva.estado,
+        reserva.cerrada_en,
+        Evaluacion.objects.count(),
+        tutor.reputacion_promedio,
+        tutor.reputacion_total,
     )
 
 
@@ -189,7 +207,7 @@ class TestEvaluar:
 
         reserva.refresh_from_db()
         assert reserva.estado == EstadoReserva.EVALUADA
-        assert reserva.cerrada_en is not None
+        assert reserva.cerrada_en is not None  # la REALIZADA llega sin cerrada_en
 
         tutor.refresh_from_db()
         assert tutor.reputacion_promedio == Decimal("5.00")
@@ -338,8 +356,8 @@ class TestEvaluar:
     @pytest.mark.parametrize(
         "comentario,mensaje_esperado",
         [
-            (123, "El comentario puede tener hasta 500 caracteres."),
-            (["hola"], "El comentario puede tener hasta 500 caracteres."),
+            (123, "El comentario tiene que ser un texto."),
+            (["hola"], "El comentario tiene que ser un texto."),
             ("a" * 501, "El comentario puede tener hasta 500 caracteres."),
             (
                 "hola\x00mundo",
@@ -400,6 +418,7 @@ class TestEvaluar:
         self, cliente_autenticado
     ):
         reserva = crear_reserva()
+        antes = foto(reserva)
         cliente_ajeno = cliente_autenticado(ID_AJENO)
 
         r_inexistente = cliente_ajeno.post(
@@ -418,9 +437,11 @@ class TestEvaluar:
         assert r_ajena.status_code == 404
         assert r_inexistente.json() == esperado
         assert r_ajena.json() == esperado
+        assert foto(reserva) == antes
 
     def test_el_tutor_no_puede_evaluar_su_propia_tutoria_403(self, cliente_autenticado):
         reserva = crear_reserva()
+        antes = foto(reserva)
         cliente_tutor = cliente_autenticado(ID_TUTOR)
 
         respuesta = cliente_tutor.post(
@@ -433,6 +454,7 @@ class TestEvaluar:
             "mensaje": "Solo quien pidió la tutoría puede evaluarla.",
             "detalles": None,
         }
+        assert foto(reserva) == antes
 
     def test_evaluar_por_segunda_vez_responde_409_reserva_ya_evaluada(
         self, cliente_autenticado
@@ -455,6 +477,13 @@ class TestEvaluar:
             "detalles": None,
         }
         assert Evaluacion.objects.filter(reserva=reserva).count() == 1
+        primera_guardada = Evaluacion.objects.get(reserva=reserva)
+        assert primera_guardada.calificacion == 5
+        tutor = UsuarioRef.objects.get(pk=ID_TUTOR)
+        assert (tutor.reputacion_promedio, tutor.reputacion_total) == (
+            Decimal("5.00"),
+            1,
+        )
 
     @pytest.mark.parametrize(
         "estado",
@@ -470,6 +499,7 @@ class TestEvaluar:
         self, cliente_autenticado, estado
     ):
         reserva = crear_reserva(estado=estado)
+        antes = foto(reserva)
         cliente = cliente_autenticado(ID_SOLICITANTE)
 
         respuesta = cliente.post(
@@ -482,6 +512,7 @@ class TestEvaluar:
             "mensaje": "Solo se puede evaluar una tutoría realizada.",
             "detalles": None,
         }
+        assert foto(reserva) == antes
 
     def test_bloque_que_aun_no_termina_responde_409_tutoria_no_terminada(
         self, cliente_autenticado
@@ -492,6 +523,7 @@ class TestEvaluar:
             inicio_en=ahora - timedelta(minutes=30),
             fin_en=ahora + timedelta(minutes=30),
         )
+        antes = foto(reserva)
         cliente = cliente_autenticado(ID_SOLICITANTE)
 
         respuesta = cliente.post(
@@ -504,6 +536,99 @@ class TestEvaluar:
             "mensaje": "Podrás evaluarla cuando termine la tutoría.",
             "detalles": None,
         }
+        assert foto(reserva) == antes
+
+    def test_bloque_terminado_hace_un_minuto_y_nota_1_se_aceptan(
+        self, cliente_autenticado
+    ):
+        ahora = tz.now()
+        reserva = crear_reserva(
+            inicio_en=ahora - timedelta(minutes=61),
+            fin_en=ahora - timedelta(minutes=1),
+        )
+        cliente = cliente_autenticado(ID_SOLICITANTE)
+
+        respuesta = cliente.post(
+            url_evaluacion(reserva.id), {"calificacion": 1}, format="json"
+        )
+
+        assert respuesta.status_code == 201
+        reserva.refresh_from_db()
+        assert reserva.estado == EstadoReserva.EVALUADA
+        assert reserva.cerrada_en >= ahora
+
+    def test_reputacion_no_cuenta_otro_tutor_y_junta_asignaturas(
+        self, cliente_autenticado
+    ):
+        ahora = tz.now().replace(microsecond=0)
+        crear_asignatura(ID_ASIGNATURA_REDES, "RED1101", "Fundamentos de Redes")
+        base_de_datos = crear_reserva(
+            inicio_en=ahora - timedelta(hours=6), fin_en=ahora - timedelta(hours=5)
+        )
+        redes = crear_reserva(
+            inicio_en=ahora - timedelta(hours=4),
+            fin_en=ahora - timedelta(hours=3),
+            asignatura_id=ID_ASIGNATURA_REDES,
+        )
+        de_otro_tutor = crear_reserva(
+            tutor_id=ID_AJENO,
+            inicio_en=ahora - timedelta(hours=4),
+            fin_en=ahora - timedelta(hours=3),
+        )
+        UsuarioRef.objects.filter(pk=ID_TUTOR).update(
+            actualizado_en=datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+        )
+        cliente = cliente_autenticado(ID_SOLICITANTE)
+
+        for reserva, nota in ((base_de_datos, 5), (redes, 4), (de_otro_tutor, 1)):
+            respuesta = cliente.post(
+                url_evaluacion(reserva.id), {"calificacion": nota}, format="json"
+            )
+            assert respuesta.status_code == 201
+
+        tutor = UsuarioRef.objects.get(pk=ID_TUTOR)
+        assert (tutor.reputacion_promedio, tutor.reputacion_total) == (
+            Decimal("4.50"),
+            2,
+        )
+        assert tutor.actualizado_en == datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+        otro = UsuarioRef.objects.get(pk=ID_AJENO)
+        assert (otro.reputacion_promedio, otro.reputacion_total) == (
+            Decimal("1.00"),
+            1,
+        )
+
+    def test_recalcular_no_cuenta_evaluaciones_retiradas(self, cliente_autenticado):
+        ahora = tz.now().replace(microsecond=0)
+        visible = crear_reserva(
+            inicio_en=ahora - timedelta(hours=6), fin_en=ahora - timedelta(hours=5)
+        )
+        a_retirar = crear_reserva(
+            inicio_en=ahora - timedelta(hours=4), fin_en=ahora - timedelta(hours=3)
+        )
+        cliente = cliente_autenticado(ID_SOLICITANTE)
+        for reserva, nota in ((visible, 5), (a_retirar, 1)):
+            respuesta = cliente.post(
+                url_evaluacion(reserva.id), {"calificacion": nota}, format="json"
+            )
+            assert respuesta.status_code == 201
+        assert recalcular_reputacion(ID_TUTOR) == (Decimal("3.00"), 2)
+
+        # Lo que hara DELETE /admin/evaluaciones/{id} (HU-33), directo en la base.
+        Evaluacion.objects.filter(reserva=a_retirar).update(
+            retirada_en=tz.now(), retirada_por_usuario_id=ID_ADMIN
+        )
+        assert recalcular_reputacion(ID_TUTOR) == (Decimal("5.00"), 1)
+
+        Evaluacion.objects.filter(reserva=visible).update(
+            retirada_en=tz.now(), retirada_por_usuario_id=ID_ADMIN
+        )
+        assert recalcular_reputacion(ID_TUTOR) == (Decimal("0.00"), 0)
+        tutor = UsuarioRef.objects.get(pk=ID_TUTOR)
+        assert (tutor.reputacion_promedio, tutor.reputacion_total) == (
+            Decimal("0.00"),
+            0,
+        )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -527,10 +652,13 @@ def test_concurrencia_dos_evaluaciones_simultaneas_una_201_y_una_409(
                 {"calificacion": nota, "comentario": f"Nota {nota}"},
                 format="json",
             )
-            with candado:
-                resultados.append((respuesta.status_code, respuesta.json()))
+            resultado = (respuesta.status_code, respuesta.json())
+        except Exception as error:
+            resultado = (error, None)
         finally:
             connections.close_all()
+        with candado:
+            resultados.append(resultado)
 
     hilo_1 = threading.Thread(target=enviar, args=(5,))
     hilo_2 = threading.Thread(target=enviar, args=(3,))
@@ -539,6 +667,7 @@ def test_concurrencia_dos_evaluaciones_simultaneas_una_201_y_una_409(
     hilo_1.join(timeout=10)
     hilo_2.join(timeout=10)
 
+    assert all(isinstance(estado, int) for estado, _ in resultados), resultados
     estados = sorted(estado for estado, _ in resultados)
     assert estados == [201, 409]
 
@@ -548,3 +677,53 @@ def test_concurrencia_dos_evaluaciones_simultaneas_una_201_y_una_409(
     assert Evaluacion.objects.filter(reserva=reserva).count() == 1
     tutor = UsuarioRef.objects.get(pk=ID_TUTOR)
     assert tutor.reputacion_total == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrencia_dos_reservas_del_mismo_tutor_cuentan_las_dos(
+    clave_de_identidad,
+):
+    ahora = tz.now().replace(microsecond=0)
+    primera = crear_reserva(
+        inicio_en=ahora - timedelta(hours=6), fin_en=ahora - timedelta(hours=5)
+    )
+    segunda = crear_reserva(
+        solicitante_id=ID_OTRO_ESTUDIANTE,
+        inicio_en=ahora - timedelta(hours=4),
+        fin_en=ahora - timedelta(hours=3),
+    )
+    barrera = threading.Barrier(2)
+    resultados = []
+    candado = threading.Lock()
+
+    def evaluar(reserva, estudiante_id, nota):
+        try:
+            cliente = APIClient()
+            token = firmar(clave_de_identidad, estudiante_id)
+            cliente.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+            barrera.wait(timeout=5)
+            resultado = cliente.post(
+                url_evaluacion(reserva.id), {"calificacion": nota}, format="json"
+            ).status_code
+        except Exception as error:
+            resultado = error
+        finally:
+            connections.close_all()
+        with candado:
+            resultados.append(resultado)
+
+    hilos = [
+        threading.Thread(target=evaluar, args=(primera, ID_SOLICITANTE, 5)),
+        threading.Thread(target=evaluar, args=(segunda, ID_OTRO_ESTUDIANTE, 4)),
+    ]
+    for hilo in hilos:
+        hilo.start()
+    for hilo in hilos:
+        hilo.join(timeout=15)
+
+    assert resultados == [201, 201]
+    tutor = UsuarioRef.objects.get(pk=ID_TUTOR)
+    assert (tutor.reputacion_promedio, tutor.reputacion_total) == (
+        Decimal("4.50"),
+        2,
+    )

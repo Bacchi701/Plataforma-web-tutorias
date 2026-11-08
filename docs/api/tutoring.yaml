@@ -6,11 +6,12 @@ info:
   description: |
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
-    - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14 y HU-41:
-      la búsqueda de tutores y el perfil público de cada tutor (HU-20), los
-      bloques de disponibilidad del tutor (HU-15), las asignaturas que el
+    - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14, HU-41 y
+      HU-25: la búsqueda de tutores y el perfil público de cada tutor (HU-20),
+      los bloques de disponibilidad del tutor (HU-15), las asignaturas que el
       usuario declara que puede enseñar (HU-14), la copia de sus datos que
-      guarda Tutorías (HU-41) y `/estado`, que existe desde HU-01.
+      guarda Tutorías (HU-41), la evaluación de una tutoría realizada (HU-25)
+      y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
     - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
@@ -25,8 +26,9 @@ info:
     pública, el emisor `identity` y las reclamaciones `sub`, `iat`, `exp` e
     `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. Para
     saber quién hace la petición no le pregunta a Identidad: sale del token.
-    - Las rutas de disponibilidad, las de `/perfiles` y `/yo/refrescar` piden
-      el token: sin él responden 401 (`not_authenticated`).
+    - Las rutas de disponibilidad, las de `/perfiles`, `/yo/refrescar` y
+      `/reservas/{reserva_id}/evaluacion` piden el token: sin él responden 401
+      (`not_authenticated`).
     - `/estado`, `/tutores` y `/tutores/{usuario_id}` no piden token. Pero si
       la petición trae uno que no sirve (vencido, inválido o con la cabecera
       mal formada), responden 401 igual, porque Tutorías revisa el token
@@ -55,6 +57,9 @@ info:
       `GET /api/catalog/v1/carreras/{id}/asignaturas`, que es pública. Si uno
       de los dos no responde en 3 segundos, la ruta responde 503
       `servicio_no_disponible` (`components/responses/SinOtroServicio`).
+    - La evaluación (`POST /reservas/{reserva_id}/evaluacion`) sale de
+      tutoring_db, sin llamar a otros servicios. Al guardarla se recalcula la
+      reputación del tutor en `usuario_ref` (RN-06), en la misma transacción.
     - Ninguna respuesta trae el correo de nadie (RNF-07).
     - Los identificadores van como texto. La carrera y la sede van como
       identificador de Catálogo: el nombre se toma de
@@ -92,6 +97,12 @@ info:
       Tutorías consulta a Identidad y a Catálogo (ver «Datos») y suma los
       códigos de error de esas rutas (ver el esquema `Error`).
 
+    - Próxima versión (HU-25): agrega `POST /reservas/{reserva_id}/evaluacion`,
+      con sesión, con la etiqueta Evaluaciones, el parámetro `ReservaId`, los
+      esquemas `NuevaEvaluacion` y `EvaluacionRegistrada` y sus códigos de
+      error (ver el esquema `Error`). La reputación del tutor se recalcula al
+      evaluar.
+
 servers:
   - url: http://localhost:8080/api/tutoring/v1
     description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
@@ -106,7 +117,7 @@ tags:
   - name: Copia del usuario
     description: La copia de los datos del usuario que guarda Tutorías, `usuario_ref` (HU-41). Con sesión.
   - name: Evaluaciones
-    description: Evaluación de una tutoría realizada y recálculo de la reputación del tutor (HU-25, RN-03 y RN-06).
+    description: Evaluación de una tutoría realizada y evaluaciones visibles de un tutor (HU-25).
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -179,20 +190,7 @@ paths:
             minimum: 1
             maximum: 5
           example: 4
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: |
             Los tutores, en orden. Con `asignatura`, cada elemento es un
@@ -365,20 +363,7 @@ paths:
             format: uuid
             pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
           example: 10000000-0000-4000-8000-000000000001
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: El perfil público del tutor.
           content:
@@ -505,20 +490,7 @@ paths:
         - No pagina.
       security:
         - tokenAcceso: []
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: Los bloques, del más próximo al más lejano. La lista puede venir vacía.
           content:
@@ -594,20 +566,7 @@ paths:
                 value:
                   inicio_en: '2026-10-22T18:00:00-03:00'
                   fin_en: '2026-10-22T19:00:00-03:00'
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '201':
           description: Bloque publicado. Queda LIBRE y sale en «Mis bloques» y en el perfil público del tutor.
           content:
@@ -677,20 +636,7 @@ paths:
                 summary: Alargarlo hasta las 20:00, hora de Chile, sin cambiar el inicio
                 value:
                   fin_en: '2026-10-22T23:00:00.000Z'
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: Bloque cambiado. Sigue LIBRE y sin solicitudes.
           content:
@@ -750,20 +696,7 @@ paths:
         - tokenAcceso: []
       parameters:
         - $ref: '#/components/parameters/BloqueId'
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '204':
           description: Bloque eliminado. La respuesta no trae cuerpo.
         '401':
@@ -807,20 +740,7 @@ paths:
             type: string
             format: uuid
           example: 10000000-0000-4000-8000-000000000004
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: Sus asignaturas declaradas, por sigla. La lista puede venir vacía.
           content:
@@ -927,20 +847,7 @@ paths:
                 value:
                   asignatura_id: 40000000-0000-4000-8000-000000000001
                   tarifa: 4000
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: La asignatura estaba declarada y desactivada. Queda activa otra vez, con la tarifa y la descripción nuevas, y el mismo `id`.
           content:
@@ -1024,20 +931,7 @@ paths:
                 summary: Dejar de enseñarla por ahora
                 value:
                   activo: false
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: La asignatura declarada, con los cambios.
           content:
@@ -1103,20 +997,7 @@ paths:
         - No toca la reputación. No lleva cuerpo.
       security:
         - tokenAcceso: []
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: Lo que pasó con la copia.
           content:
@@ -1146,7 +1027,7 @@ paths:
       summary: Evaluar una tutoría realizada
       description: |
         Registra la evaluación de una tutoría realizada y recalcula la
-        reputación del tutor en la misma transacción (HU-25, RN-03 y RN-06).
+        reputación del tutor en la misma transacción (HU-25 y RN-06).
 
         - Primero valida el cuerpo, sin tocar la base: `calificacion` es un
           entero de 1 a 5 (400 `calificacion_invalida`, en JSON `true` y
@@ -1191,20 +1072,7 @@ paths:
                 summary: Calificación sin comentario
                 value:
                   calificacion: 4
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '201':
           description: Evaluación registrada, reserva en EVALUADA y reputación del tutor al día.
           content:
@@ -1244,6 +1112,12 @@ paths:
                   value:
                     codigo: comentario_invalido
                     mensaje: El comentario tiene caracteres que no se pueden guardar.
+                    detalles: null
+                comentario_no_texto:
+                  summary: Comentario que no es texto
+                  value:
+                    codigo: comentario_invalido
+                    mensaje: El comentario tiene que ser un texto.
                     detalles: null
         '401':
           $ref: '#/components/responses/SinTokenValido'
@@ -1288,7 +1162,7 @@ paths:
                     mensaje: Ya evaluaste esta tutoría.
                     detalles: null
                 reserva_no_realizada:
-                  summary: La reserva sigue CONFIRMADA, SOLICITADA, CANCELADA, RECHAZADA o en INASISTENCIA
+                  summary: La reserva está SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA o CANCELADA
                   value:
                     codigo: reserva_no_realizada
                     mensaje: Solo se puede evaluar una tutoría realizada.
@@ -1318,20 +1192,7 @@ paths:
       security:
         - tokenAcceso: []
         - {}
-        ReservaId:
-      name: reserva_id
-      in: path
-      required: true
-      description: |
-        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
-        otra forma la ruta no existe (ver la respuesta 404).
-      schema:
-        type: string
-        format: uuid
-        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
-
-  responses:
+      responses:
         '200':
           description: El servicio y su base responden.
           content:
@@ -1855,8 +1716,8 @@ components:
       type: object
       description: |
         Reputación del tutor: el dato que guarda `usuario_ref` (RN-06). Se
-        recalcula al registrar o retirar una evaluación (HU-25); la búsqueda
-        y el perfil la leen tal cual, sin recalcularla.
+        recalcula al evaluar (HU-25) y al retirar una evaluación (HU-33); la
+        búsqueda y el perfil la leen tal cual, sin recalcularla.
       required: [promedio, total]
       properties:
         promedio:
@@ -2210,6 +2071,10 @@ components:
           carrera_no_valida y asignatura_no_habilitada (400); cuenta_inactiva
           (403); asignatura_ya_declarada (409), y servicio_no_disponible
           (503). asignatura_invalida también sale al declarar una asignatura.
+        - Con la evaluación (HU-25) se suman calificacion_invalida y
+          comentario_invalido (400), solo_el_solicitante (403),
+          reserva_no_encontrada (404) y reserva_ya_evaluada,
+          reserva_no_realizada y tutoria_no_terminada (409).
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.

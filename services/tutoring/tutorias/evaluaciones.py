@@ -45,7 +45,7 @@ def leer_comentario(datos):
         return None, respuesta_error(
             400,
             "comentario_invalido",
-            f"El comentario puede tener hasta {MAXIMO_COMENTARIO} caracteres.",
+            "El comentario tiene que ser un texto.",
         )
     if "\x00" in valor or any("\ud800" <= c <= "\udfff" for c in valor):
         return None, respuesta_error(
@@ -72,7 +72,7 @@ def es_evaluacion_duplicada(error):
     return RESTRICCION_EVALUACION_UNICA in str(error)
 
 
-def evaluacion_json(evaluacion):
+def evaluacion_registrada_json(evaluacion):
     return {
         "id": str(evaluacion.id),
         "reserva_id": str(evaluacion.reserva_id),
@@ -168,4 +168,4 @@ def evaluar(peticion, reserva_id):
 
         recalcular_reputacion(reserva.bloque.usuario_id)
 
-    return Response(evaluacion_json(evaluacion), status=201)
+    return Response(evaluacion_registrada_json(evaluacion), status=201)
