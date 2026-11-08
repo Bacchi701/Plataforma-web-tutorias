@@ -98,3 +98,5 @@ REFRESH_DIAS = 7
 # Secure en la cookie de renovacion. localhost cuenta como origen seguro para
 # el navegador, asi que funciona tambien con http://localhost:8080.
 COOKIE_REFRESH_SEGURA = os.environ.get("COOKIE_REFRESH_SEGURA", "1") == "1"
+# ---------- Llamadas internas (Pilar 2, seccion 5.4) ----------
+CLAVE_SERVICIO = os.environ.get("CLAVE_SERVICIO", "")

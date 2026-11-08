@@ -68,6 +68,7 @@ services:
       # Enlace de verificacion del correo y cookie de renovacion (HU-04, HU-05).
       URL_FRONTEND: ${URL_FRONTEND:-http://localhost:8080/app}
       COOKIE_REFRESH_SEGURA: ${COOKIE_REFRESH_SEGURA:-1}
+      CLAVE_SERVICIO: ${CLAVE_SERVICIO:-clave-interna-de-desarrollo}
     # Claves de firma de los tokens (Pilar 2, seccion 10): la privada se monta
     # solo aqui y no se versiona; se genera con manage.py generar_claves_jwt.
     volumes:
@@ -107,6 +108,7 @@ services:
       POSTGRES_DB: ${CATALOG_DB_NAME}
       POSTGRES_USER: ${CATALOG_DB_USER}
       POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD}
+      CLAVE_SERVICIO: ${CLAVE_SERVICIO:-clave-interna-de-desarrollo}
     depends_on:
       catalog_db: { condition: service_healthy }
     healthcheck:
@@ -145,6 +147,7 @@ services:
       POSTGRES_DB: ${TUTORING_DB_NAME}
       POSTGRES_USER: ${TUTORING_DB_USER}
       POSTGRES_PASSWORD: ${TUTORING_DB_PASSWORD}
+      CLAVE_SERVICIO: ${CLAVE_SERVICIO:-clave-interna-de-desarrollo}
     # Clave publica de los tokens (Pilar 2, seccion 10): Tutorias solo verifica
     # la firma (HU-17); la privada se monta solo en Identidad.
     volumes:
@@ -207,6 +210,7 @@ services:
       POSTGRES_DB: ${PAYMENT_DB_NAME}
       POSTGRES_USER: ${PAYMENT_DB_USER}
       POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      CLAVE_SERVICIO: ${CLAVE_SERVICIO:-clave-interna-de-desarrollo}
     depends_on:
       payment_db: { condition: service_healthy }
     healthcheck:

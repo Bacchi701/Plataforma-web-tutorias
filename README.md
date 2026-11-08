@@ -221,6 +221,7 @@ Todas viven en un solo archivo `.env` en la raíz, que se crea copiando
 | `PUERTO_BANDEJA`                                                 | Puerto de la bandeja de correo de desarrollo (8025 por defecto).                                    |
 | `EMAIL_*` y `CORREO_REMITENTE`                                   | Vacías por defecto, así todo el correo cae en Mailpit. Solo se llenan para la prueba de envío real. |
 | `URL_FRONTEND`, `COOKIE_REFRESH_SEGURA`                          | La página a la que lleva el enlace del correo de verificación, y si la cookie de renovación de la sesión va marcada como segura (`1`, por defecto). En macOS va en `0` (ver «Probar la demo»). |
+| `CLAVE_SERVICIO` | La clave con que los servicios se llaman entre sí, en la cabecera `X-Clave-Servicio`. Vale lo mismo en los cuatro; fuera del computador de desarrollo se cambia. |
 
 ### Bandeja de correo de desarrollo
 

@@ -10,8 +10,10 @@ RN-01, pregunta a las rutas publicas de los otros servicios:
 - Catalogo, GET /api/catalog/v1/carreras/<id>/asignaturas: la malla vigente
   de la carrera, por semestre. Es publica.
 
-Las rutas /internal con clave de servicio (Pilar 2, seccion 5.4) quedan para
-lo que necesite datos de otro usuario, como la sincronizacion de las copias.
+Las rutas /internal con clave de servicio (Pilar 2, seccion 5.4) se llaman
+con _pedir() y la clave de servicio para lo que necesite datos de otro usuario,
+como la sincronizacion de las copias (usuario_por_id), los avisos por correo
+(HU-16) y los pagos simulados (HU-23).
 
 De esa convencion se toma lo demas: urllib de la biblioteca estandar, 3
 segundos de espera y un solo intento. Si el otro servicio no responde, se
@@ -27,6 +29,7 @@ import http.client
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -88,27 +91,42 @@ def _cuerpo_del_error(error):
         error.close()
 
 
-def _pedir(servicio, url, cabeceras=None):
-    """GET a otro servicio. Devuelve (estado, cuerpo) si responde 2xx o 4xx.
+def _pedir(servicio, url, cabeceras=None, *, metodo="GET", cuerpo=None):
+    """Llamada HTTP a otro servicio. Devuelve (estado, cuerpo) si responde 2xx o 4xx.
 
     Si no responde, se demora o responde 5xx, lanza ServicioNoDisponible.
     """
+    encabezados = {"Accept": "application/json", **(cabeceras or {})}
+    datos = None
+    if cuerpo is not None:
+        datos = json.dumps(cuerpo).encode("utf-8")
+        encabezados["Content-Type"] = "application/json"
+
+    ruta = urllib.parse.urlsplit(url).path
+    if "/v1/internal/" in ruta:
+        encabezados["X-Clave-Servicio"] = getattr(settings, "CLAVE_SERVICIO", "")
+
     peticion = urllib.request.Request(
-        url, headers={"Accept": "application/json", **(cabeceras or {})}
+        url, data=datos, headers=encabezados, method=metodo
     )
     try:
         with abrir(peticion) as respuesta:
-            return respuesta.status, json.loads(respuesta.read())
+            contenido = respuesta.read()
+            if not contenido:
+                return respuesta.status, None
+            return respuesta.status, json.loads(contenido)
     except urllib.error.HTTPError as error:
         if error.code >= 500:
             error.close()
-            logger.warning("%s respondió %s a GET %s", servicio, error.code, url)
+            logger.warning("%s respondió %s a %s %s", servicio, error.code, metodo, url)
             raise no_disponible(servicio) from error
         return error.code, _cuerpo_del_error(error)
     except (OSError, http.client.HTTPException, ValueError) as error:
         # OSError cubre URLError (no se pudo conectar), TimeoutError (no
         # contesto a tiempo) y ConnectionError (corto la conexion).
-        logger.warning("No se pudo consultar a %s (GET %s): %r", servicio, url, error)
+        logger.warning(
+            "No se pudo consultar a %s (%s %s): %r", servicio, metodo, url, error
+        )
         raise no_disponible(servicio) from error
 
 
@@ -163,6 +181,38 @@ def datos_del_usuario(autorizacion):
     elif estado == 401 and codigo == "token_vencido":
         raise AuthenticationFailed(VENCIDO, code="token_vencido")
     logger.error("Identidad respondió %s (codigo %s) a GET /yo", estado, codigo)
+    raise no_disponible(IDENTIDAD)
+
+
+def usuario_por_id(usuario_id):
+    """GET a la ruta interna de Identidad para obtener los datos de un usuario.
+
+    Devuelve un diccionario con id, nombre, apellido, carrera_id, sede_id
+    (uuid.UUID o None), nivel (entero o None) y activo (booleano).
+    - 200: devuelve el diccionario completo.
+    - 404 usuario_no_encontrado: devuelve None.
+    - 404 sin codigo conocido (o HTML): lanza ServicioNoDisponible y registra
+      el error en el log pidiendo revisar CLAVE_SERVICIO.
+    - Cualquier otra respuesta: registra el error en el log y lanza 503.
+    """
+    url = f"{settings.URL_IDENTIDAD}/api/identity/v1/internal/usuarios/{usuario_id}"
+    estado, cuerpo = _pedir(IDENTIDAD, url)
+    codigo = _codigo(cuerpo)
+
+    if estado == 200:
+        datos = _datos_de_yo(cuerpo)
+        activo = cuerpo.get("activo") if isinstance(cuerpo, dict) else None
+        if datos is not None and isinstance(activo, bool):
+            return {**datos, "activo": activo}
+    elif estado == 404:
+        if codigo == "usuario_no_encontrado":
+            return None
+        logger.error(
+            "404 sin código conocido desde %s: revisa CLAVE_SERVICIO", IDENTIDAD
+        )
+        raise no_disponible(IDENTIDAD)
+
+    logger.error("Identidad respondió %s (codigo %s) a GET %s", estado, codigo, url)
     raise no_disponible(IDENTIDAD)
 
 
