@@ -6,11 +6,12 @@ info:
   description: |
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
-    - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14 y HU-41:
-      la búsqueda de tutores y el perfil público de cada tutor (HU-20), los
-      bloques de disponibilidad del tutor (HU-15), las asignaturas que el
+    - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14, HU-41 y
+      HU-25: la búsqueda de tutores y el perfil público de cada tutor (HU-20),
+      los bloques de disponibilidad del tutor (HU-15), las asignaturas que el
       usuario declara que puede enseñar (HU-14), la copia de sus datos que
-      guarda Tutorías (HU-41) y `/estado`, que existe desde HU-01.
+      guarda Tutorías (HU-41), la evaluación de una tutoría realizada (HU-25)
+      y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
     - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
@@ -25,8 +26,9 @@ info:
     pública, el emisor `identity` y las reclamaciones `sub`, `iat`, `exp` e
     `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. Para
     saber quién hace la petición no le pregunta a Identidad: sale del token.
-    - Las rutas de disponibilidad, las de `/perfiles` y `/yo/refrescar` piden
-      el token: sin él responden 401 (`not_authenticated`).
+    - Las rutas de disponibilidad, las de `/perfiles`, `/yo/refrescar` y
+      `/reservas/{reserva_id}/evaluacion` piden el token: sin él responden 401
+      (`not_authenticated`).
     - `/estado`, `/tutores` y `/tutores/{usuario_id}` no piden token. Pero si
       la petición trae uno que no sirve (vencido, inválido o con la cabecera
       mal formada), responden 401 igual, porque Tutorías revisa el token
@@ -55,6 +57,9 @@ info:
       `GET /api/catalog/v1/carreras/{id}/asignaturas`, que es pública. Si uno
       de los dos no responde en 3 segundos, la ruta responde 503
       `servicio_no_disponible` (`components/responses/SinOtroServicio`).
+    - La evaluación (`POST /reservas/{reserva_id}/evaluacion`) sale de
+      tutoring_db, sin llamar a otros servicios. Al guardarla se recalcula la
+      reputación del tutor en `usuario_ref` (RN-06), en la misma transacción.
     - Ninguna respuesta trae el correo de nadie (RNF-07).
     - Los identificadores van como texto. La carrera y la sede van como
       identificador de Catálogo: el nombre se toma de
@@ -92,6 +97,12 @@ info:
       Tutorías consulta a Identidad y a Catálogo (ver «Datos») y suma los
       códigos de error de esas rutas (ver el esquema `Error`).
 
+    - Próxima versión (HU-25): agrega `POST /reservas/{reserva_id}/evaluacion`,
+      con sesión, con la etiqueta Evaluaciones, el parámetro `ReservaId`, los
+      esquemas `NuevaEvaluacion` y `EvaluacionRegistrada` y sus códigos de
+      error (ver el esquema `Error`). La reputación del tutor se recalcula al
+      evaluar.
+
 servers:
   - url: http://localhost:8080/api/tutoring/v1
     description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
@@ -105,6 +116,8 @@ tags:
     description: Las asignaturas que el usuario declara que puede enseñar, con su tarifa (HU-14). Con sesión.
   - name: Copia del usuario
     description: La copia de los datos del usuario que guarda Tutorías, `usuario_ref` (HU-41). Con sesión.
+  - name: Evaluaciones
+    description: Evaluación de una tutoría realizada y evaluaciones visibles de un tutor (HU-25).
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -1007,6 +1020,162 @@ paths:
         '503':
           $ref: '#/components/responses/SinOtroServicio'
 
+  /reservas/{reserva_id}/evaluacion:
+    post:
+      tags: [Evaluaciones]
+      operationId: evaluarTutoria
+      summary: Evaluar una tutoría realizada
+      description: |
+        Registra la evaluación de una tutoría realizada y recalcula la
+        reputación del tutor en la misma transacción (HU-25 y RN-06).
+
+        - Primero valida el cuerpo, sin tocar la base: `calificacion` es un
+          entero de 1 a 5 (400 `calificacion_invalida`, en JSON `true` y
+          `false` no cuentan como enteros) y `comentario`, si viene, es un
+          texto de hasta 500 caracteres después de quitar los espacios de los
+          lados y sin caracteres nulos ni sustitutos UTF-16 (400
+          `comentario_invalido`). Vacío o en blanco se guarda como `null`.
+        - En una transacción bloquea la reserva (`SELECT … FOR UPDATE`) y
+          revisa, en este orden:
+          1. Si la reserva no existe o el usuario del token no es ni el
+             solicitante ni el tutor: 404 `reserva_no_encontrada` (los dos
+             casos responden igual, para no revelar que existe).
+          2. Si el usuario del token es el tutor del bloque: 403
+             `solo_el_solicitante`.
+          3. Si la reserva ya está en `EVALUADA` o ya tiene fila en
+             `evaluacion`: 409 `reserva_ya_evaluada`.
+          4. Si la reserva no está en `REALIZADA`: 409 `reserva_no_realizada`.
+          5. Si `fin_en` del bloque todavía no pasó: 409
+             `tutoria_no_terminada`.
+        - Crea la evaluación, pasa la reserva a `EVALUADA` con `cerrada_en` en
+          el instante actual y recalcula `reputacion_promedio` (redondeado a 2
+          decimales con `ROUND_HALF_UP`) y `reputacion_total` en `usuario_ref`
+          contando solo las evaluaciones con `retirada_en IS NULL`, sin tocar
+          `actualizado_en`.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevaEvaluacion'
+            examples:
+              con_comentario:
+                summary: Calificación de 5 con comentario
+                value:
+                  calificacion: 5
+                  comentario: Explicó claro y con ejercicios parecidos a los del certamen.
+              sin_comentario:
+                summary: Calificación sin comentario
+                value:
+                  calificacion: 4
+      responses:
+        '201':
+          description: Evaluación registrada, reserva en EVALUADA y reputación del tutor al día.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluacionRegistrada'
+              example:
+                id: 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d
+                reserva_id: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+                calificacion: 5
+                comentario: Explicó claro y con ejercicios parecidos a los del certamen.
+                creada_en: '2026-11-05T19:30:00Z'
+        '400':
+          description: |
+            La calificación o el comentario no sirven (`calificacion_invalida`
+            o `comentario_invalido`), o el cuerpo no es JSON válido
+            (`parse_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                calificacion_invalida:
+                  summary: Calificación fuera de 1 a 5 o no entera
+                  value:
+                    codigo: calificacion_invalida
+                    mensaje: La nota tiene que ser un número entero de 1 a 5.
+                    detalles: null
+                comentario_largo:
+                  summary: Comentario de más de 500 caracteres
+                  value:
+                    codigo: comentario_invalido
+                    mensaje: El comentario puede tener hasta 500 caracteres.
+                    detalles: null
+                comentario_caracteres:
+                  summary: Comentario con carácter nulo o sustituto UTF-16
+                  value:
+                    codigo: comentario_invalido
+                    mensaje: El comentario tiene caracteres que no se pueden guardar.
+                    detalles: null
+                comentario_no_texto:
+                  summary: Comentario que no es texto
+                  value:
+                    codigo: comentario_invalido
+                    mensaje: El comentario tiene que ser un texto.
+                    detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          description: El usuario del token es el tutor de esa reserva, no quien la solicitó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: solo_el_solicitante
+                mensaje: Solo quien pidió la tutoría puede evaluarla.
+                detalles: null
+        '404':
+          description: |
+            La reserva no existe o es de otras personas (`reserva_no_encontrada`).
+            Si `reserva_id` no es un uuid en minúsculas, la ruta no existe y
+            responde Django con su página 404 en HTML.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_no_encontrada
+                mensaje: No encontramos esa tutoría.
+                detalles: null
+        '409':
+          description: |
+            La reserva no se puede evaluar: ya fue evaluada
+            (`reserva_ya_evaluada`), no está en estado REALIZADA
+            (`reserva_no_realizada`) o su bloque todavía no termina
+            (`tutoria_no_terminada`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                reserva_ya_evaluada:
+                  summary: Ya tenía evaluación
+                  value:
+                    codigo: reserva_ya_evaluada
+                    mensaje: Ya evaluaste esta tutoría.
+                    detalles: null
+                reserva_no_realizada:
+                  summary: La reserva está SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA o CANCELADA
+                  value:
+                    codigo: reserva_no_realizada
+                    mensaje: Solo se puede evaluar una tutoría realizada.
+                    detalles: null
+                tutoria_no_terminada:
+                  summary: El bloque todavía no termina
+                  value:
+                    codigo: tutoria_no_terminada
+                    mensaje: Podrás evaluarla cuando termine la tutoría.
+                    detalles: null
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
   /estado:
     get:
       tags: [Estado]
@@ -1092,6 +1261,19 @@ components:
         format: uuid
         pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       example: 7d1c2b3a-4e5f-4a6b-9c8d-0e1f2a3b4c5d
+
+    ReservaId:
+      name: reserva_id
+      in: path
+      required: true
+      description: |
+        Identificador de la reserva: un uuid en minúsculas y con guiones. Con
+        otra forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
 
   responses:
     TokenNoValido:
@@ -1533,7 +1715,8 @@ components:
     Reputacion:
       type: object
       description: |
-        Reputación del tutor: el dato que guarda `usuario_ref` (RN-06). La
+        Reputación del tutor: el dato que guarda `usuario_ref` (RN-06). Se
+        recalcula al evaluar (HU-25) y al retirar una evaluación (HU-33); la
         búsqueda y el perfil la leen tal cual, sin recalcularla.
       required: [promedio, total]
       properties:
@@ -1810,6 +1993,46 @@ components:
           type: boolean
           description: true si el usuario tenía copia en Tutorías y quedó al día; false si todavía no tiene copia.
 
+    NuevaEvaluacion:
+      type: object
+      description: Datos para evaluar una tutoría realizada (HU-25). Otros campos se ignoran.
+      required: [calificacion]
+      properties:
+        calificacion:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Nota entera de 1 a 5 estrellas.
+        comentario:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Opcional, hasta 500 caracteres sin contar los espacios de los lados. Vacío o en blanco se guarda como null.
+
+    EvaluacionRegistrada:
+      type: object
+      description: Evaluación recién creada para una reserva (HU-25).
+      required: [id, reserva_id, calificacion, comentario, creada_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reserva_id:
+          type: string
+          format: uuid
+        calificacion:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comentario:
+          type: string
+          maxLength: 500
+          nullable: true
+        creada_en:
+          type: string
+          format: date-time
+          description: Cuándo se registró la evaluación, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+
     Estado:
       type: object
       description: Estado del servicio y de su base (HU-01).
@@ -1848,6 +2071,10 @@ components:
           carrera_no_valida y asignatura_no_habilitada (400); cuenta_inactiva
           (403); asignatura_ya_declarada (409), y servicio_no_disponible
           (503). asignatura_invalida también sale al declarar una asignatura.
+        - Con la evaluación (HU-25) se suman calificacion_invalida y
+          comentario_invalido (400), solo_el_solicitante (403),
+          reserva_no_encontrada (404) y reserva_ya_evaluada,
+          reserva_no_realizada y tutoria_no_terminada (409).
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.
