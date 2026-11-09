@@ -1291,10 +1291,9 @@ footer a:hover {
    RESPONSIVE (MEDIA QUERIES)
 ========================================= */
 
-/* El menú ☰ aparece hasta 1439 px: con sesión, los enlaces de la cuenta
-   (con «Mis reservas» e «Historial») necesitan unos 1260 px, más que el
-   contenedor de 1180. */
-@media(max-width: 1439.98px) {
+/* El menú ☰ aparece hasta 1100 px: con sesión, los enlaces de la cuenta
+   no caben en el encabezado más angosto. */
+@media(max-width: 1100px) {
     .nav-menu,
     .nav-actions {
         display: none;
@@ -1338,14 +1337,6 @@ footer a:hover {
     /* En el menú abierto, los enlaces de la cuenta conservan su relleno. */
     .header.menu-abierto .btn-login {
         padding: 11px 18px;
-    }
-}
-
-/* Desde 1440 px, el encabezado llega hasta 1300 px de ancho, más que el resto
-   de la página, para que los enlaces de la cuenta quepan en una línea. */
-@media(min-width: 1440px) {
-    .navbar {
-        width: min(1300px, 90%);
     }
 }
 

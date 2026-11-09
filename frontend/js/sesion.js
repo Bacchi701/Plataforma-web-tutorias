@@ -120,8 +120,7 @@ async function mostrarSesionEnEncabezado() {
         return;
     }
 
-    // Paginas de la cuenta, antes del saludo (HU-10). Disponibilidad es de HU-15
-    // y Mis reservas, de HU-30.
+    // Paginas de la cuenta, antes del saludo (HU-10). Disponibilidad es de HU-15.
     const perfil = document.createElement("a");
     perfil.href = "perfil.html";
     perfil.className = "btn-login";
@@ -131,11 +130,6 @@ async function mostrarSesionEnEncabezado() {
     disponibilidad.href = "disponibilidad.html";
     disponibilidad.className = "btn-login";
     disponibilidad.textContent = "Mi disponibilidad";
-
-    const reservas = document.createElement("a");
-    reservas.href = "reservas.html";
-    reservas.className = "btn-login";
-    reservas.textContent = "Mis reservas";
 
     // Las tutorias terminadas y su evaluacion (HU-26).
     const historial = document.createElement("a");
@@ -158,7 +152,7 @@ async function mostrarSesionEnEncabezado() {
         window.location.href = "index.html";
     });
 
-    acciones.replaceChildren(perfil, disponibilidad, reservas, historial, saludo, salir);
+    acciones.replaceChildren(perfil, disponibilidad, historial, saludo, salir);
 }
 
 document.addEventListener("DOMContentLoaded", mostrarSesionEnEncabezado);
