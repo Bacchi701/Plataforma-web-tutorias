@@ -131,6 +131,12 @@ async function mostrarSesionEnEncabezado() {
     disponibilidad.className = "btn-login";
     disponibilidad.textContent = "Mi disponibilidad";
 
+    // Las tutorias terminadas y su evaluacion (HU-26).
+    const historial = document.createElement("a");
+    historial.href = "historial.html";
+    historial.className = "btn-login";
+    historial.textContent = "Historial";
+
     const saludo = document.createElement("span");
     saludo.className = "btn-login";
     saludo.textContent = `Hola, ${usuario.nombre}`;
@@ -146,7 +152,7 @@ async function mostrarSesionEnEncabezado() {
         window.location.href = "index.html";
     });
 
-    acciones.replaceChildren(perfil, disponibilidad, saludo, salir);
+    acciones.replaceChildren(perfil, disponibilidad, historial, saludo, salir);
 }
 
 document.addEventListener("DOMContentLoaded", mostrarSesionEnEncabezado);
