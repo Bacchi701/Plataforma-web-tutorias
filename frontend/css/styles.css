@@ -1349,6 +1349,54 @@ footer a:hover {
     }
 }
 
+/* El encabezado del administrador, con «Administración» (HU-33), necesita
+   unos 1380 px, más que los 1300 que alcanza: desde 1440 px también usa el
+   menú ☰. Son las reglas del bloque de 1439 px, solo para el encabezado que
+   trae el enlace a admin.html. */
+@media(min-width: 1440px) {
+    .header:has(.nav-actions a[href="admin.html"]) .nav-menu,
+    .header:has(.nav-actions a[href="admin.html"]) .nav-actions {
+        display: none;
+    }
+
+    .header:has(.nav-actions a[href="admin.html"]) .mobile-menu {
+        display: block;
+    }
+
+    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) {
+        height: auto;
+    }
+
+    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .navbar {
+        flex-wrap: wrap;
+        padding: 16px 0 20px;
+    }
+
+    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-menu,
+    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+        width: 100%;
+        order: 1;
+    }
+
+    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-menu {
+        margin-top: 18px;
+    }
+
+    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-actions {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+    }
+
+    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .btn-login {
+        padding: 11px 18px;
+    }
+}
+
 @media(max-width: 950px) {
     .hero-grid {
         grid-template-columns: 1fr;
