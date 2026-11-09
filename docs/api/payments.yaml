@@ -1,0 +1,786 @@
+openapi: 3.0.3
+
+info:
+  title: Pagos · Plataforma de Tutorías entre Estudiantes
+  version: 0.1.0
+  description: |
+    Contrato de la API pública de Pagos (Pilar 2, sección 4.4).
+
+    - Describe lo que hace Pagos con HU-23 y la sesión de HU-17: crear el
+      pago simulado de una tutoría confirmada, consultarlo, simular su
+      resultado y reintentarlo si falla (HU-23), y `/estado`, que existe
+      desde HU-01.
+    - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
+      del servicio, `/api/payments/v1/`, que va en `servers`.
+    - Las rutas `/internal` no son parte de este contrato: el gateway no las
+      enruta y desde fuera responden 404. Entre ellas está el reembolso que
+      pide Tutorías al cancelar una tutoría pagada (HU-28).
+    - Un cambio a lo ya publicado se acuerda entre los tres antes de
+      implementarse (acuerdo A4), como en Identidad y en Tutorías. Los
+      cambios y las rutas nuevas se anotan en «Cambios», al final de esta
+      descripción.
+
+    **Sesión (HU-17).** Pagos no emite tokens: verifica el token de acceso
+    que firma Identidad, un JWT RS256 (esquema `tokenAcceso`), con la clave
+    pública, el emisor `identity` y las reclamaciones `sub`, `iat`, `exp` e
+    `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. Para
+    saber quién hace la petición no le pregunta a Identidad: sale del token.
+    - Las tres rutas de pagos piden el token: sin él responden 401
+      (`not_authenticated`).
+    - `/estado` no pide token. Pero si la petición trae uno que no sirve
+      (vencido, inválido o con la cabecera mal formada), responde 401 igual,
+      porque Pagos revisa el token antes de llegar a la ruta, como Tutorías.
+    - Si Pagos no encuentra la clave pública, toda petición con token
+      responde 503 `claves_no_configuradas` (ver
+      `components/responses/ClavesNoConfiguradas`). Está en las rutas que
+      siempre llevan token.
+
+    **Pago simulado.** No se cobra dinero real ni se piden datos de tarjeta:
+    quien paga elige el resultado de la simulación, `EXITOSO` o `FALLIDO`. El
+    proveedor de todos los pagos es `SIMULADO`, el punto donde entraría una
+    pasarela de pago real (RF-18).
+
+    **Formato de error (Pilar 2, sección 11).** Toda respuesta de error trae
+    `codigo`, `mensaje` y `detalles` (ver el esquema `Error`, el mismo de
+    Identidad y de Tutorías). No lo traen el 503 de `/estado`, que responde
+    con su propio esquema, ni la página 404 que responde Django cuando la
+    ruta no existe (ver `POST /pagos/{pago_id}/simular`).
+
+    **Datos.**
+    - Pagos no conoce usuarios ni asignaturas: solo reservas y montos. Para
+      saber de quién es una reserva, si está confirmada y cuánto vale, le
+      pregunta a Tutorías por una ruta interna, con una clave de servicio y
+      sin el token del usuario. Si Tutorías no responde en 3 segundos, la
+      ruta responde 503 `servicio_no_disponible`
+      (`components/responses/SinTutorias`).
+    - Cada cambio del estado del pago se avisa a Tutorías, que guarda una
+      copia en `estado_pago` de la reserva. Esa copia es nula hasta que se
+      crea el pago, y pasa a `PENDIENTE` con el aviso de la creación (M-10).
+      Tutorías descarta los avisos que llegan fuera de orden (A-06).
+    - Un aviso que no llegó se reenvía cuando alguien consulta el pago o lo
+      vuelve a crear. La respuesta sale igual aunque el aviso no llegue.
+    - Si la reserva se canceló mientras se pagaba, Tutorías no acepta el
+      aviso `PAGADO`, y el pago queda `REEMBOLSADO` solo, con un intento de
+      reembolso.
+    - Se paga una reserva `CONFIRMADA`, `REALIZADA` o `EVALUADA`: el pago no
+      bloquea la sesión (RN-05), y una tutoría que ya terminó también se
+      paga.
+    - Un pago por reserva, con todos sus intentos: cada cobro o reembolso es
+      un intento, y un reintento no borra el anterior (A-10). Sin tarifa no
+      hay pago (RN-05).
+    - Los montos van como número entero de pesos chilenos.
+    - Las fechas van en ISO 8601, en UTC, con `Z` y sin fracción de segundo,
+      por ejemplo `2026-11-08T22:10:05Z`. El navegador las muestra en hora
+      de Chile (`America/Santiago`).
+    - Los identificadores van como texto.
+
+    **Cambios**
+    - 0.1.0 (HU-23): primera versión, con POST y GET /pagos, POST /pagos/{pago_id}/simular y GET /estado.
+
+servers:
+  - url: http://localhost:8080/api/payments/v1
+    description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Pagos. La API se llama siempre a través de él.
+
+tags:
+  - name: Pagos
+    description: El pago simulado de una tutoría confirmada, su consulta y la simulación de su resultado (HU-23). Con sesión.
+  - name: Estado
+    description: Estado del servicio y de su base (HU-01).
+
+paths:
+
+  /pagos:
+    post:
+      tags: [Pagos]
+      operationId: crearPago
+      summary: Crear el pago de una reserva
+      description: |
+        Crea el pago `PENDIENTE` de una reserva confirmada, por el monto de la
+        reserva y con el proveedor `SIMULADO` (HU-23, criterios 1 y 5). Solo
+        lo crea quien pidió la tutoría: el tutor tampoco crea pagos.
+
+        Se revisa en este orden:
+        1. `reserva_id` tiene que ser un uuid: si falta o no lo es, 400
+           `reserva_invalida`, sin llamar a nadie.
+        2. Pagos le pide la reserva a Tutorías. Si no existe, o si quien pide
+           no es quien la solicitó: 404 `reserva_no_encontrada`. Si Tutorías
+           no responde: 503 `servicio_no_disponible`.
+        3. Una reserva de monto 0 es una tutoría gratuita: 409 `sin_pago`, y
+           no se crea nada (RN-05).
+        4. Si la reserva ya tiene pago, responde 200 con ese pago: hay uno
+           por reserva. Se revisa antes que el estado, para que la misma
+           petición responda igual aunque la reserva haya cambiado. Si el
+           último aviso de ese pago a Tutorías no llegó, lo reenvía antes de
+           responder.
+        5. Si la reserva no está `CONFIRMADA`, `REALIZADA` ni `EVALUADA`: 409
+           `reserva_no_confirmada`.
+        6. Crea el pago y responde 201. Después avisa a Tutorías, que pasa
+           `estado_pago` de la reserva a `PENDIENTE` (M-10).
+
+        Si dos peticiones crean el pago de la misma reserva a la vez, la base
+        acepta uno solo y la segunda responde 200 con el que quedó.
+        Otros campos del cuerpo se ignoran.
+      security:
+        - tokenAcceso: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevoPago'
+            example:
+              reserva_id: 70000000-0000-4000-8000-000000000003
+      responses:
+        '201':
+          description: Pago creado, en `PENDIENTE` y sin intentos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              example:
+                id: 5e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b
+                reserva_id: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+                monto: 5000
+                estado: PENDIENTE
+                proveedor: SIMULADO
+                creado_en: '2026-11-08T22:05:12Z'
+                actualizado_en: '2026-11-08T22:05:12Z'
+                intentos: []
+        '200':
+          description: La reserva ya tenía pago. Responde ese pago, con sus intentos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              example:
+                id: 90000000-0000-4000-8000-000000000003
+                reserva_id: 70000000-0000-4000-8000-000000000003
+                monto: 4000
+                estado: PENDIENTE
+                proveedor: SIMULADO
+                creado_en: '2026-09-29T12:00:30Z'
+                actualizado_en: '2026-09-29T12:00:30Z'
+                intentos: []
+        '400':
+          description: |
+            Falta `reserva_id` o no es un uuid (`reserva_invalida`), o el
+            cuerpo no es JSON válido (`parse_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_invalida
+                mensaje: Indica la reserva que quieres pagar.
+                detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          description: |
+            La reserva no existe en Tutorías o la pidió otra persona
+            (`reserva_no_encontrada`). Los dos casos responden lo mismo, para
+            no revelar que existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_no_encontrada
+                mensaje: No tienes una reserva con ese identificador.
+                detalles: null
+        '409':
+          description: |
+            La reserva no lleva pago: es gratuita (`sin_pago`) o no está
+            confirmada (`reserva_no_confirmada`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                sin_pago:
+                  summary: Tutoría gratuita, de tarifa $0
+                  value:
+                    codigo: sin_pago
+                    mensaje: 'Esta tutoría es gratuita: no tiene pago.'
+                    detalles: null
+                reserva_no_confirmada:
+                  summary: La reserva está SOLICITADA, RECHAZADA, EXPIRADA o CANCELADA
+                  value:
+                    codigo: reserva_no_confirmada
+                    mensaje: Solo se paga una tutoría confirmada.
+                    detalles: null
+        '503':
+          $ref: '#/components/responses/SinTutorias'
+
+    get:
+      tags: [Pagos]
+      operationId: verPagoDeReserva
+      summary: El pago de una reserva
+      description: |
+        El pago de la reserva `?reserva=`, con todos sus intentos, del más
+        nuevo al más antiguo (HU-23). Lo ven quien pidió la tutoría y el
+        tutor.
+
+        - Si la reserva no tiene pago: 404 `pago_no_encontrado`, sin llamar a
+          Tutorías.
+        - Si lo tiene, Pagos le pide la reserva a Tutorías para saber de quién
+          es. Si quien pide no es el solicitante ni el tutor, o si Tutorías ya
+          no tiene la reserva: el mismo 404 `pago_no_encontrado`.
+        - Si el último aviso del pago a Tutorías no llegó, lo reenvía antes de
+          responder. Si en ese aviso Tutorías responde que la reserva se
+          canceló mientras se pagaba, el pago `PAGADO` queda `REEMBOLSADO`, y
+          la respuesta ya lo trae.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - name: reserva
+          in: query
+          required: true
+          description: |
+            Identificador de la reserva en Tutorías. Se lee con `uuid.UUID` de
+            Python, que también acepta mayúsculas y el uuid sin guiones.
+          schema:
+            type: string
+            format: uuid
+          example: 70000000-0000-4000-8000-000000000003
+      responses:
+        '200':
+          description: El pago, con sus intentos del más nuevo al más antiguo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              examples:
+                pagado_al_segundo_intento:
+                  summary: Rechazado en la simulación y después aprobado
+                  value:
+                    id: 90000000-0000-4000-8000-000000000003
+                    reserva_id: 70000000-0000-4000-8000-000000000003
+                    monto: 4000
+                    estado: PAGADO
+                    proveedor: SIMULADO
+                    creado_en: '2026-09-29T12:00:30Z'
+                    actualizado_en: '2026-11-08T22:10:05Z'
+                    intentos:
+                      - tipo: COBRO
+                        resultado: EXITOSO
+                        mensaje: null
+                        creado_en: '2026-11-08T22:10:05Z'
+                      - tipo: COBRO
+                        resultado: FALLIDO
+                        mensaje: Pago rechazado en la simulación.
+                        creado_en: '2026-11-08T22:10:01Z'
+                reembolsado_solo:
+                  summary: Pagado mientras la reserva se cancelaba, y reembolsado solo
+                  value:
+                    id: 90000000-0000-4000-8000-000000000003
+                    reserva_id: 70000000-0000-4000-8000-000000000003
+                    monto: 4000
+                    estado: REEMBOLSADO
+                    proveedor: SIMULADO
+                    creado_en: '2026-09-29T12:00:30Z'
+                    actualizado_en: '2026-11-08T22:20:41Z'
+                    intentos:
+                      - tipo: REEMBOLSO
+                        resultado: EXITOSO
+                        mensaje: 'Reembolso automático: la reserva se canceló mientras se pagaba.'
+                        creado_en: '2026-11-08T22:20:41Z'
+                      - tipo: COBRO
+                        resultado: EXITOSO
+                        mensaje: null
+                        creado_en: '2026-11-08T22:15:09Z'
+        '400':
+          description: Falta `reserva` o no es un uuid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_invalida
+                mensaje: Indica la reserva con ?reserva=<identificador>.
+                detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          description: |
+            La reserva no tiene pago, o quien pide no es el solicitante ni el
+            tutor (`pago_no_encontrado`). Los dos casos responden lo mismo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: pago_no_encontrado
+                mensaje: Esta reserva todavía no tiene pago.
+                detalles: null
+        '503':
+          $ref: '#/components/responses/SinTutorias'
+
+  /pagos/{pago_id}/simular:
+    post:
+      tags: [Pagos]
+      operationId: simularPago
+      summary: Simular el resultado de un cobro
+      description: |
+        Registra un intento de cobro con el resultado elegido y deja el pago
+        `PAGADO` o `FALLIDO` (HU-23, criterios 2 a 4). Reintentar un pago
+        `FALLIDO` es esta misma ruta: un intento nuevo sobre el mismo pago,
+        sin borrar el anterior (criterio 3).
+
+        Se revisa en este orden:
+        1. `resultado` tiene que ser `EXITOSO` o `FALLIDO`: si no, 400
+           `resultado_invalido`, sin llamar a nadie.
+        2. Si el pago no existe: 404 `pago_no_encontrado`.
+        3. Pagos le pide la reserva a Tutorías. Si quien pide no es quien
+           solicitó la tutoría: el mismo 404. Si la reserva está `CANCELADA`,
+           `RECHAZADA` o `EXPIRADA`: 409 `reserva_no_confirmada`. Una reserva
+           `REALIZADA` o `EVALUADA` sí se paga: el pago no depende de la
+           sesión (criterio 7).
+        4. Con el pago bloqueado, solo se simula desde `PENDIENTE` o
+           `FALLIDO`: si ya está `PAGADO` o `REEMBOLSADO`, 409
+           `pago_no_simulable`.
+        5. Guarda el intento (con `FALLIDO`, con el mensaje «Pago rechazado en
+           la simulación.») y el estado nuevo, y después avisa a Tutorías,
+           que guarda la copia en la reserva (criterio 4).
+
+        Responde el pago leído de nuevo después del aviso: si la reserva se
+        canceló mientras se pagaba, ya viene `REEMBOLSADO`, con el intento de
+        reembolso. Otros campos del cuerpo se ignoran.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/PagoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Simulacion'
+            examples:
+              aprobado:
+                summary: El cobro se aprueba
+                value:
+                  resultado: EXITOSO
+              rechazado:
+                summary: El cobro se rechaza
+                value:
+                  resultado: FALLIDO
+      responses:
+        '200':
+          description: El pago con el intento nuevo, el más nuevo primero.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              examples:
+                rechazado:
+                  summary: Primer intento, rechazado
+                  value:
+                    id: 90000000-0000-4000-8000-000000000003
+                    reserva_id: 70000000-0000-4000-8000-000000000003
+                    monto: 4000
+                    estado: FALLIDO
+                    proveedor: SIMULADO
+                    creado_en: '2026-09-29T12:00:30Z'
+                    actualizado_en: '2026-11-08T22:10:01Z'
+                    intentos:
+                      - tipo: COBRO
+                        resultado: FALLIDO
+                        mensaje: Pago rechazado en la simulación.
+                        creado_en: '2026-11-08T22:10:01Z'
+                aprobado_al_reintentar:
+                  summary: El reintento, aprobado
+                  value:
+                    id: 90000000-0000-4000-8000-000000000003
+                    reserva_id: 70000000-0000-4000-8000-000000000003
+                    monto: 4000
+                    estado: PAGADO
+                    proveedor: SIMULADO
+                    creado_en: '2026-09-29T12:00:30Z'
+                    actualizado_en: '2026-11-08T22:10:05Z'
+                    intentos:
+                      - tipo: COBRO
+                        resultado: EXITOSO
+                        mensaje: null
+                        creado_en: '2026-11-08T22:10:05Z'
+                      - tipo: COBRO
+                        resultado: FALLIDO
+                        mensaje: Pago rechazado en la simulación.
+                        creado_en: '2026-11-08T22:10:01Z'
+        '400':
+          description: |
+            `resultado` no es `EXITOSO` ni `FALLIDO` (`resultado_invalido`), o
+            el cuerpo no es JSON válido (`parse_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: resultado_invalido
+                mensaje: 'Indica el resultado de la simulación: EXITOSO o FALLIDO.'
+                detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          description: |
+            El pago no existe o es de una reserva que pidió otra persona
+            (`pago_no_encontrado`). Los dos casos responden lo mismo.
+
+            Si `pago_id` no es un uuid en minúsculas, la ruta no existe y
+            responde Django con su página 404, en HTML y sin el formato de
+            error de la API.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: pago_no_encontrado
+                mensaje: No tienes un pago con ese identificador.
+                detalles: null
+            text/html:
+              schema:
+                type: string
+              examples:
+                ruta_inexistente:
+                  summary: POST /pagos/abc/simular con DJANGO_DEBUG=1 (recortada)
+                  value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/payments/v1/pagos/abc/simular</title>...</html>'
+        '409':
+          description: |
+            El pago ya está `PAGADO` o `REEMBOLSADO` (`pago_no_simulable`), o
+            la tutoría ya no está vigente: la reserva está `CANCELADA`,
+            `RECHAZADA` o `EXPIRADA` (`reserva_no_confirmada`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                pago_no_simulable:
+                  summary: El pago ya está pagado o reembolsado
+                  value:
+                    codigo: pago_no_simulable
+                    mensaje: Este pago ya está pagado o reembolsado.
+                    detalles: null
+                reserva_no_confirmada:
+                  summary: La reserva está CANCELADA, RECHAZADA o EXPIRADA
+                  value:
+                    codigo: reserva_no_confirmada
+                    mensaje: 'Esta tutoría ya no está vigente: no se puede pagar.'
+                    detalles: null
+        '503':
+          $ref: '#/components/responses/SinTutorias'
+
+  /estado:
+    get:
+      tags: [Estado]
+      operationId: estadoPagos
+      summary: Estado del servicio y de su base
+      description: |
+        Dice si el servicio está arriba y puede leer su base, que prueba con
+        un `SELECT 1` (HU-01). Lo consultan la integración continua (trabajo
+        «levantar», que espera un 200) y la verificación de salud del
+        contenedor en `docker-compose.yml`. Es pública: no pide token.
+
+        Si la base no responde, no es un error de la API: responde 503 con
+        el mismo esquema, con `estado` en `degradado`.
+      security:
+        - tokenAcceso: []
+        - {}
+      responses:
+        '200':
+          description: El servicio y su base responden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: payments
+                estado: ok
+                base_de_datos: ok
+                version: 0.1.0
+        '503':
+          description: El servicio arrancó, pero no puede leer su base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estado'
+              example:
+                servicio: payments
+                estado: degradado
+                base_de_datos: sin conexion
+                version: 0.1.0
+        '401':
+          $ref: '#/components/responses/TokenNoValido'
+
+components:
+
+  securitySchemes:
+    tokenAcceso:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Cabecera `Authorization: Bearer <token_acceso>`. Es el token de acceso que firma Identidad, un JWT RS256 de 30 minutos (ver su contrato). Pagos verifica la firma con la clave pública.'
+
+  headers:
+    DesafioBearer:
+      description: Siempre `Bearer realm="payments"`.
+      schema:
+        type: string
+      example: 'Bearer realm="payments"'
+
+  parameters:
+    PagoId:
+      name: pago_id
+      in: path
+      required: true
+      description: |
+        Identificador del pago, el `id` que entregan `POST` y `GET /pagos`: un
+        uuid en minúsculas y con guiones. Con otra forma la ruta no existe
+        (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 90000000-0000-4000-8000-000000000003
+
+  responses:
+    TokenNoValido:
+      description: |
+        La petición trae un token en `Authorization: Bearer …` que no sirve.
+        La ruta no pide token, pero si viene, Pagos lo revisa antes de llegar
+        a ella (HU-17). Los códigos posibles son:
+        - `token_invalido`: el token está mal formado, su firma o su emisor
+          no calzan, le falta una reclamación obligatoria o su `sub` no es un
+          uuid;
+        - `token_vencido`: el token venció (dura 30 minutos);
+        - `authentication_failed`: la cabecera trae `Bearer` sin el token, o
+          algo más después del token.
+      headers:
+        WWW-Authenticate:
+          $ref: '#/components/headers/DesafioBearer'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            token_invalido:
+              $ref: '#/components/examples/TokenInvalido'
+            token_vencido:
+              $ref: '#/components/examples/TokenVencido'
+            cabecera_mal_formada:
+              $ref: '#/components/examples/CabeceraMalFormada'
+    SinTokenValido:
+      description: |
+        Sin un token válido (HU-17). Los códigos posibles son:
+        - `not_authenticated`: no viene la cabecera
+          `Authorization: Bearer …` (el mensaje es el estándar de Django REST
+          Framework);
+        - `token_invalido`, `token_vencido` y `authentication_failed`, como en
+          `TokenNoValido`.
+      headers:
+        WWW-Authenticate:
+          $ref: '#/components/headers/DesafioBearer'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            token_invalido:
+              $ref: '#/components/examples/TokenInvalido'
+            token_vencido:
+              $ref: '#/components/examples/TokenVencido'
+            cabecera_mal_formada:
+              $ref: '#/components/examples/CabeceraMalFormada'
+    ClavesNoConfiguradas:
+      description: |
+        Pagos no encuentra la clave pública con que verifica el token
+        (`keys/jwt_public.pem`, que docker-compose.yml monta en `/app/keys`).
+        Pasa en un clon nuevo si no se generaron las claves.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: claves_no_configuradas
+            mensaje: 'No existe el archivo /app/keys/jwt_public.pem. Pagos verifica los tokens con la clave pública de Identidad, keys/jwt_public.pem, que docker-compose.yml monta en /app/keys. Si faltan las claves, se generan en Identidad con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
+            detalles: null
+    SinTutorias:
+      description: |
+        Pagos no pudo consultar a Tutorías: no responde, se demora más de 3
+        segundos o responde con un error 5xx. El código es
+        `servicio_no_disponible` y el mensaje dice que falló el servicio de
+        Tutorías.
+
+        También puede ser `claves_no_configuradas`, si falta la clave pública
+        (ver `ClavesNoConfiguradas`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            tutorias:
+              summary: Tutorías no responde
+              value:
+                codigo: servicio_no_disponible
+                mensaje: No pudimos comunicarnos con el servicio de Tutorías. Intenta de nuevo en unos minutos.
+                detalles: null
+            claves_no_configuradas:
+              summary: Falta la clave pública
+              value:
+                codigo: claves_no_configuradas
+                mensaje: 'No existe el archivo /app/keys/jwt_public.pem. Pagos verifica los tokens con la clave pública de Identidad, keys/jwt_public.pem, que docker-compose.yml monta en /app/keys. Si faltan las claves, se generan en Identidad con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
+                detalles: null
+
+  examples:
+    TokenInvalido:
+      summary: El token no es válido
+      value:
+        codigo: token_invalido
+        mensaje: El token de acceso no es válido.
+        detalles: null
+    TokenVencido:
+      summary: El token venció
+      value:
+        codigo: token_vencido
+        mensaje: El token de acceso venció.
+        detalles: null
+    CabeceraMalFormada:
+      summary: Authorization trae Bearer sin el token
+      value:
+        codigo: authentication_failed
+        mensaje: La cabecera Authorization está mal formada.
+        detalles: null
+
+  schemas:
+
+    Pago:
+      type: object
+      description: |
+        Un pago simulado, con sus intentos (HU-23). Es el formato que usa la
+        pantalla de pago (HU-24): un cambio de estos nombres se avisa antes.
+      required: [id, reserva_id, monto, estado, proveedor, creado_en, actualizado_en, intentos]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reserva_id:
+          type: string
+          format: uuid
+          description: La reserva de Tutorías que se paga. Hay un pago por reserva.
+        monto:
+          type: integer
+          minimum: 1
+          description: Pesos chilenos. Es el monto de la reserva, la copia congelada de la tarifa al solicitar (A-04).
+        estado:
+          type: string
+          enum: [PENDIENTE, PAGADO, FALLIDO, REEMBOLSADO]
+          description: PENDIENTE al crearlo; PAGADO o FALLIDO después de simular; REEMBOLSADO cuando se cancela una tutoría pagada.
+        proveedor:
+          type: string
+          enum: [SIMULADO]
+          description: Quién procesa el cobro. Siempre SIMULADO, el punto donde entraría una pasarela real (RF-18).
+        creado_en:
+          type: string
+          format: date-time
+          description: Cuándo se creó, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+        actualizado_en:
+          type: string
+          format: date-time
+          description: El último cambio de estado, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+        intentos:
+          type: array
+          description: Los cobros y reembolsos, del más nuevo al más antiguo. Recién creado, vacío.
+          items:
+            $ref: '#/components/schemas/IntentoPago'
+
+    IntentoPago:
+      type: object
+      description: Un cobro o un reembolso de un pago (A-10).
+      required: [tipo, resultado, mensaje, creado_en]
+      properties:
+        tipo:
+          type: string
+          enum: [COBRO, REEMBOLSO]
+        resultado:
+          type: string
+          enum: [EXITOSO, FALLIDO]
+        mensaje:
+          type: string
+          maxLength: 200
+          nullable: true
+          description: El motivo de un cobro rechazado o de un reembolso automático. Null en los demás.
+        creado_en:
+          type: string
+          format: date-time
+          description: Cuándo se registró, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+
+    NuevoPago:
+      type: object
+      description: La reserva que se quiere pagar. Otros campos se ignoran.
+      required: [reserva_id]
+      properties:
+        reserva_id:
+          type: string
+          format: uuid
+          description: Identificador de la reserva en Tutorías.
+
+    Simulacion:
+      type: object
+      description: El resultado que se simula. Otros campos se ignoran.
+      required: [resultado]
+      properties:
+        resultado:
+          type: string
+          enum: [EXITOSO, FALLIDO]
+
+    Estado:
+      type: object
+      description: Estado del servicio y de su base (HU-01).
+      required: [servicio, estado, base_de_datos, version]
+      properties:
+        servicio:
+          type: string
+          description: El valor de la variable de entorno `NOMBRE_SERVICIO`, que en Docker Compose es `payments`. Sin la variable, `desconocido`.
+        estado:
+          type: string
+          enum: [ok, degradado]
+          description: ok si la base responde; degradado si no.
+        base_de_datos:
+          type: string
+          enum: [ok, sin conexion]
+        version:
+          type: string
+          description: La versión del servicio que tiene escrita la vista, hoy 0.1.0. No es la versión de este contrato.
+
+    Error:
+      type: object
+      description: |
+        Formato único de error de la API (Pilar 2, sección 11), el mismo de
+        Identidad y de Tutorías.
+
+        - Errores con código propio: `detalles` = null. En las rutas de este
+          contrato son reserva_invalida y resultado_invalido (400);
+          not_authenticated, token_invalido, token_vencido y
+          authentication_failed (401); reserva_no_encontrada y
+          pago_no_encontrado (404); sin_pago, reserva_no_confirmada y
+          pago_no_simulable (409), y claves_no_configuradas y
+          servicio_no_disponible (503).
+        - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
+          petición tiene datos inválidos.» y `detalles` = un objeto con una
+          lista de mensajes por campo. Las rutas de este contrato no los dan.
+        - Otros códigos los pone el framework: parse_error (JSON mal formado,
+          400), method_not_allowed (405) si se usa un método que la ruta no
+          acepta, y unsupported_media_type (415) si el cuerpo no es JSON ni un
+          formulario.
+      required: [codigo, mensaje, detalles]
+      properties:
+        codigo:
+          type: string
+        mensaje:
+          type: string
+        detalles:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: array
+            items:
+              type: string
