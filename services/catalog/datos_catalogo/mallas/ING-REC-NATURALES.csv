@@ -1,0 +1,45 @@
+semestre,sigla,nombre,creditos,area
+1,CCI1101,Ciencias Ambientales,,Especialidades
+1,CCI1102,Fundamentos de Ecología,,Especialidades
+1,GSI1101,Fundamentos de la Sostenibilidad I,,Especialidades
+1,PFI1101,Fundamentos de Ingeniería,,Especialidades
+1,FCE1101,La Aventura de Ser Humano,,Formación Sello
+1,MAT1114,Matemáticas y Medio Ambiente,,Formación General
+2,CCI1103,Geología e Hidrología,,Especialidades
+2,CCI1104,Biodiversidad y Servicios Ecosistémicos,,Especialidades
+2,GSI1102,Fundamentos de la Sostenibilidad II,,Especialidades
+2,SIR1101,Seguridad Ocupacional,,Especialidades
+2,QIR1101,Química Inorgánica,,Especialidades
+2,MAT2112,Álgebra Aplicada al Medio Ambiente,,Formación General
+2,PLC1150,Habilidades de Comunicación para Contextos Medioambientales,,Formación General
+3,CCI1105,Ciencias del Clima,,Especialidades
+3,PFI1102,Aspectos Sociales de la Sostenibilidad,,Especialidades
+3,ESI1101,Evaluación de Impacto Ambiental I,,Especialidades
+3,QIR1102,Química Orgánica,,Especialidades
+3,MAT6140,Mecánica Aplicada al Medio Ambiente,,Formación General
+4,PFI1103,Procesos Industriales,,Especialidades
+4,PFI1104,Planificación y Ordenamiento Territorial,,Especialidades
+4,ESI1102,Gestión del Agua y Eficiencia Hídrica,,Especialidades
+4,MAT4112,Estadística Descriptiva para Análisis Medioambientales,,Formación General
+4,MAT6150,Análisis de Fenómenos Físicos en Sistemas Naturales,,Formación General
+5,ESI1103,Gestión de Emisiones,,Especialidades
+5,ESI1104,Evaluación de Impacto Ambiental II,,Especialidades
+5,MTI1101,Modelación de Sistemas Ambientales,,Especialidades
+5,MTI1102,Interpretación de Planos y Uso de SIG,,Especialidades
+5,INI1141,Inglés Básico para Recursos Naturales y Sostenibilidad,,Formación General
+5,MAT4153,Estadística Inferencial para la Toma de Decisiones,,Formación General
+6,PFI1105,Economía y Finanzas para el Desarrollo Sostenible,,Especialidades
+6,PFI1106,Formulación y Gestión de Proyectos,,Especialidades
+6,ESI1105,Gestión de Residuos Sólidos,,Especialidades
+6,ESI1106,Auditoría y Sistemas de Gestión Integrados,,Especialidades
+6,MTI1103,Gestión Sustentable,,Especialidades
+6,INI3141,Inglés Elemental para Recursos Naturales y Sostenibilidad,,Formación General
+7,PFI1107,"Modelos de Negocios, Innovación, Financiamiento",,Especialidades
+7,PFI1108,Instrumentos Financieros,,Especialidades
+7,ESI1108,Evaluación Ambiental Estratégica,,Especialidades
+7,ESI1109,Reportes de Sostenibilidad,,Especialidades
+7,EAR7870,Etica para el Trabajo,,Formación Sello
+7,PLC2120,Estrategias de Comunicación para el Ámbito del Medioambiente y la Sostenibilidad,,Formación General
+8,TSR1101,Trabajo de Título,,Especialidades
+8,PSR1101,Práctica Profesional,,Especialidades
+8,EAR7875,Ética Profesional,,Formación Sello

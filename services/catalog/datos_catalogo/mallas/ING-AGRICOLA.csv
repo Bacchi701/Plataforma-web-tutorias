@@ -1,0 +1,45 @@
+semestre,sigla,nombre,creditos,area
+1,AGR1101,Fundamentos de Edafología,,Especialidades
+1,AGR1102,Morfofisiología General,,Especialidades
+1,ATR1101,Maquinaria Agrícola,,Especialidades
+1,SIR1101,Seguridad Ocupacional,,Especialidades
+1,PLC1110,Habilidades de Comunicación,,Formación General
+1,MAT1111,Nivelación Matemática,,Formación General
+2,ATR1102,Fundamentos de Riego,,Especialidades
+2,AGR1103,Agrometeorología,,Especialidades
+2,AGR1104,Fundamentos de Fertilización Agrícola,,Especialidades
+2,ATR1103,Técnicas Agroecológicas,,Especialidades
+2,VAR1101,Educación Financiera,,Especialidades
+2,FCE1100,Fundamentos de Antropología,,Formación Sello
+3,ATR1104,Técnicas de Riego,,Especialidades
+3,AGR1107,Cultivo de Hortalizas en Sistema Forzado,,Especialidades
+3,AGR1106,Enfermedades y Malezas en Cultivos Agrícolas,,Especialidades
+3,VAR1102,Manejo y Administración Agrícola,,Especialidades
+3,AGR1105,Manejo de Frutales Caducos y Persistentes,,Especialidades
+3,SRI1102,Desarrollo Sostenible,,Especialidades
+4,AGR1108,Manejo Integrado de Plagas,,Especialidades
+4,AGR1112,Cultivo de Hortalizas al Aire Libre,,Especialidades
+4,AGR1110,Producción de Vides,,Especialidades
+4,AGR1109,Manejo Productivo y Económico de Huertos Frutícolas,,Especialidades
+4,VAR1103,Implementación de Protocolos de Certificación y BPA,,Especialidades
+4,EAR1110,Ética para el Trabajo,,Formación Sello
+5,AGR1113,Producción Vitivinífera,,Especialidades
+5,ATR1105,Sistemas de Fertirrigación,,Especialidades
+5,ATR1106,Manejo de Tecnologías Agrícolas,,Especialidades
+5,VAR1104,Gestión Predial,,Especialidades
+5,MAT4121,Herramientas de Análisis para la Gestión,,Formación General
+5,INV1501,Proyectos de Innovación,,Formación General
+6,AGR1114,Gestión de la Producción Agrícola,,Especialidades
+6,AGR1115,Gestión Integral de Cultivos,,Especialidades
+6,AGR1116,Desarrollo Sostenible en la Agricultura,,Especialidades
+6,AGR1117,Flores en la Agricultura,,Especialidades
+6,AGR1118,Producción de Semillas,,Especialidades
+6,INU3100,Inglés Elemental I,,Formación General
+7,ATR1107,Agricultura de Precisión,,Especialidades
+7,AGR1119,Poscosecha de Productos Hortofrutícolas,,Especialidades
+7,VAR1105,Comercialización,,Especialidades
+7,ATR1108,Manejo de Agroindustria,,Especialidades
+7,EAR1115,Ética Profesional,,Formación Sello
+7,INU4100,Inglés Elemental II,,Formación General
+8,TPR1101,Taller de Título: Ingeniería Agrícola,,Especialidades
+8,PRR1101,Práctica Profesional,,Especialidades

@@ -1,0 +1,28 @@
+semestre,sigla,nombre,creditos,area
+1,FMI1101,Introducción a la Industria Minera,,Especialidades
+1,FMI1102,Interpretación de Planos,,Especialidades
+1,SOI1101,Geología,,Especialidades
+1,SEI1101,Seguridad y Salud Ocupacional,,Especialidades
+1,MAT1111,Nivelación Matemática,,Formación General
+1,PLC1110,Habilidades de Comunicación,,Formación General
+2,FMI1103,Química Aplicada,,Especialidades
+2,FMI1104,Física Aplicada,,Especialidades
+2,SOI1102,Procesos de Minas Subterráneas,,Especialidades
+2,SOI1103,Procesos de Minas de Rajo Abierto,,Especialidades
+2,SMI1101,Conminución de Minerales,,Especialidades
+2,MAT2111,Álgebra,,Formación General
+3,SMI1105,Concentración de Minerales,,Especialidades
+3,SMI1103,Procesos Hidrometalúrgicos,,Especialidades
+3,SEI1102,Liderazgo y Trabajo en Equipo en la Minería,,Especialidades
+3,FCE1100,Fundamentos de Antropología,,Formación Sello
+3,INT3141,Inglés Técnico para la Minería I,,Formación General
+3,MAT4111,Estadística Descriptiva,,Formación General
+4,FMI1105,Desarrollo Sostenible,,Especialidades
+4,FMI1106,Sostenibilidad y Economía Circular en Minería,,Especialidades
+4,SMI1104,Procesos Pirometalúrgicos,,Especialidades
+4,SEI1103,Excelencia Operacional,,Especialidades
+4,EAR7860,Ética para el Trabajo,,Formación Sello
+4,INT4141,Inglés Técnico para la Minería II,,Formación General
+5,PPI1102,Práctica Profesional,,Especialidades
+5,TTI1101,Taller de Título,,Especialidades
+5,INV1501,Proyectos de Innovación,,Formación General

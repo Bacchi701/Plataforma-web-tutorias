@@ -1,0 +1,28 @@
+semestre,sigla,nombre,creditos,area
+1,BCS1101,Anatomofisiopatología,,Especialidades
+1,BCS1102,Mecanismos de Prevención y Control de IAAS y Bioseguridad,,Especialidades
+1,IMS1101,Fundamentos de Imagenología,,Especialidades
+1,IUS1101,Primeros Auxilios en Procesos Diagnósticos,,Especialidades
+1,IUS1102,"Rol del Técnico, Bioética y Trato Humanizado",,Especialidades
+1,MAT1111,Nivelación Matemática,,Formación General
+2,BCS1103,Preparación de Personas Usuarias para la Toma de Muestra y Procedimientos Diagnósticos,,Especialidades
+2,BCS1104,Técnicas de Bioanálisis Clínico,,Especialidades
+2,IMS1102,Equipos e Insumos de Imagenología,,Especialidades
+2,IMS1105,Seguridad Radiológica,,Especialidades
+2,MTS1101,Banco de Sangre y Procesos de Donación,,Especialidades
+2,IUS1103,Herramientas Digitales para Salud,,Especialidades
+2,PLC1110,Habilidades de Comunicación,,Formación General
+3,IMS1103,Procedimientos de Imagenología,,Especialidades
+3,IMS1104,Medicina Nuclear y Radioterapia,,Especialidades
+3,BCS1105,Microbiología y Parasitología,,Especialidades
+3,PLS1101,Práctica Clínica 1,,Especialidades
+3,MTS1102,Inmunohematología y Proceso Transfusional,,Especialidades
+3,FCE1101,La Aventura de Ser Humano,,Formación Sello
+4,IUS1104,Atención Integral en el Curso de Vida y Bienestar,,Especialidades
+4,IUS1105,"Acreditación, Gestión de Calidad y Seguridad en Salud",,Especialidades
+4,BCS1106,Técnicas de Laboratorio para Diagnóstico Especial,,Especialidades
+4,TSS1101,Taller de Simulación de Bioanálisis Clínico,,Especialidades
+4,PIS1102,Práctica Clínica 2,,Especialidades
+4,EAS5050,Ética para el Trabajo,,Formación Sello
+5,ITS1101,Internado,,Especialidades
+5,PSS1101,Taller Integrado de Salud,,Especialidades

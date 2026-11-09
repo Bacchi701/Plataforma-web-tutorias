@@ -1,0 +1,26 @@
+semestre,sigla,nombre,creditos,area
+1,OMI1101,Herramientas y Técnicas para el Mantenimiento,,Especialidades
+1,OMI1102,Mantenimiento Automotriz,,Especialidades
+1,ATI1101,Autotrónica I Fundamentos Electrónicos,,Especialidades
+1,SIR1101,Seguridad Ocupacional,,Especialidades
+1,MAT1111,Nivelación Matemática,,Formación General
+1,PLC1110,Habilidades de Comunicación,,Formación General
+2,OMI1103,Mecánica de Motores,,Especialidades
+2,OMI1104,"Dirección, Suspensión y Frenos",,Especialidades
+2,OMI1105,Sistemas de Transmisión Automotriz,,Especialidades
+2,ATI1102,Electricidad Automotriz,,Especialidades
+2,ATI1103,Autotrónica II Electrónica Aplicada,,Especialidades
+2,FCE1100,Fundamentos de Antropología,,Formación Sello
+3,OMI1106,Sistemas de Inyección de Gasolina,,Especialidades
+3,OMI1107,Sistemas de Inyección Diesel,,Especialidades
+3,OMI1108,Mecánica de Motos,,Especialidades
+3,ATI1104,Autotrónica III Electrónica del Automóvil,,Especialidades
+3,ATI1105,Sistemas de Seguridad Confort y Climatización,,Especialidades
+4,OMI1109,Líneas de Inspección Técnica,,Especialidades
+4,ATI1106,Electromovilidad,,Especialidades
+4,ATI1107,Autotrónica IV Sistemas Multiplexado,,Especialidades
+4,ATI1108,Diagnóstico Electrónico,,Especialidades
+4,INV1504,Emprendimiento y Sostenibilidad en la Industria Automotriz,,Especialidades
+4,EAI4710,Ética para el Trabajo,,Formación Sello
+5,PPM1103,Práctica Profesional,,Especialidades
+5,TI1101,Taller Integrado Mecánica y Autotrónica,,Especialidades
