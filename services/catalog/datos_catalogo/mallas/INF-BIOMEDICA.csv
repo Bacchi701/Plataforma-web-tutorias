@@ -1,0 +1,40 @@
+semestre,sigla,nombre,creditos,area
+1,GSS1101,Ecosistema Sanitario y Bienestar,,Especialidades
+1,GSS1102,Terminología Sanitaria,,Especialidades
+1,GDS1101,Fundamentos de Programación,,Especialidades
+1,MAT1111,Nivelación Matemática,,Formación General
+1,PLC1120,Comunicación Efectiva para Informática Biomédica,,Formación General
+2,IRS1101,Innovación y Gestión de Requisitos,,Especialidades
+2,BDS1101,Base de Datos Aplicada I,,Especialidades
+2,GSS1103,Sistemas de Información en Salud,,Especialidades
+2,FCE1100,Fundamentos de Antropología,,Formación Sello
+2,MAT2122,Herramientas de Álgebra y Probabilidad,,Formación General
+2,INU3141,Inglés Elemental I para IBME,,Formación General
+3,BDS1102,Base de Datos Aplicada II,,Especialidades
+3,IRS1102,Ingeniería de Requisitos,,Especialidades
+3,GSS1105,Bioestadística,,Especialidades
+3,GSS1106,Bases de Cloud Computing y Telemedicina,,Especialidades
+3,INU4141,Inglés Elemental II para IBME,,Formación General
+4,GSS1107,Administración en Salud,,Especialidades
+4,BPM1103,Gestión de Procesos en Salud,,Especialidades
+4,IRS1103,Ingeniería de Software,,Especialidades
+4,GDS1102,Programación y Procesamiento de Datos,,Especialidades
+4,EAS5040,Ética para el Trabajo,,Formación Sello
+4,ESP7171,ESP Biomédica,,Formación General
+5,TBS1101,Taller Integrado en Salud I,,Especialidades
+5,INS1104,Inteligencia de Negocios y Big Data en Salud,,Especialidades
+5,GSS1108,Epidemiología,,Especialidades
+5,GPS1101,Evaluación de Proyectos de Salud,,Especialidades
+5,ISS1101,Estándares de Interoperabilidad,,Especialidades
+5,GDS1103,Machine Learning en Salud I,,Especialidades
+6,ISS1102,Modelamiento de Interoprabilidad,,Especialidades
+6,GPS1102,Gestión de Proyectos en Salud I,,Especialidades
+6,GDS1104,Machine Learning en Salud II,,Especialidades
+6,GHS1105,Gobernanza y Humanización en Salud,,Especialidades
+7,ISS1103,Implementación de Interoperabilidad,,Especialidades
+7,GSS1109,Finanzas en Salud,,Especialidades
+7,GPS1103,Gestión de Proyectos en Salud II,,Especialidades
+7,GDS1105,Deep Learning,,Especialidades
+7,EAS5045,Ética Profesional,,Formación Sello
+8,PPS0416,Práctica Profesional,,Especialidades
+8,TBS1102,Taller Integrado en Salud II,,Especialidades

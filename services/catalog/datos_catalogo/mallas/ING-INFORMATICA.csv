@@ -1,0 +1,38 @@
+semestre,sigla,nombre,creditos,area
+1,FPY1101,Fundamentos de Programación,,Especialidades
+1,DSY1101,Introducción a Cloud Computing,,Especialidades
+1,BIY1101,Bases de Innovación,,Especialidades
+1,MAT1111,Nivelación Matemática,,Formación General
+1,PLC1110,Habilidades de Comunicación,,Formación General
+2,DSY1102,Desarrollo Orientado a Objetos,,Especialidades
+2,BDY1101,Base de Datos Aplicada I,,Especialidades
+2,RQY1101,Ingeniería de Requisitos,,Especialidades
+2,FCE1100,Fundamentos de Antropología,,Formación Sello
+2,MAT2121,Matemática Aplicada,,Formación General
+2,INU3100,Inglés Elemental I,,Formación General
+3,DSY1103,Desarrollo Full Stack I,,Especialidades
+3,BDY1102,Base de Datos Aplicada II,,Especialidades
+3,RQY1102,Ingeniería de Software,,Especialidades
+3,INU4100,Inglés Elemental II,,Formación General
+4,DSY1104,Desarrollo Full Stack II,,Especialidades
+4,DSY1105,Desarrollo de Aplicaciones Móviles,,Especialidades
+4,BDY1103,Taller de Base de Datos,,Especialidades
+4,EAY4730,Ética para el Trabajo,,Formación Sello
+4,MAT4141,Estadística Descriptiva,,Formación General
+4,INU5100,Inglés Intermedio I,,Formación General
+5,ITY1101,Gestión de Datos para IA,,Especialidades
+5,IAY1101,IA Ética y Social,,Especialidades
+5,MAT4152,Inferencia Estadística,,Formación General
+5,MAT3131,Herramientas de Cálculo Diferencial,,Formación General
+6,ITY1102,Arquitectura de Sistemas IA,,Especialidades
+6,TLY1101,Machine Learning,,Especialidades
+6,TLY1102,Técnicas Avanzadas de Machine Learning I,,Especialidades
+6,MAT6130,Álgebra Lineal,,Formación General
+7,TLY1103,Programación en Lenguaje Natural y Redes Neuronales Gráficas,,Especialidades
+7,TLY1104,Técnicas Avanzadas de Machine Learning II,,Especialidades
+7,TLY1105,Computer Vision con Deep Learning,,Especialidades
+7,MOY1102,MLOps,,Especialidades
+7,EAY4615,Ética Profesional,,Formación Sello
+8,IAY4610,Taller Aplicado de IA,,Especialidades
+8,TTY1103,Taller de Tecnologías de Vanguardia,,Especialidades
+8,PPY4610,Práctica Profesional,,Especialidades

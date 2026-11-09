@@ -1,0 +1,24 @@
+codigo,nombre,escuela,activa,malla_version,vigente_desde
+ADM-TURISMO-HOSP,Administración en Turismo y Hospitalidad,Escuela de Turismo y Hospitalidad,true,2026,2026-03-01
+INF-BIOMEDICA,Informática Biomédica,Escuela de Salud,true,2026,2026-03-01
+ING-AGRICOLA,Ingeniería Agrícola,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+ING-ELEC-AUTOMATIZ,Ingeniería en Electricidad y Automatización Industrial,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+ING-INFORMATICA,Ingeniería en Informática,Escuela de Informática y Telecomunicaciones,true,2026,2026-03-01
+ING-MANTENIMIENTO,Ingeniería en Mantenimiento Industrial,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+ING-MAQUINARIA,Ingeniería en Maquinaria y Vehículos Pesados,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+ING-MARKETING,Ingeniería en Marketing Digital,Escuela de Administración y Negocios,true,2026,2026-03-01
+ING-MEC-AUTOMOTRIZ,Ingeniería en Mecánica Automotriz y Autotrónica,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+ING-REC-NATURALES,Ingeniería en Recursos Naturales y Sostenibilidad,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+PREPARADOR-FISICO,Preparador Físico,Escuela de Salud,true,2026,2026-03-01
+TEC-AUDIOVISUAL,Técnico Audiovisual,Escuela de Comunicación,true,2026,2026-03-01
+TEC-CALIDAD-ALIM,Técnico en Calidad de Alimentos,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+TEC-DESABOLLADURA,Técnico en Desabolladura y Pintura Automotriz,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+TEC-ELEC-AUTOMATIZ,Técnico en Electricidad y Automatización Industrial,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+TEC-ELEC-RENOVABLES,Técnico en Electricidad y Energías Renovables,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+TEC-LAB-CLINICO,"Técnico en Laboratorio Clínico, Banco de Sangre e Imagenología",Escuela de Salud,true,2026,2026-03-01
+TEC-MANTENIMIENTO,Técnico en Mantenimiento Industrial,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+TEC-MEC-AUTOMOTRIZ,Técnico en Mecánica Automotriz y Autotrónica,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+TEC-MODELADOR,Técnico Modelador Proyectista,Escuela de Construcción,true,2026,2026-03-01
+TEC-PROCESOS-MINEROS,Técnico en Operación y Supervisión de Procesos Mineros,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01
+TEC-TURISMO-HOSP,Técnico en Turismo y Hospitalidad,Escuela de Turismo y Hospitalidad,true,2026,2026-03-01
+TEC-VETERINARIO,Técnico Veterinario y Pecuario,Escuela de Ingeniería y Recursos Naturales,true,2026,2026-03-01

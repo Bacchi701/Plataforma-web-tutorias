@@ -1,0 +1,43 @@
+semestre,sigla,nombre,creditos,area
+1,HMI1102,Herramientas y Metrología para Mantenimiento,,Especialidades
+1,TMI1101,Técnicas Aplicadas de Mantenimiento,,Especialidades
+1,ELI1101,Electrotecnia Aplicada I,,Especialidades
+1,MAT1111,Nivelación Matemática,,Formación General
+1,PLC1110,Habilidades de Comunicación,,Formación General
+2,MDI1103,"Dirección, Suspensión y Frenos",,Especialidades
+2,ELI1102,Electrotecnia Aplicada II,,Especialidades
+2,DII1101,Diagnóstico y Reparación de Motores de Combustión Interna,,Especialidades
+2,SIR1101,Seguridad Ocupacional,,Especialidades
+2,FCE1100,Fundamentos de Antropología,,Formación Sello
+2,MAT2111,Álgebra,,Formación General
+3,HNI1104,Mantenimiento de Hidráulica y Neumática,,Especialidades
+3,ELI1103,Electricidad MVP,,Especialidades
+3,ELI1104,Electromovilidad de MVP,,Especialidades
+3,DII1102,Actuadores y Sensores,,Especialidades
+3,EAI1110,Ética para el Trabajo,,Formación Sello
+3,INU3100,Inglés Elemental I,,Formación General
+4,DII1103,Sistemas de Inyección Diésel,,Especialidades
+4,DII1105,Sistemas de Transmisión,,Especialidades
+4,DII1104,Diagnóstico de Hidráulica y Neumática,,Especialidades
+4,DII1106,Electrónica MVP y Multiplexado,,Especialidades
+4,SRI1102,Desarrollo Sostenible,,Especialidades
+4,INU4100,Inglés Elemental II,,Formación General
+5,GCI1101,Administración de Talleres de Maquinaria Pesada,,Especialidades
+5,RMI1101,Rendimiento del Motor y Dinamómetro,,Especialidades
+5,PLI1101,Práctica Laboral,,Especialidades
+5,SCI1102,"Monitoreo, Seguridad y Control de MVP",,Especialidades
+5,INU5100,Inglés Intermedio I,,Formación General
+5,INV1502,Proyectos de Innovación y Emprendimiento,,Formación General
+6,GPI1101,Formulación y Evaluación de Proyectos de Maquinaria Pesada,,Especialidades
+6,GCI1102,"Mantenimiento, Logística y Distribución de Repuestos de Maquinaria Pesada",,Especialidades
+6,GCI1103,Control de Calidad y Garantías de Maquinaria Pesada,,Especialidades
+6,DAI1103,Diagnostico Avanzado de Maquinaria Pesada,,Especialidades
+6,EAI1115,Ética Profesional,,Formación Sello
+6,INU6100,Ingles Intermedio II,,Formación General
+7,GCI1104,Seguridad y Medio Ambiente de Maquinaria Pesada,,Especialidades
+7,SOI1104,Soluciones Electrónicas Avanzadas de MVP,,Especialidades
+7,LCI1105,Lubricantes y Combustibles,,Especialidades
+7,GDP2470,Gestión de Proyectos II,,Especialidades
+7,ESP1902,ESP MVP,,Formación General
+8,PPI4705,Práctica Profesional,,Especialidades
+8,TII1102,Taller de Título,,Especialidades

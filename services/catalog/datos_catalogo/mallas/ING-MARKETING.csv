@@ -1,0 +1,41 @@
+semestre,sigla,nombre,creditos,area
+1,MKA1101,Introducción al Marketing,,Especialidades
+1,VNA1101,Fundamentos de Ventas,,Especialidades
+1,ANA1201,Fundamentos de Economía,,Especialidades
+1,GAA1101,Herramientas Tecnológicas I,,Especialidades
+1,MAT1111,Nivelación Matemática,,Formación General
+1,PLC1110,Habilidades de Comunicación,,Formación General
+2,MKA1102,Plan de Marketing,,Especialidades
+2,MKA1203,Sitios Web y Landing Pages,,Especialidades
+2,ANA1902,Fundamentos de Gestión de Personas,,Especialidades
+2,ANA1903,Fundamentos de Finanzas y Presupuestos,,Especialidades
+2,GAA1902,Herramientas Tecnológicas II,,Especialidades
+2,MAT2111,Álgebra,,Formación General
+3,MKA1104,Branding,,Especialidades
+3,MKA1116,Storytelling,,Especialidades
+3,MKA1206,Herramientas de Marketing Digital,,Especialidades
+3,GAA1103,Herramientas Tecnológicas III,,Especialidades
+3,VNA1102,Propuesta de Valor y Precios,,Especialidades
+3,FCE1100,Fundamentos de Antropología,,Formación Sello
+3,MAT4111,Estadística Descriptiva,,Formación General
+4,MKA1107,Investigación de Mercados,,Especialidades
+4,MKA2908,Social Media Marketing,,Especialidades
+4,VNA1103,Negociación,,Especialidades
+4,TMA1101,Taller Aplicado I de Marketing,,Especialidades
+4,EAA1430,Ética para el Trabajo,,Formación Sello
+5,MKA1109,Medios & Audiencias,,Especialidades
+5,MKA1210,Inbound Marketing I,,Especialidades
+5,MKA1117,Comunicaciones Integradas de Marketing,,Especialidades
+5,VNA1104,Key Account Management,,Especialidades
+6,MKA1912,Diseño UX/UI,,Especialidades
+6,MKA1213,Inbound Marketing II,,Especialidades
+6,TMA1102,Taller Aplicado II de Marketing,,Especialidades
+6,GAA1105,Big Data e Inteligencia de Negocios,,Especialidades
+6,ANA1104,Cadena de Suministros,,Especialidades
+7,MKA1119,Productos y Servicios,,Especialidades
+7,MKA1215,Inbound Marketing III,,Especialidades
+7,MKA1216,Canales de Distribución & E-Commerce,,Especialidades
+7,VNA1105,Gestión de Equipos de Venta,,Especialidades
+7,EAA1625,Ética Profesional,,Formación Sello
+8,TMA1103,Taller Aplicado Final,,Especialidades
+8,PLC2110,Habilidades Comunicacionales para el Trabajo,,Formación General
