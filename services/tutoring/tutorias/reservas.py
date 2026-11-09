@@ -37,6 +37,21 @@ el tutor, que es el dueno del bloque de la reserva.
   estado del pago.
 - Despues de guardar se pide a Identidad el aviso a cada estudiante
   (RESERVA_CONFIRMADA o RESERVA_RECHAZADA, HU-16).
+
+HU-28 (parte A): POST /reservas/<id>/cancelar, para el solicitante o el tutor.
+
+- El estudiante retira su solicitud SOLICITADA: queda CANCELADA y el bloque
+  no cambia, porque nunca estuvo ocupado. El tutor no retira una solicitud:
+  la rechaza (RN-04).
+- Cualquiera de las dos partes cancela una reserva CONFIRMADA que todavia no
+  empieza: queda CANCELADA y el bloque vuelve a LIBRE (RN-04, CA9).
+- Las dos escriben estado, cerrada_en y quien cancelo (cancelada_por_usuario),
+  y bloquean en el mismo orden que confirmar y rechazar.
+- Despues de guardar se pide a Identidad el aviso RESERVA_CANCELADA para la
+  otra parte (HU-16).
+- El reembolso de una reserva pagada (criterio 3) no esta aqui: llega con la
+  parte B de HU-28, cuando exista Pagos (HU-23). La expiracion de las
+  solicitudes esta en por_tiempo.py.
 """
 
 import uuid
@@ -68,6 +83,7 @@ RESTRICCION_BLOQUE_OCUPADO = "ux_reserva_bloque_ocupado"
 SOLICITUD_RECIBIDA = "SOLICITUD_RECIBIDA"
 RESERVA_CONFIRMADA = "RESERVA_CONFIRMADA"
 RESERVA_RECHAZADA = "RESERVA_RECHAZADA"
+RESERVA_CANCELADA = "RESERVA_CANCELADA"
 LARGO_NOTA = 500
 LARGO_LUGAR = 300
 PREFIJOS_ENLACE = ("http://", "https://")
@@ -103,6 +119,12 @@ ENLACE_INVALIDO = (
 NO_PENDIENTE = "Esa solicitud ya no está pendiente."
 YA_EMPEZO_AL_CONFIRMAR = "Ese horario ya empezó: la tutoría ya no se puede confirmar."
 BLOQUE_OCUPADO = "Ese horario ya tiene otra tutoría confirmada."
+NO_CANCELABLE = "Esta reserva ya no se puede cancelar: está {estado}."
+SOLO_RETIRA_QUIEN_PIDIO = (
+    "Una solicitud pendiente solo la retira quien la pidió. Como tutor, puedes "
+    "rechazarla."
+)
+YA_EMPEZO_AL_CANCELAR = "La tutoría ya empezó: ya no se puede cancelar ni retirar."
 
 
 # ------------------------------------------------------------ el formato
@@ -539,3 +561,98 @@ def rechazar(request, reserva_id):
             )
         )
     return Response(reserva_json(reserva, TUTOR))
+
+
+# ------------------------------------------------------------ cancelar (HU-28)
+
+
+def no_cancelable(estado):
+    """409 de una reserva que ya no esta SOLICITADA ni CONFIRMADA (criterio 4).
+
+    El mensaje dice en que estado esta, por ejemplo «...: está rechazada.».
+    """
+    return Rechazo(
+        NO_CANCELABLE.format(estado=estado.lower()),
+        "reserva_no_cancelable",
+        status.HTTP_409_CONFLICT,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cancelar(request, reserva_id):
+    """POST /reservas/<id>/cancelar: retirar una solicitud o cancelar una tutoria.
+
+    Criterios 1, 2 y 4 de HU-28. Sin cuerpo: si viene uno, se ignora. Responde
+    200 con la reserva CANCELADA, leida de nuevo despues de la transaccion.
+    """
+    # 1. Sin bloquear: la reserva y su bloque. Si no existe, o si quien pide
+    # no es el solicitante ni el tutor (el dueno del bloque), el mismo 404 de
+    # GET /reservas/<id>, para no revelar que existe.
+    usuario_id = request.user.usuario_id
+    leida = (
+        Reserva.objects.select_related("bloque")
+        .filter(id=reserva_id)
+        .filter(Q(solicitante_usuario_id=usuario_id) | Q(bloque__usuario_id=usuario_id))
+        .first()
+    )
+    if leida is None:
+        raise Rechazo(
+            RESERVA_NO_ENCONTRADA, "reserva_no_encontrada", status.HTTP_404_NOT_FOUND
+        )
+    # Nadie se reserva su propio bloque (ck_reserva_no_auto): es una o la otra.
+    es_tutor = leida.bloque.usuario_id == usuario_id
+
+    # 2. En una transaccion, en el orden de confirmar (HU-22): asi una
+    # cancelacion y una confirmacion del mismo bloque se esperan, en vez de
+    # bloquearse entre si, y la segunda ve lo que dejo la primera.
+    with transaction.atomic():
+        # b. El bloque.
+        bloque = BloqueDisponibilidad.objects.select_for_update().get(
+            pk=leida.bloque_id
+        )
+        # c. La reserva otra vez, ahora bloqueada (solo su fila). Recien aqui
+        # se revisa su estado.
+        reserva = (
+            Reserva.objects.select_for_update(of=("self",))
+            .select_related("bloque__usuario", "solicitante_usuario", "asignatura")
+            .get(pk=reserva_id)
+        )
+        estado = reserva.estado
+        if estado not in (EstadoReserva.SOLICITADA, EstadoReserva.CONFIRMADA):
+            raise no_cancelable(estado)
+        if estado == EstadoReserva.SOLICITADA and es_tutor:
+            # RN-04: retirar es del estudiante; el tutor la rechaza (HU-22).
+            raise Rechazo(
+                SOLO_RETIRA_QUIEN_PIDIO,
+                "reserva_no_cancelable",
+                status.HTTP_409_CONFLICT,
+            )
+        ahora = timezone.now()
+        if bloque.inicio_en <= ahora:
+            # Tambien una solicitud que el programador todavia no expira.
+            raise Rechazo(YA_EMPEZO_AL_CANCELAR, "bloque_en_el_pasado")
+
+        # Criterios 1 y 2: queda registrado quien cancelo. Las dos partes ya
+        # tienen su fila en usuario_ref, asi que la FK se cumple.
+        reserva.estado = EstadoReserva.CANCELADA
+        reserva.cerrada_en = ahora
+        reserva.cancelada_por_usuario_id = usuario_id
+        reserva.save(update_fields=["estado", "cerrada_en", "cancelada_por_usuario"])
+        if estado == EstadoReserva.CONFIRMADA:
+            # Criterio 2: el horario vuelve a estar disponible. Una solicitud
+            # nunca ocupo el bloque: ahi no cambia (criterio 1).
+            bloque.estado = EstadoBloque.LIBRE
+            bloque.save(update_fields=["estado", "actualizado_en"])
+
+        # 3. El aviso a la otra parte sale cuando todo quedo guardado, y asi
+        # otra_persona, que calcula pedir_aviso, es quien cancelo. Si la
+        # transaccion se deshace, no sale.
+        destinatario = reserva.solicitante_usuario_id if es_tutor else bloque.usuario_id
+        transaction.on_commit(
+            partial(pedir_aviso, destinatario, RESERVA_CANCELADA, reserva)
+        )
+
+    # 4. Con el formato de HU-21, leida de nuevo despues de la transaccion.
+    reserva = reservas_con_todo().get(pk=reserva_id)
+    return Response(reserva_json(reserva, TUTOR if es_tutor else ESTUDIANTE))

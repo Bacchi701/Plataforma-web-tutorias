@@ -24,6 +24,7 @@ urlpatterns = [
     path("reservas/<uuid:reserva_id>", reservas.una_reserva, name="reserva"),
     path("reservas/<uuid:reserva_id>/confirmar", reservas.confirmar, name="confirmar"),
     path("reservas/<uuid:reserva_id>/rechazar", reservas.rechazar, name="rechazar"),
+    path("reservas/<uuid:reserva_id>/cancelar", reservas.cancelar, name="cancelar"),
 ]
 
 # Las rutas internas que usa Pagos (HU-23) estan en tutorias/internas.py.
