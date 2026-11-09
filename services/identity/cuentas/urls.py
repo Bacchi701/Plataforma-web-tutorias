@@ -21,4 +21,5 @@ urlpatterns = [
         name="interna-usuario",
     ),
     path("internal/usuarios", internas.varios_usuarios, name="interna-usuarios"),
+    path("internal/avisos", internas.enviar_aviso, name="interna-avisos"),
 ]
