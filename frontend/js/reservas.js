@@ -1,12 +1,13 @@
-// Pagina "Mis reservas y solicitudes recibidas" (HU-30, parte A): lo vigente
-// del usuario, en dos pestanas, siempre con su token de acceso:
+// Pagina "Mis reservas y solicitudes recibidas" (HU-30): lo vigente del
+// usuario, en dos pestanas, siempre con su token de acceso:
 //   GET  /api/tutoring/v1/reservas?rol=estudiante&estado=  -> «Mis reservas» (HU-21)
 //   GET  /api/tutoring/v1/reservas?rol=tutor&estado=       -> «Solicitudes recibidas» (HU-21)
 //   POST /api/tutoring/v1/reservas/{id}/confirmar          -> el tutor confirma (HU-22)
 //   POST /api/tutoring/v1/reservas/{id}/rechazar           -> el tutor rechaza (HU-22)
+//   POST /api/tutoring/v1/reservas/{id}/cancelar           -> retirar o cancelar (HU-28)
 // Lo vigente es SOLICITADA y CONFIRMADA: en cada pestana, un GET por estado, en
-// paralelo. Lo terminado es del historial (HU-26). Pagar (HU-24) y retirar o
-// cancelar (HU-28) llegan en las partes B y C.
+// paralelo. Lo terminado es del historial (HU-26). Pagar y ver el detalle
+// (HU-24) se hacen en pago.html.
 // Las fechas llegan en UTC y se muestran en hora de Chile (America/Santiago).
 // Los datos se escriben con textContent, nunca con innerHTML.
 
@@ -286,6 +287,9 @@
         }
         // HU-24 (parte B de HU-30): «Pagar» y «Ver detalle», al final.
         item.appendChild(enlacesDelPago(reserva, rol));
+        // HU-28 (parte C de HU-30): «Retirar solicitud» o «Cancelar tutoría», en
+        // esa misma fila.
+        sumarCancelacion(item, reserva, rol);
         return item;
     }
 
@@ -779,5 +783,154 @@
         simbolo.setAttribute("aria-hidden", "true");
         nodo.append(simbolo, elemento("span", null, texto));
         return nodo;
+    }
+
+    // ------------------------------------------------------------ retirar y cancelar (HU-28)
+
+    // HU-30, criterio 1, con las reglas de RN-04: en «Mis reservas», el
+    // estudiante retira su solicitud mientras sigue SOLICITADA, y en las dos
+    // pestanas cualquiera de las dos partes cancela una tutoria CONFIRMADA. El
+    // tutor no retira una solicitud: la rechaza (parte A). Los dos botones
+    // llaman a POST /reservas/{id}/cancelar, sin cuerpo.
+    const RETIRAR = {
+        texto: "Retirar solicitud",
+        icono: "fa-solid fa-arrow-rotate-left",
+        armado: "¿Retirar? Pulsa de nuevo",
+        accion: "retirar la solicitud",
+        exito: "Solicitud retirada.",
+        fallo: "No se pudo retirar la solicitud.",
+    };
+    const CANCELAR = {
+        texto: "Cancelar tutoría",
+        icono: "fa-solid fa-calendar-xmark",
+        armado: "¿Cancelar? Pulsa de nuevo",
+        accion: "cancelar la tutoría",
+        exito: "Tutoría cancelada. El horario quedó libre.",
+        fallo: "No se pudo cancelar la tutoría.",
+    };
+    // Con la parte B de HU-28, al cancelar una tutoria pagada, Tutorias pide el
+    // reembolso a Pagos antes de responder, y la respuesta ya trae estado_pago
+    // REEMBOLSADO. Sin ella, o si Pagos no respondio, trae el estado que tenia:
+    // el aviso dice solo lo que viene en la respuesta.
+    const AVISO_REEMBOLSO = "El pago quedó reembolsado (simulado).";
+
+    // El boton de la tarjeta, o null si no lleva. Los dos, solo si el bloque
+    // todavia no empieza: despues, la API responde 400 bloque_en_el_pasado,
+    // tambien a una solicitud (que el programador de HU-29 deja expirada).
+    function cancelacionDe(reserva, rol) {
+        if (reserva.rol !== rol || !(Date.parse(reserva.bloque.inicio_en) > Date.now())) {
+            return null;
+        }
+        if (reserva.estado === "SOLICITADA") {
+            return rol === "estudiante" ? RETIRAR : null;
+        }
+        return reserva.estado === "CONFIRMADA" ? CANCELAR : null;
+    }
+
+    // El boton va al final de la fila de «Pagar» y «Ver detalle» (la de
+    // enlacesDelPago), y su error, debajo. Como «Rechazar»: la primera
+    // pulsacion cambia el texto y la segunda, dentro de 5 segundos
+    // (ESPERA_RECHAZO), envia. Sin ventanas del navegador.
+    function sumarCancelacion(item, reserva, rol) {
+        const accion = cancelacionDe(reserva, rol);
+        if (!accion) {
+            return;
+        }
+        const tutoria = `${reserva.asignatura.nombre}, ${describir(reserva.bloque)}`;
+        const etiqueta = `${accion.texto} de ${tutoria}`;
+        const pulsador = boton(accion.texto, accion.icono, "res-boton res-boton-peligro", etiqueta);
+        const fila = item.querySelector(".res-enlaces");
+        fila.appendChild(pulsador);
+
+        // Los errores de esta tarjeta que no vuelven a cargar la lista.
+        const errorTarjeta = mensajeDeCampo(`res-error-cancelar-${reserva.id}`);
+        errorTarjeta.setAttribute("role", "alert");
+        item.appendChild(errorTarjeta);
+
+        // «Pagar» y «Ver detalle» son enlaces: mientras la peticion esta en
+        // curso no llevan a ninguna parte, tampoco con el teclado (ocuparTarjeta).
+        fila.addEventListener("click", (evento) => {
+            if (evento.target.closest('a[aria-disabled="true"]')) {
+                evento.preventDefault();
+            }
+        });
+
+        let espera = null;
+        const desarmar = () => {
+            clearTimeout(espera);
+            espera = null;
+            pulsador.classList.remove("res-boton-armado");
+            cambiarTexto(pulsador, accion.texto, etiqueta);
+        };
+        pulsador.addEventListener("click", async () => {
+            if (pulsador.disabled) {
+                return;
+            }
+            ocultarMensaje(errorTarjeta);
+            if (!espera) {
+                pulsador.classList.add("res-boton-armado");
+                cambiarTexto(pulsador, accion.armado, `${accion.armado} para ${accion.accion} de ${tutoria}`);
+                espera = setTimeout(desarmar, ESPERA_RECHAZO);
+                return;
+            }
+            desarmar();
+            ocuparTarjeta(item, true);
+            try {
+                await enviarCancelacion(reserva.id, accion, errorTarjeta);
+            } finally {
+                ocuparTarjeta(item, false);
+            }
+        });
+    }
+
+    // Mientras la peticion esta en curso, los botones de la tarjeta quedan
+    // deshabilitados, y los enlaces con aspecto de boton («Pagar» y «Ver
+    // detalle»), sin efecto: con aria-disabled y fuera del orden del tabulador.
+    function ocuparTarjeta(item, ocupada) {
+        for (const control of item.querySelectorAll("button")) {
+            control.disabled = ocupada;
+        }
+        for (const enlace of item.querySelectorAll(".res-enlaces a")) {
+            if (ocupada) {
+                enlace.setAttribute("aria-disabled", "true");
+                enlace.tabIndex = -1;
+            } else {
+                enlace.removeAttribute("aria-disabled");
+                enlace.removeAttribute("tabindex");
+            }
+        }
+    }
+
+    // POST /cancelar, sin cuerpo. Con 200, el aviso y las dos pestanas de
+    // nuevo: la reserva quedo CANCELADA, deja de estar vigente y sale de ellas.
+    // Con un 404 o un 409, la reserva cambio desde que se cargo la lista (por
+    // ejemplo, la otra parte ya la cancelo): el mensaje de la API y las
+    // pestanas de nuevo. Los demas errores, como el 400 bloque_en_el_pasado, en
+    // la tarjeta.
+    async function enviarCancelacion(id, accion, errorTarjeta) {
+        let r;
+        try {
+            r = await pedirTutorias(`/reservas/${encodeURIComponent(id)}/cancelar`, { method: "POST" });
+        } catch {
+            mostrarMensaje(errorTarjeta, null, SIN_CONEXION);
+            return;
+        }
+        if (r.ok) {
+            const reembolsada = r.cuerpo?.estado_pago === "REEMBOLSADO";
+            mostrarAviso("exito", reembolsada ? `${accion.exito} ${AVISO_REEMBOLSO}` : accion.exito);
+            await cargarReservas();
+            return;
+        }
+        if (r.estado === 401) {
+            mostrarSinSesion(`Tu sesión venció. Vuelve a iniciar sesión para ${accion.accion}.`);
+            return;
+        }
+        const texto = mensajeDeError(r.cuerpo, accion.fallo);
+        if (r.estado === 404 || r.estado === 409) {
+            mostrarAviso("error", texto);
+            await cargarReservas();
+        } else {
+            mostrarMensaje(errorTarjeta, null, texto);
+        }
     }
 })();
