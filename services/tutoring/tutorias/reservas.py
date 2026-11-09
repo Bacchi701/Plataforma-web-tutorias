@@ -20,6 +20,23 @@ pide sale del token (HU-17).
   respuesta trae un correo: no esta en esta base (RNF-07). Son el backend de
   las pantallas «Mis reservas y solicitudes recibidas» (HU-30) y de pago
   (HU-24).
+
+HU-22: POST /reservas/<id>/confirmar y POST /reservas/<id>/rechazar, solo para
+el tutor, que es el dueno del bloque de la reserva.
+
+- Confirmar escribe estado, modalidad, lugar_o_enlace y confirmada_en, pasa el
+  bloque a OCUPADO y las demas solicitudes del bloque a RECHAZADA, todo en una
+  transaccion (anexo A, seccion 9). Rechazar escribe estado y cerrada_en.
+- Las dos bloquean siempre en el mismo orden: primero el bloque y despues la
+  reserva. Asi dos confirmaciones del mismo bloque, o una confirmacion y un
+  rechazo, se esperan en vez de bloquearse entre si, y la segunda ve lo que
+  dejo la primera. Si aun asi llegaran dos confirmaciones, la base deja una
+  sola (ux_reserva_bloque_ocupado, ajuste A-03).
+- T-174: estado_pago queda nulo al confirmar. Pasa a PENDIENTE cuando Pagos
+  crea el pago y lo informa a Tutorias (HU-23): Pagos es la unica fuente del
+  estado del pago.
+- Despues de guardar se pide a Identidad el aviso a cada estudiante
+  (RESERVA_CONFIRMADA o RESERVA_RECHAZADA, HU-16).
 """
 
 import uuid
@@ -40,14 +57,20 @@ from .models import (
     BloqueDisponibilidad,
     EstadoBloque,
     EstadoReserva,
+    Modalidad,
     PerfilTutor,
     Reserva,
 )
 
 RESTRICCION_SOLICITUD_UNICA = "ux_reserva_solicitud_unica"
 RESTRICCION_NO_AUTO = "ck_reserva_no_auto"
+RESTRICCION_BLOQUE_OCUPADO = "ux_reserva_bloque_ocupado"
 SOLICITUD_RECIBIDA = "SOLICITUD_RECIBIDA"
+RESERVA_CONFIRMADA = "RESERVA_CONFIRMADA"
+RESERVA_RECHAZADA = "RESERVA_RECHAZADA"
 LARGO_NOTA = 500
+LARGO_LUGAR = 300
+PREFIJOS_ENLACE = ("http://", "https://")
 MAXIMO_RESERVAS = 100
 ESTUDIANTE = "estudiante"
 TUTOR = "tutor"
@@ -68,6 +91,18 @@ ESTADO_INVALIDO = (
     "EXPIRADA, CANCELADA, REALIZADA o EVALUADA."
 )
 RESERVA_NO_ENCONTRADA = "No encontramos esa tutoría."
+MODALIDAD_INVALIDA = "Indica la modalidad de la tutoría: PRESENCIAL o EN_LINEA."
+SIN_LUGAR = "Indica el lugar de la tutoría presencial."
+SIN_ENLACE = "Indica el enlace de la tutoría en línea."
+LUGAR_NO_ES_TEXTO = "El lugar o el enlace tiene que ser un texto."
+LUGAR_CON_CARACTERES = "El lugar o el enlace tiene caracteres que no se pueden guardar."
+LUGAR_LARGO = f"El lugar o el enlace puede tener hasta {LARGO_LUGAR} caracteres."
+ENLACE_INVALIDO = (
+    "El enlace de una tutoría en línea tiene que empezar con http:// o https://."
+)
+NO_PENDIENTE = "Esa solicitud ya no está pendiente."
+YA_EMPEZO_AL_CONFIRMAR = "Ese horario ya empezó: la tutoría ya no se puede confirmar."
+BLOQUE_OCUPADO = "Ese horario ya tiene otra tutoría confirmada."
 
 
 # ------------------------------------------------------------ el formato
@@ -312,3 +347,195 @@ def una_reserva(request, reserva_id):
         )
     rol = ESTUDIANTE if reserva.solicitante_usuario_id == usuario_id else TUTOR
     return Response(reserva_json(reserva, rol))
+
+
+# ------------------------------------------------------------ confirmar (HU-22)
+
+
+def leer_modalidad(datos):
+    """PRESENCIAL o EN_LINEA (RN-07)."""
+    modalidad = datos.get("modalidad")
+    if modalidad not in Modalidad.values:
+        raise Rechazo(MODALIDAD_INVALIDA, "modalidad_invalida")
+    return modalidad
+
+
+def leer_lugar_o_enlace(datos, modalidad):
+    """Texto de 1 a 300 caracteres, sin espacios a los lados (RN-07).
+
+    En linea, un enlace que empieza con http:// o https://.
+    """
+    valor = datos.get("lugar_o_enlace")
+    falta = SIN_ENLACE if modalidad == Modalidad.EN_LINEA else SIN_LUGAR
+    if valor is None:
+        raise Rechazo(falta, "lugar_o_enlace_invalido")
+    if not isinstance(valor, str):
+        raise Rechazo(LUGAR_NO_ES_TEXTO, "lugar_o_enlace_invalido")
+    # Como en la nota: el caracter nulo y una mitad de par sustituto
+    # terminarian en un error 500 al guardar.
+    if any(c == "\x00" or "\ud800" <= c <= "\udfff" for c in valor):
+        raise Rechazo(LUGAR_CON_CARACTERES, "lugar_o_enlace_invalido")
+    valor = valor.strip()
+    if not valor:
+        raise Rechazo(falta, "lugar_o_enlace_invalido")
+    if len(valor) > LARGO_LUGAR:
+        raise Rechazo(LUGAR_LARGO, "lugar_o_enlace_invalido")
+    if modalidad == Modalidad.EN_LINEA and not valor.startswith(PREFIJOS_ENLACE):
+        raise Rechazo(ENLACE_INVALIDO, "lugar_o_enlace_invalido")
+    return valor
+
+
+def solicitud_bloqueada(request, reserva_id):
+    """La solicitud y su bloque, bloqueados hasta el fin de la transaccion.
+
+    Siempre en este orden, el mismo de las dos rutas:
+    a. la reserva, sin bloquearla, solo para saber su bloque y que el bloque
+       es del usuario del token;
+    b. el bloque;
+    c. la reserva otra vez, ahora bloqueada (solo su fila). Recien ahi se
+       revisa su estado: si otra peticion la cambio mientras se esperaba el
+       bloque, aqui ya se ve el cambio.
+    """
+    # a. El solicitante, otro usuario o una reserva que no existe: el mismo 404,
+    # para no revelar que existe.
+    usuario_id = request.user.usuario_id
+    bloque_id = (
+        Reserva.objects.filter(id=reserva_id, bloque__usuario_id=usuario_id)
+        .values_list("bloque_id", flat=True)
+        .first()
+    )
+    if bloque_id is None:
+        raise Rechazo(
+            RESERVA_NO_ENCONTRADA, "reserva_no_encontrada", status.HTTP_404_NOT_FOUND
+        )
+    # b.
+    bloque = BloqueDisponibilidad.objects.select_for_update().get(pk=bloque_id)
+    # c. Con of=("self",): el tutor, el solicitante y la asignatura se leen en
+    # la misma consulta, sin bloquear sus filas.
+    reserva = (
+        Reserva.objects.select_for_update(of=("self",))
+        .select_related("bloque__usuario", "solicitante_usuario", "asignatura")
+        .get(pk=reserva_id)
+    )
+    if reserva.estado != EstadoReserva.SOLICITADA:
+        raise Rechazo(NO_PENDIENTE, "reserva_no_pendiente", status.HTTP_409_CONFLICT)
+    return bloque, reserva
+
+
+def guardar_confirmacion(reserva):
+    """Guarda la reserva CONFIRMADA.
+
+    Si la base la rechaza porque el bloque ya tiene una reserva que lo ocupa
+    (ux_reserva_bloque_ocupado, la garantia de ultimo recurso del criterio 4),
+    responde 409.
+    """
+    try:
+        with transaction.atomic():
+            reserva.save(
+                update_fields=["estado", "modalidad", "lugar_o_enlace", "confirmada_en"]
+            )
+    except IntegrityError as error:
+        diagnostico = getattr(error.__cause__, "diag", None)
+        if getattr(diagnostico, "constraint_name", None) != RESTRICCION_BLOQUE_OCUPADO:
+            raise
+        raise Rechazo(
+            BLOQUE_OCUPADO, "bloque_ocupado", status.HTTP_409_CONFLICT
+        ) from error
+
+
+def rechazar_las_demas(bloque, confirmada, ahora):
+    """Criterio 3 (RN-03): las otras solicitudes pendientes del bloque.
+
+    Pasan a RECHAZADA con cerrada_en. Se leen bloqueadas, con lo que necesita
+    su aviso, y se devuelven para pedirlo.
+    """
+    demas = list(
+        Reserva.objects.select_for_update(of=("self",))
+        .select_related("bloque__usuario", "solicitante_usuario", "asignatura")
+        .filter(bloque_id=bloque.id, estado=EstadoReserva.SOLICITADA)
+        .exclude(id=confirmada.id)
+        .order_by("creada_en", "id")
+    )
+    for otra in demas:
+        otra.estado = EstadoReserva.RECHAZADA
+        otra.cerrada_en = ahora
+    Reserva.objects.filter(id__in=[otra.id for otra in demas]).update(
+        estado=EstadoReserva.RECHAZADA, cerrada_en=ahora
+    )
+    return demas
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def confirmar(request, reserva_id):
+    """POST /reservas/<id>/confirmar: el tutor confirma una solicitud.
+
+    Criterios 1 a 4, 6 y 7. Responde 200 con la reserva CONFIRMADA.
+    """
+    # 1. El cuerpo, antes de tocar la base (criterio 2, RN-07).
+    datos = cuerpo(request)
+    modalidad = leer_modalidad(datos)
+    lugar_o_enlace = leer_lugar_o_enlace(datos, modalidad)
+
+    # 2. Todo en una transaccion, con el bloque y la reserva bloqueados.
+    with transaction.atomic():
+        bloque, reserva = solicitud_bloqueada(request, reserva_id)
+        ahora = timezone.now()
+        if bloque.inicio_en <= ahora:
+            raise Rechazo(YA_EMPEZO_AL_CONFIRMAR, "bloque_en_el_pasado")
+        if bloque.estado == EstadoBloque.OCUPADO:
+            raise Rechazo(BLOQUE_OCUPADO, "bloque_ocupado", status.HTTP_409_CONFLICT)
+
+        # Criterio 1 (CA4). estado_pago no se toca: queda nulo hasta que Pagos
+        # cree el pago (T-174).
+        reserva.estado = EstadoReserva.CONFIRMADA
+        reserva.modalidad = modalidad
+        reserva.lugar_o_enlace = lugar_o_enlace
+        reserva.confirmada_en = ahora
+        guardar_confirmacion(reserva)
+        bloque.estado = EstadoBloque.OCUPADO
+        bloque.save(update_fields=["estado", "actualizado_en"])
+        rechazadas = rechazar_las_demas(bloque, reserva, ahora)
+
+        # 3. Criterio 7: los avisos salen cuando todo quedo guardado. Si la
+        # transaccion se deshace, no sale ninguno.
+        transaction.on_commit(
+            partial(
+                pedir_aviso, reserva.solicitante_usuario_id, RESERVA_CONFIRMADA, reserva
+            )
+        )
+        for otra in rechazadas:
+            transaction.on_commit(
+                partial(
+                    pedir_aviso, otra.solicitante_usuario_id, RESERVA_RECHAZADA, otra
+                )
+            )
+    # 4.
+    return Response(reserva_json(reserva, TUTOR))
+
+
+# ------------------------------------------------------------ rechazar (HU-22)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def rechazar(request, reserva_id):
+    """POST /reservas/<id>/rechazar: el tutor rechaza una solicitud.
+
+    Criterio 5: la reserva pasa a RECHAZADA y el bloque no cambia. Sin cuerpo.
+    Bloquea en el mismo orden que la confirmacion, porque un rechazo puede
+    llegar al mismo tiempo que una confirmacion del mismo bloque. Responde 200
+    con la reserva RECHAZADA.
+    """
+    with transaction.atomic():
+        _, reserva = solicitud_bloqueada(request, reserva_id)
+        reserva.estado = EstadoReserva.RECHAZADA
+        reserva.cerrada_en = timezone.now()
+        reserva.save(update_fields=["estado", "cerrada_en"])
+        # Criterio 7.
+        transaction.on_commit(
+            partial(
+                pedir_aviso, reserva.solicitante_usuario_id, RESERVA_RECHAZADA, reserva
+            )
+        )
+    return Response(reserva_json(reserva, TUTOR))
