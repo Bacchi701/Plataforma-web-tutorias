@@ -284,6 +284,8 @@
         if (rol === "tutor" && reserva.rol === "tutor" && reserva.estado === "SOLICITADA") {
             item.appendChild(gestion(reserva));
         }
+        // HU-24 (parte B de HU-30): «Pagar» y «Ver detalle», al final.
+        item.appendChild(enlacesDelPago(reserva, rol));
         return item;
     }
 
@@ -720,5 +722,62 @@
         const texto = `${fechaDeChile(inicio)}, de ${horaDeChile(inicio)} a ${horaDeChile(fin)}`;
         const otroDia = fechaDeChile(fin) !== fechaDeChile(inicio);
         return otroDia ? `${texto} (termina el ${fechaDeChile(fin)})` : texto;
+    }
+
+    // ------------------------------------------------------------ pagar y ver detalle (HU-24)
+
+    // El pago sin resolver: todavia sin pago (null), PENDIENTE o FALLIDO.
+    const PAGO_SIN_RESOLVER = new Set([null, "PENDIENTE", "FALLIDO"]);
+
+    // HU-30, criterio 1: en «Mis reservas», una tutoria CONFIRMADA con monto y
+    // el pago sin resolver tiene «Pagar» («Reintentar el pago» si fallo).
+    // HU-24, criterio 3: cada tarjeta, en las dos pestanas, tiene «Ver
+    // detalle». Los dos llevan a pago.html?reserva=<id>.
+    function enlacesDelPago(reserva, rol) {
+        const destino = `pago.html?reserva=${encodeURIComponent(reserva.id)}`;
+        const tutoria = `la tutoría de ${reserva.asignatura.nombre}, ${describir(reserva.bloque)}`;
+        const enlaces = elemento("div", "res-enlaces");
+        if (rol === "estudiante" && reserva.rol === "estudiante" && sePuedePagar(reserva)) {
+            const reintento = reserva.estado_pago === "FALLIDO";
+            const texto = reintento ? "Reintentar el pago" : "Pagar";
+            enlaces.appendChild(
+                enlaceConIcono(
+                    destino,
+                    texto,
+                    reintento ? "fa-solid fa-rotate-right" : "fa-solid fa-wallet",
+                    "btn-primary res-boton-principal",
+                    reintento ? `Reintentar el pago de ${tutoria}` : `Pagar ${tutoria}`
+                )
+            );
+        }
+        enlaces.appendChild(
+            enlaceConIcono(
+                destino,
+                "Ver detalle",
+                "fa-solid fa-circle-info",
+                "res-boton",
+                `Ver detalle de ${tutoria}`
+            )
+        );
+        return enlaces;
+    }
+
+    function sePuedePagar(reserva) {
+        return (
+            reserva.estado === "CONFIRMADA" &&
+            Number(reserva.monto) > 0 &&
+            PAGO_SIN_RESOLVER.has(reserva.estado_pago ?? null)
+        );
+    }
+
+    // Un enlace con icono y aspecto de boton. El texto va en su propio span.
+    function enlaceConIcono(destino, texto, icono, clase, etiqueta) {
+        const nodo = elemento("a", clase);
+        nodo.href = destino;
+        nodo.setAttribute("aria-label", etiqueta);
+        const simbolo = elemento("i", icono);
+        simbolo.setAttribute("aria-hidden", "true");
+        nodo.append(simbolo, elemento("span", null, texto));
+        return nodo;
     }
 })();

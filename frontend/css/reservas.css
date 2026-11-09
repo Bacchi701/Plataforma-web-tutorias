@@ -513,3 +513,216 @@
         flex-basis: 100%;
     }
 }
+
+
+/* =========================================
+   DETALLE Y PAGO (HU-24) Y LOS ENLACES DE LAS TARJETAS (HU-30, parte B)
+   pago.html usa también las clases de arriba (res-tarjeta,
+   res-item-cabecera, res-datos, res-acciones, res-aviso...).
+========================================= */
+
+/* «Pagar», «Reintentar el pago» y «Ver detalle», al final de cada tarjeta */
+.res-enlaces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.res-enlaces a:focus-visible,
+.res-volver:focus-visible {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 2px;
+}
+
+/* «Volver a Mis reservas», arriba del título */
+.res-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    color: var(--duoc-blue-light);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* El pago es simulado (criterio 1): siempre a la vista */
+.res-simulado {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    max-width: 880px;
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    border: 1px solid #BFDBFE;
+    border-radius: 10px;
+    background: #EFF6FF;
+    color: var(--duoc-blue);
+    font-size: 15px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.res-simulado i {
+    margin-top: 3px;
+}
+
+.res-aviso-advertencia {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    color: #92400E;
+}
+
+#noEncontrada {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.res-detalle {
+    display: grid;
+    gap: 10px;
+}
+
+/* El estado de lo que ya no está vigente, como en el historial */
+.res-estado-realizada {
+    background: #E8F0FB;
+    color: var(--duoc-blue);
+}
+
+.res-estado-evaluada {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.res-estado-cancelada,
+.res-estado-rechazada,
+.res-estado-expirada {
+    background: #F3F4F6;
+    color: #4B5563;
+}
+
+/* El pago: el estado en color, el texto y los botones */
+.res-pago-datos {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.res-pago-estado {
+    font-weight: 700;
+}
+
+.res-pago-pagado {
+    color: #15803D;
+}
+
+.res-pago-fallido {
+    color: #B91C1C;
+}
+
+.res-pago-pendiente {
+    color: #92400E;
+}
+
+.res-pago-reembolsado,
+.res-pago-sin-pago {
+    color: #4B5563;
+}
+
+.res-pago-texto {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.res-detalle button:disabled {
+    opacity: .6;
+    cursor: wait;
+    transform: none;
+}
+
+/* Los intentos del pago, del más nuevo al más antiguo */
+.res-intentos {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    margin-top: 6px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.res-intentos h3 {
+    color: var(--duoc-blue);
+    font-size: 16px;
+}
+
+.res-intentos-lista {
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.res-intento {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.res-intento-cuando {
+    color: var(--text-light);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+/* "lunes, 28 de septiembre" pasa a "Lunes, 28 de septiembre" */
+.res-intento-cuando::first-letter {
+    text-transform: uppercase;
+}
+
+.res-intento-linea {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+}
+
+.res-intento-tipo {
+    color: var(--dark);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.res-intento-resultado {
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.res-intento-aprobado {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.res-intento-rechazado {
+    background: #FEE2E2;
+    color: #B91C1C;
+}
+
+.res-intento-mensaje {
+    color: var(--text);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+/* Teléfono (RNF-03): los enlaces de las tarjetas, a lo ancho */
+@media (max-width: 600px) {
+    .res-enlaces > a {
+        flex: 1 1 auto;
+    }
+}
