@@ -7,14 +7,15 @@ info:
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
     - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14, HU-41,
-      HU-25, HU-21, HU-22 y HU-28: la búsqueda de tutores y el perfil público de
-      cada tutor (HU-20), los bloques de disponibilidad del tutor (HU-15), las
-      asignaturas que el usuario declara que puede enseñar (HU-14), la copia
-      de sus datos que guarda Tutorías (HU-41), la evaluación de una tutoría
-      realizada (HU-25), la solicitud de una tutoría y las reservas de cada
-      usuario (HU-21), la confirmación o el rechazo de una solicitud por el
-      tutor (HU-22), el retiro de una solicitud o la cancelación de una
-      tutoría confirmada (HU-28), y `/estado`, que existe desde HU-01.
+      HU-25, HU-21, HU-22, HU-28 y HU-33: la búsqueda de tutores y el perfil
+      público de cada tutor (HU-20), los bloques de disponibilidad del tutor
+      (HU-15), las asignaturas que el usuario declara que puede enseñar
+      (HU-14), la copia de sus datos que guarda Tutorías (HU-41), la
+      evaluación de una tutoría realizada (HU-25), la solicitud de una tutoría
+      y las reservas de cada usuario (HU-21), la confirmación o el rechazo de
+      una solicitud por el tutor (HU-22), el retiro de una solicitud o la
+      cancelación de una tutoría confirmada (HU-28), las rutas del panel de
+      administración (HU-33) y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
     - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
@@ -30,9 +31,13 @@ info:
     `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. Para
     saber quién hace la petición no le pregunta a Identidad: sale del token.
     - Las rutas de disponibilidad, las de `/perfiles` y las de `/reservas`
-      (HU-21, HU-22 y HU-28), `/yo/refrescar` y
-      `/reservas/{reserva_id}/evaluacion` piden el token: sin él responden 401
-      (`not_authenticated`).
+      (HU-21, HU-22 y HU-28), `/yo/refrescar`,
+      `/reservas/{reserva_id}/evaluacion` y las de `/admin` piden el token:
+      sin él responden 401 (`not_authenticated`).
+    - Las rutas de `/admin` (HU-33) además piden que el token traiga
+      `es_admin` en `true`, un booleano de JSON: con un token sin esa marca
+      responden 403 `no_es_administrador` (AD-09). La marca sale del token,
+      sin preguntarle a Identidad.
     - `/estado`, `/tutores`, `/tutores/{usuario_id}` y
       `/tutores/{usuario_id}/evaluaciones` no piden token. Pero si la
       petición trae uno que no sirve (vencido, inválido o con la cabecera mal
@@ -79,6 +84,10 @@ info:
     - Las evaluaciones visibles de un tutor
       (`GET /tutores/{usuario_id}/evaluaciones`) salen de tutoring_db, sin
       llamar a otros servicios. Esa ruta no recalcula la reputación.
+    - Las rutas de `/admin` (HU-33) salen de tutoring_db, sin llamar a
+      Identidad ni a otros servicios. Retirar una evaluación recalcula la
+      reputación del tutor en `usuario_ref` en la misma transacción, como al
+      evaluar.
     - Ninguna respuesta trae el correo de nadie (RNF-07).
     - Los identificadores van como texto. La carrera y la sede van como
       identificador de Catálogo: el nombre se toma de
@@ -150,6 +159,14 @@ info:
       el esquema `Error`). Responde la reserva CANCELADA con el esquema
       `Reserva` de HU-21. Si estaba CONFIRMADA, el bloque vuelve a LIBRE.
 
+    - Próxima versión (HU-33): agrega las rutas del panel de administración,
+      `GET /admin/reservas` y `DELETE /admin/evaluaciones/{evaluacion_id}`,
+      solo con un token con `es_admin` (AD-09). Suma la etiqueta
+      Administración, el parámetro `EvaluacionId`, los esquemas
+      `ReservaAdministrada` y `EvaluacionAdministrada`, la respuesta
+      `NoEsAdministrador` y sus códigos de error (ver el esquema `Error`).
+      Retirar una evaluación recalcula la reputación del tutor.
+
 servers:
   - url: http://localhost:8080/api/tutoring/v1
     description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
@@ -167,6 +184,8 @@ tags:
     description: La solicitud de una tutoría, su confirmación o su rechazo por el tutor, su retiro o su cancelación, y las reservas del usuario, como estudiante o como tutor (HU-21, HU-22 y HU-28). Con sesión.
   - name: Evaluaciones
     description: Evaluación de una tutoría realizada y evaluaciones visibles de un tutor (HU-25).
+  - name: Administración
+    description: Rutas del panel de administración (HU-33, AD-09). Solo con un token con es_admin.
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -2123,6 +2142,203 @@ paths:
         '503':
           $ref: '#/components/responses/ClavesNoConfiguradas'
 
+  /admin/reservas:
+    get:
+      tags: [Administración]
+      operationId: verReservasAdministradas
+      summary: Las reservas, para el panel de administración
+      description: |
+        Las reservas de la plataforma, con su estado, sus participantes y sus
+        fechas, de la más nueva a la más antigua (HU-33, criterio 3).
+
+        - Solo con un token con `es_admin` en `true` (AD-09): sin token, 401;
+          con un token sin la marca, 403 `no_es_administrador`. La marca sale
+          del token, sin preguntarle a Identidad.
+        - Orden: `creada_en`, de la más nueva a la más antigua, y después
+          `id`. Trae hasta 100. No pagina.
+        - `estado` es opcional. Si viene, tiene que ser uno de los siete
+          estados de una reserva, en mayúsculas; si no, 400
+          `estado_invalido`. Vacío (`?estado=`) también es inválido.
+        - El tutor es el dueño del bloque. Cada reserva trae su evaluación si
+          la tiene, también si el administrador ya la retiró (`retirada_en`).
+        - Sale de tutoring_db en una sola consulta, sin llamar a otros
+          servicios. No trae la nota del estudiante ni el lugar o enlace de
+          la tutoría, que no hacen falta para administrar, ni ningún correo,
+          que no está en esta base (RNF-07).
+      security:
+        - tokenAcceso: []
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          description: Solo las reservas en ese estado. Sin él, todas.
+          schema:
+            type: string
+            enum: [SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA, EVALUADA]
+          example: EVALUADA
+      responses:
+        '200':
+          description: Las reservas, de la más nueva a la más antigua, hasta 100. La lista puede venir vacía.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/ReservaAdministrada'
+              examples:
+                evaluadas:
+                  summary: Con estado=EVALUADA, las dos tutorías evaluadas de Valentina
+                  description: |
+                    Datos de ejemplo de `data/seeds/demo`. La evaluación de 1,
+                    de Diego, la retiró el administrador; la de 5, de Camila,
+                    está visible.
+                  value:
+                    - id: 70000000-0000-4000-8000-000000000008
+                      estado: EVALUADA
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000005
+                        sigla: PRO1101
+                        nombre: Programación de Algoritmos
+                      tutor:
+                        usuario_id: 10000000-0000-4000-8000-000000000001
+                        nombre: Valentina
+                        apellido: Soto
+                      solicitante:
+                        usuario_id: 10000000-0000-4000-8000-000000000005
+                        nombre: Diego
+                        apellido: Herrera
+                      bloque:
+                        id: 60000000-0000-4000-8000-000000000008
+                        inicio_en: '2026-09-23T20:00:00Z'
+                        fin_en: '2026-09-23T21:00:00Z'
+                      monto: 0
+                      estado_pago: null
+                      creada_en: '2026-09-21T23:00:00Z'
+                      confirmada_en: '2026-09-22T12:00:00Z'
+                      cerrada_en: '2026-09-24T12:00:00Z'
+                      cancelada_por_usuario_id: null
+                      evaluacion:
+                        id: 80000000-0000-4000-8000-000000000002
+                        calificacion: 1
+                        comentario: Comentario fuera de las normas de la comunidad.
+                        creada_en: '2026-09-24T12:00:00Z'
+                        retirada_en: '2026-09-25T09:00:00Z'
+                    - id: 70000000-0000-4000-8000-000000000001
+                      estado: EVALUADA
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000006
+                        sigla: BDD1101
+                        nombre: Base de Datos
+                      tutor:
+                        usuario_id: 10000000-0000-4000-8000-000000000001
+                        nombre: Valentina
+                        apellido: Soto
+                      solicitante:
+                        usuario_id: 10000000-0000-4000-8000-000000000004
+                        nombre: Camila
+                        apellido: Rojas
+                      bloque:
+                        id: 60000000-0000-4000-8000-000000000001
+                        inicio_en: '2026-09-21T21:00:00Z'
+                        fin_en: '2026-09-21T22:00:00Z'
+                      monto: 5000
+                      estado_pago: PAGADO
+                      creada_en: '2026-09-18T14:00:00Z'
+                      confirmada_en: '2026-09-18T20:00:00Z'
+                      cerrada_en: '2026-09-22T13:00:00Z'
+                      cancelada_por_usuario_id: null
+                      evaluacion:
+                        id: 80000000-0000-4000-8000-000000000001
+                        calificacion: 5
+                        comentario: Explicó la normalización con ejemplos claros. Muy recomendable.
+                        creada_en: '2026-09-22T13:00:00Z'
+                        retirada_en: null
+        '400':
+          description: El estado pedido no es uno de los siete estados de una reserva (`estado_invalido`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                estado_invalido:
+                  $ref: '#/components/examples/EstadoInvalido'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/NoEsAdministrador'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
+  /admin/evaluaciones/{evaluacion_id}:
+    delete:
+      tags: [Administración]
+      operationId: retirarEvaluacion
+      summary: Retirar una evaluación
+      description: |
+        Retira una evaluación inapropiada: deja de contar para la reputación
+        del tutor y deja de salir en su perfil público (HU-33, criterio 4,
+        CA7). No borra la fila.
+
+        - Solo con un token con `es_admin` en `true` (AD-09), como
+          `GET /admin/reservas`.
+        - En una transacción bloquea la evaluación (`SELECT … FOR UPDATE`) y
+          revisa, en este orden:
+          1. Si no existe una evaluación con ese identificador: 404
+             `evaluacion_no_encontrada`.
+          2. Si ya está retirada: 409 `evaluacion_ya_retirada`, sin cambiar
+             cuándo ni quién la retiró.
+        - Escribe `retirada_en` (el instante actual) y
+          `retirada_por_usuario_id` (el usuario del token, que no necesita
+          fila en `usuario_ref`) y, en la misma transacción, recalcula la
+          reputación del tutor en `usuario_ref` con las evaluaciones no
+          retiradas, como al evaluar (HU-25, RN-06).
+        - La reserva no cambia: sigue en `EVALUADA` (anexo A, sección 9).
+        - No llama a otros servicios.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/EvaluacionId'
+      responses:
+        '204':
+          description: Evaluación retirada y reputación del tutor al día. La respuesta no trae cuerpo.
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/NoEsAdministrador'
+        '404':
+          description: |
+            No existe una evaluación con ese identificador
+            (`evaluacion_no_encontrada`). Si `evaluacion_id` no es un uuid en
+            minúsculas, la ruta no existe y responde Django con su página 404
+            en HTML.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                evaluacion_no_encontrada:
+                  summary: El id de una reserva, 70000000-0000-4000-8000-000000000001, que no es el de ninguna evaluación
+                  value:
+                    codigo: evaluacion_no_encontrada
+                    mensaje: No existe una evaluación con ese identificador.
+                    detalles: null
+        '409':
+          description: La evaluación ya estaba retirada. No cambia cuándo ni quién la retiró.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                evaluacion_ya_retirada:
+                  summary: La de 1 de Diego, 80000000-0000-4000-8000-000000000002, que en los datos de ejemplo ya está retirada
+                  value:
+                    codigo: evaluacion_ya_retirada
+                    mensaje: Esa evaluación ya estaba retirada.
+                    detalles: null
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
   /estado:
     get:
       tags: [Estado]
@@ -2221,6 +2437,20 @@ components:
         format: uuid
         pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
       example: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+
+    EvaluacionId:
+      name: evaluacion_id
+      in: path
+      required: true
+      description: |
+        Identificador de la evaluación, el `evaluacion.id` que entrega
+        `GET /admin/reservas`: un uuid en minúsculas y con guiones. Con otra
+        forma la ruta no existe (ver la respuesta 404).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 80000000-0000-4000-8000-000000000001
 
   responses:
     TokenNoValido:
@@ -2433,6 +2663,24 @@ components:
               value:
                 codigo: servicio_no_disponible
                 mensaje: No pudimos comunicarnos con el servicio de Catálogo. Intenta de nuevo en unos minutos.
+                detalles: null
+    NoEsAdministrador:
+      description: |
+        El token no trae `es_admin` en `true`: la cuenta no es
+        administradora (AD-09). La marca sale del token, sin preguntarle a
+        Identidad, así que cambia con el próximo token, al iniciar sesión o
+        al renovarlo: un token emitido antes de quitarle la marca a una
+        cuenta sigue sirviendo en Tutorías hasta que vence (30 minutos).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            no_es_administrador:
+              summary: Camila, que no es administradora
+              value:
+                codigo: no_es_administrador
+                mensaje: Esta sección es solo para administradores.
                 detalles: null
 
   examples:
@@ -3294,6 +3542,140 @@ components:
           format: date-time
           description: Cuándo se registró la evaluación, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
 
+    ReservaAdministrada:
+      type: object
+      description: |
+        Una reserva en el panel de administración (HU-33, criterio 3). No
+        trae la nota del estudiante, la modalidad ni el lugar o enlace, ni
+        ningún correo (RNF-07). Las fechas van en ISO 8601 y en UTC, con `Z`
+        y sin fracción de segundo.
+      required: [id, estado, asignatura, tutor, solicitante, bloque, monto, estado_pago, creada_en, confirmada_en, cerrada_en, cancelada_por_usuario_id, evaluacion]
+      properties:
+        id:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum: [SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA, EVALUADA]
+        asignatura:
+          type: object
+          description: La asignatura de la reserva, de la copia de lectura de Catálogo (`asignatura_ref`).
+          required: [asignatura_id, sigla, nombre]
+          properties:
+            asignatura_id:
+              type: string
+              format: uuid
+            sigla:
+              type: string
+              maxLength: 15
+            nombre:
+              type: string
+              maxLength: 150
+        tutor:
+          type: object
+          description: El dueño del bloque, de la copia de lectura de Identidad (`usuario_ref`).
+          required: [usuario_id, nombre, apellido]
+          properties:
+            usuario_id:
+              type: string
+              format: uuid
+            nombre:
+              type: string
+              maxLength: 80
+            apellido:
+              type: string
+              maxLength: 80
+        solicitante:
+          type: object
+          description: Quien pidió la tutoría, de la copia de lectura de Identidad (`usuario_ref`).
+          required: [usuario_id, nombre, apellido]
+          properties:
+            usuario_id:
+              type: string
+              format: uuid
+            nombre:
+              type: string
+              maxLength: 80
+            apellido:
+              type: string
+              maxLength: 80
+        bloque:
+          type: object
+          description: El bloque de la tutoría.
+          required: [id, inicio_en, fin_en]
+          properties:
+            id:
+              type: string
+              format: uuid
+            inicio_en:
+              type: string
+              format: date-time
+            fin_en:
+              type: string
+              format: date-time
+        monto:
+          type: integer
+          minimum: 0
+          description: En pesos chilenos, la copia de la tarifa al solicitar (A-04). 0 es una tutoría gratuita (RN-05).
+        estado_pago:
+          type: string
+          nullable: true
+          enum: [PENDIENTE, PAGADO, FALLIDO, REEMBOLSADO, null]
+          description: La copia del estado del pago que informa Pagos. null mientras Pagos no informa un pago, y en una tutoría gratuita (RN-05).
+        creada_en:
+          type: string
+          format: date-time
+          description: Cuándo se solicitó.
+        confirmada_en:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo se confirmó, o null si no se confirmó.
+        cerrada_en:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo se cerró, o null si todavía no se cierra.
+        cancelada_por_usuario_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Quién la canceló, o null si nadie la canceló.
+        evaluacion:
+          $ref: '#/components/schemas/EvaluacionAdministrada'
+
+    EvaluacionAdministrada:
+      type: object
+      nullable: true
+      description: |
+        La evaluación de una reserva en el panel de administración (HU-33,
+        criterio 4): lo que hace falta para retirarla. Viene en null si la
+        reserva no tiene evaluación. No trae datos de quien evaluó.
+      required: [id, calificacion, comentario, creada_en, retirada_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador de la evaluación. Es el que pide `DELETE /admin/evaluaciones/{evaluacion_id}`.
+        calificacion:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comentario:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Puede venir en null.
+        creada_en:
+          type: string
+          format: date-time
+          description: Cuándo se evaluó. En ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+        retirada_en:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo la retiró el administrador, en el mismo formato, o null si está visible y cuenta para la reputación.
+
     Estado:
       type: object
       description: Estado del servicio y de su base (HU-01).
@@ -3351,6 +3733,10 @@ components:
           (HU-28) se suma reserva_no_cancelable (409). reserva_no_encontrada
           (404) también sale al cancelar, y bloque_en_el_pasado, al retirar o
           cancelar una reserva cuyo bloque ya empezó.
+        - Con el panel de administración (HU-33) se suman no_es_administrador
+          (403), evaluacion_no_encontrada (404) y evaluacion_ya_retirada
+          (409). estado_invalido (400) también sale al filtrar
+          `GET /admin/reservas` por un estado que no existe.
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.

@@ -1,6 +1,14 @@
 from django.urls import include, path
 
-from . import bloques, busqueda, copias, evaluaciones, perfiles, reservas
+from . import (
+    administracion,
+    bloques,
+    busqueda,
+    copias,
+    evaluaciones,
+    perfiles,
+    reservas,
+)
 
 urlpatterns = [
     path("tutores", busqueda.buscar_tutores, name="tutores"),
@@ -25,6 +33,12 @@ urlpatterns = [
     path("reservas/<uuid:reserva_id>/confirmar", reservas.confirmar, name="confirmar"),
     path("reservas/<uuid:reserva_id>/rechazar", reservas.rechazar, name="rechazar"),
     path("reservas/<uuid:reserva_id>/cancelar", reservas.cancelar, name="cancelar"),
+    path("admin/reservas", administracion.reservas, name="admin-reservas"),
+    path(
+        "admin/evaluaciones/<uuid:evaluacion_id>",
+        administracion.retirar_evaluacion,
+        name="admin-evaluacion",
+    ),
 ]
 
 # Las rutas internas que usa Pagos (HU-23) estan en tutorias/internas.py.
