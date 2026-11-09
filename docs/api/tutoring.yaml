@@ -72,7 +72,10 @@ info:
       HU-28) sale de tutoring_db, sin llamar a Identidad ni a Catálogo antes
       de guardar: las dos partes ya tienen su copia en `usuario_ref`. Después
       de guardar, Tutorías pide a Identidad el aviso a la otra parte (HU-16);
-      si el aviso no sale, la cancelación queda igual.
+      si el aviso no sale, la cancelación queda igual. Si era una tutoría
+      CONFIRMADA con monto, antes del aviso le pide a Pagos el reembolso
+      (CA9, ver la ruta); si Pagos no responde, la cancelación también queda
+      igual.
     - La evaluación (`POST /reservas/{reserva_id}/evaluacion`) sale de
       tutoring_db, sin llamar a otros servicios. Al guardarla se recalcula la
       reputación del tutor en `usuario_ref` (RN-06), en la misma transacción.
@@ -149,6 +152,9 @@ info:
       parámetro `ReservaId` y el código de error `reserva_no_cancelable` (ver
       el esquema `Error`). Responde la reserva CANCELADA con el esquema
       `Reserva` de HU-21. Si estaba CONFIRMADA, el bloque vuelve a LIBRE.
+      Al cancelar una tutoría CONFIRMADA con monto, Tutorías le pide a Pagos
+      el reembolso (CA9): si el pago estaba PAGADO, la respuesta ya trae
+      `estado_pago` en REEMBOLSADO.
 
 servers:
   - url: http://localhost:8080/api/tutoring/v1
@@ -1824,6 +1830,18 @@ paths:
            bloque vuelve a LIBRE y acepta solicitudes nuevas. Si estaba
            SOLICITADA, el bloque no cambia: nunca estuvo ocupado.
 
+        - Después de guardar, si la reserva estaba CONFIRMADA y tiene monto
+          mayor que 0, Tutorías le pide a Pagos el reembolso del pago (CA9).
+          Se pide aunque la copia `estado_pago` no diga PAGADO, porque puede
+          venir atrasada: Pagos es la única fuente del estado del pago, y
+          decide. Si el pago estaba PAGADO, Pagos lo reembolsa y le informa
+          REEMBOLSADO a Tutorías antes de responder, así que la respuesta ya
+          trae `estado_pago` en REEMBOLSADO. Si no hay pago o no estaba
+          pagado, no hay nada que reembolsar y `estado_pago` queda como
+          estaba. No se pide si `estado_pago` ya es REEMBOLSADO, en una
+          tutoría gratuita ni al retirar una solicitud. Si Pagos no responde,
+          la cancelación queda igual y `estado_pago` no cambia: el reembolso
+          queda pendiente.
         - Después de guardar, Tutorías pide a Identidad el aviso
           RESERVA_CANCELADA para la otra parte (HU-16): para el tutor si
           retira o cancela el estudiante, y para el estudiante si cancela el
@@ -1837,7 +1855,7 @@ paths:
         - $ref: '#/components/parameters/ReservaId'
       responses:
         '200':
-          description: La reserva CANCELADA, vista por quien la retiró o la canceló. Si estaba CONFIRMADA, el bloque queda LIBRE.
+          description: La reserva CANCELADA, vista por quien la retiró o la canceló. Si estaba CONFIRMADA, el bloque queda LIBRE. Si estaba pagada y Pagos la reembolsó, `estado_pago` viene en REEMBOLSADO.
           content:
             application/json:
               schema:
@@ -1911,6 +1929,42 @@ paths:
                       nombre: Camila
                       apellido: Rojas
                     rol: tutor
+                camila_cancela_pagada:
+                  summary: Camila cancela una tutoría que ya pagó
+                  description: |
+                    Camila solicitó el bloque 014 de Valentina, Valentina la
+                    confirmó y Camila la pagó (`estado_pago` en PAGADO). Al
+                    cancelar, Tutorías le pide el reembolso a Pagos, que lo
+                    hace y le informa REEMBOLSADO antes de responder (CA9).
+                    El bloque 014 vuelve a LIBRE.
+                  value:
+                    id: 6ea541e7-57a2-481c-b93e-76abecb91700
+                    estado: CANCELADA
+                    nota: null
+                    modalidad: EN_LINEA
+                    lugar_o_enlace: 'https://meet.google.com/abc-defg-hij'
+                    monto: 5000
+                    estado_pago: REEMBOLSADO
+                    creada_en: '2026-11-09T13:02:41Z'
+                    confirmada_en: '2026-11-09T13:10:05Z'
+                    cerrada_en: '2026-11-09T13:24:18Z'
+                    bloque:
+                      id: 60000000-0000-4000-8000-000000000014
+                      inicio_en: '2026-11-13T22:00:00Z'
+                      fin_en: '2026-11-13T23:30:00Z'
+                    asignatura:
+                      asignatura_id: 40000000-0000-4000-8000-000000000006
+                      sigla: BDD1101
+                      nombre: Base de Datos
+                    tutor:
+                      usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                    solicitante:
+                      usuario_id: 10000000-0000-4000-8000-000000000004
+                      nombre: Camila
+                      apellido: Rojas
+                    rol: estudiante
         '400':
           description: |
             El bloque de la reserva ya empezó, aunque todavía no termine

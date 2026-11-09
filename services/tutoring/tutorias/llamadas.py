@@ -1,4 +1,4 @@
-"""Consultas de Tutorias a Identidad y a Catalogo (HU-14, HU-41 y HU-19).
+"""Consultas de Tutorias a otros servicios (HU-14, HU-41, HU-19 y HU-28).
 
 Tutorias guarda copias de lectura del usuario y de la asignatura (usuario_ref
 y asignatura_ref, AD-07). Para crearlas o ponerlas al dia, y para validar
@@ -14,10 +14,13 @@ RN-01, pregunta a las rutas publicas de los otros servicios:
   la sincronizacion de las copias (HU-19) sin las rutas internas de Catalogo.
 
 Las rutas /internal con clave de servicio (Pilar 2, seccion 5.4) se llaman
-con _pedir() y la clave de servicio para lo que necesite datos de otro usuario:
-los de uno (usuario_por_id) o los de varios en una sola llamada
-(usuarios_por_ids, GET /internal/usuarios?ids=, para la sincronizacion de las
-copias, HU-19), los avisos por correo (HU-16) y los pagos simulados (HU-23).
+con _pedir() y la clave de servicio:
+- en Identidad, para lo que necesite datos de otro usuario: los de uno
+  (usuario_por_id) o los de varios en una sola llamada (usuarios_por_ids,
+  GET /internal/usuarios?ids=, para la sincronizacion de las copias, HU-19),
+  y para los avisos por correo (pedir_aviso, HU-16);
+- en Pagos, para el reembolso de una tutoria cancelada (pedir_reembolso,
+  HU-28): la cuarta llamada interna del Pilar 2 (anexo A, seccion 9).
 
 De esa convencion se toma lo demas: urllib de la biblioteca estandar, 3
 segundos de espera y un solo intento. Si el otro servicio no responde, se
@@ -26,7 +29,8 @@ que dice que servicio fallo. urllib solo envuelve en URLError lo que falla al
 conectar: si el servicio acepta la conexion y no contesta a tiempo sale un
 TimeoutError suelto; si corta la respuesta, un ConnectionError o un
 http.client.HTTPException, y si el cuerpo no es JSON, un ValueError. Todos
-terminan en el mismo 503.
+terminan en el mismo 503. Salvo pedir_aviso y pedir_reembolso: corren despues
+de guardar y nunca lanzan una excepcion, y lo que no sale queda en el log.
 """
 
 import http.client
@@ -48,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 IDENTIDAD = "Identidad"
 CATALOGO = "Catálogo"
+PAGOS = "Pagos"
 # Segundos. urllib los aplica a cada operacion del socket, no a la llamada entera.
 ESPERA_MAXIMA = 3
 
@@ -281,6 +286,87 @@ def pedir_aviso(usuario_id, plantilla, reserva):
         )
         return False
     return True
+
+
+def pedir_reembolso(reserva_id):
+    """Pide a Pagos el reembolso del pago de una tutoria cancelada (HU-28, CA9).
+
+    POST /api/payments/v1/internal/pagos/reembolso, con la clave de servicio
+    (la pone _pedir, por ser una ruta /internal) y sin Authorization. El
+    cuerpo es {"reserva_id": "<id de la reserva>"}, con el id como texto.
+    Pagos es la unica fuente del estado del pago (T-174) y decide si hay algo
+    que reembolsar (pagos/internas.py):
+
+    - 2xx: Pagos reembolso el pago, o ya estaba reembolsado.
+    - 404 pago_no_encontrado (la reserva no tiene pago) o 409
+      pago_no_reembolsable (el pago no esta PAGADO): no hay nada que
+      reembolsar. Deja una linea informativa en el log, con la reserva y el
+      codigo. Con el nivel INFO no sale en docker compose logs: Tutorias no
+      configura el registro, y lo que se ve parte en WARNING.
+    - Cualquier otra respuesta, como un 404 sin codigo conocido (falta la ruta
+      o la clave no calza), un 5xx o un error de red: el reembolso quedo
+      pendiente. Deja una linea de error en el log, con la reserva y lo que
+      paso.
+
+    Devuelve True cuando no queda nada pendiente (un 2xx, o el 404 o el 409 de
+    arriba) y False cuando el reembolso quedo pendiente. Nunca lanza una
+    excepcion: un reembolso que no sale no puede deshacer una cancelacion ya
+    guardada.
+
+    Se llama despues del commit de la cancelacion (transaction.on_commit),
+    nunca dentro de la transaccion ni con un bloqueo tomado: Pagos llama de
+    vuelta a Tutorias dentro de la misma peticion, con el aviso PATCH
+    /internal/reservas/<id>/estado-pago (internas.py), que bloquea la reserva
+    con select_for_update. Con la reserva bloqueada, ese aviso esperaria hasta
+    el tiempo maximo de 3 segundos.
+    """
+    try:
+        url = f"{settings.URL_PAGOS}/api/payments/v1/internal/pagos/reembolso"
+        cuerpo = {"reserva_id": str(reserva_id)}
+        estado, respuesta = _pedir(PAGOS, url, metodo="POST", cuerpo=cuerpo)
+    except Exception as error:
+        # _pedir envuelve en ServicioNoDisponible un 5xx o un error de red: lo
+        # que paso es la causa.
+        causa = error if error.__cause__ is None else error.__cause__
+        logger.error(
+            "El reembolso de la reserva %s quedó pendiente: falló la llamada a "
+            "%s (%r)",
+            reserva_id,
+            PAGOS,
+            causa,
+        )
+        return False
+    codigo = _codigo(respuesta)
+    if 200 <= estado < 300:
+        return True
+    if (estado, codigo) in (
+        (404, "pago_no_encontrado"),
+        (409, "pago_no_reembolsable"),
+    ):
+        logger.info(
+            "Nada que reembolsar en la reserva %s: %s respondió %s (codigo %s)",
+            reserva_id,
+            PAGOS,
+            estado,
+            codigo,
+        )
+        return True
+    if estado == 404:
+        logger.error(
+            "El reembolso de la reserva %s quedó pendiente: 404 sin código "
+            "conocido desde %s: revisa CLAVE_SERVICIO",
+            reserva_id,
+            PAGOS,
+        )
+        return False
+    logger.error(
+        "El reembolso de la reserva %s quedó pendiente: %s respondió %s (codigo %s)",
+        reserva_id,
+        PAGOS,
+        estado,
+        codigo,
+    )
+    return False
 
 
 def usuario_por_id(usuario_id):
