@@ -243,39 +243,129 @@
     opacity: .7;
 }
 
-.perfil-accion {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 260px;
-}
-
-.perfil-solicitar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    line-height: 1.3;
-}
-
-/* Deshabilitado hasta HU-21: sin el efecto de styles.css al pasar el mouse */
-.perfil-solicitar:disabled,
-.perfil-solicitar:disabled:hover {
-    background: var(--duoc-blue);
-    opacity: .55;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.perfil-solicitar-estado {
-    font-size: 12px;
-    font-weight: 500;
+/* Solicitar una tutoria (HU-21): a la derecha de los datos del tutor */
+.perfil-solicitud {
+    align-self: start;
+    width: 320px;
+    max-width: 100%;
+    min-width: 0;
 }
 
 /* Con .subjects-hero delante, para ganarle a ".subjects-hero p" de styles.css */
-.subjects-hero .perfil-nota {
+.subjects-hero .perfil-solicitud-texto {
+    padding: 16px 18px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 15px;
+}
+
+.perfil-solicitud-form {
+    display: grid;
+    gap: 12px;
+    padding: 20px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.perfil-solicitud-titulo {
+    color: var(--duoc-blue);
+    font-size: 18px;
+    line-height: 1.3;
+}
+
+.perfil-campo {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.perfil-campo select,
+.perfil-campo textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #F9FAFB;
+    color: var(--dark);
+    font-family: inherit;
+    /* 16px: con menos, el telefono agranda la pagina al escribir */
+    font-size: 16px;
+    font-weight: 400;
+}
+
+.perfil-campo select {
+    height: 48px;
+    padding: 0 12px;
+}
+
+.perfil-campo textarea {
+    min-height: 96px;
+    padding: 10px 12px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.perfil-campo select:focus,
+.perfil-campo textarea:focus {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 1px;
+    border-color: var(--duoc-blue-light);
+}
+
+.perfil-campo-ayuda {
+    margin-top: -6px;
     color: var(--text-light);
     font-size: 13px;
-    text-align: center;
+}
+
+.perfil-contador {
+    text-align: right;
+}
+
+.perfil-solicitud-form .btn-primary {
+    width: 100%;
+    font-size: 15px;
+}
+
+.perfil-solicitud-form .btn-primary:disabled {
+    opacity: .6;
+    cursor: wait;
+    transform: none;
+}
+
+/* avisar() de js/sesion.js usa la clase login-message. Copiadas de
+   perfil.css, que esta pagina no carga. */
+.login-message {
+    display: none;
+    border-radius: 8px;
+    padding: 11px 13px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    font-weight: 600;
+    /* Al llevarlo a la vista, que no quede bajo el encabezado fijo de 78 px. */
+    scroll-margin-top: 96px;
+}
+
+.login-message.error {
+    display: block;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #B91C1C;
+}
+
+.login-message.success {
+    display: block;
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    color: #15803D;
 }
 
 .perfil-aviso {
@@ -408,6 +498,19 @@
    TELEFONO (RNF-03: se ve completa a 360 px, sin desplazamiento horizontal)
 ========================================= */
 
+/* La solicitud baja a su propia fila, para no apretar el nombre del tutor */
+@media (max-width: 900px) {
+    .perfil-cabecera {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .perfil-solicitud {
+        grid-column: 1 / -1;
+        width: 100%;
+        max-width: 560px;
+    }
+}
+
 @media (max-width: 768px) {
     /* styles.css pone la fila del buscador en columna, y ahi su "flex: 1"
        deja la caja de texto en 19 px de alto: vuelve a sus 50 px */
@@ -432,9 +535,12 @@
         gap: 16px;
     }
 
-    .perfil-accion {
-        width: 100%;
+    .perfil-solicitud {
         max-width: none;
+    }
+
+    .perfil-solicitud-form {
+        padding: 18px;
     }
 
     .perfil-seccion {

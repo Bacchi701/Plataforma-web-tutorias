@@ -6,12 +6,13 @@ info:
   description: |
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
-    - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14, HU-41 y
-      HU-25: la búsqueda de tutores y el perfil público de cada tutor (HU-20),
-      los bloques de disponibilidad del tutor (HU-15), las asignaturas que el
-      usuario declara que puede enseñar (HU-14), la copia de sus datos que
-      guarda Tutorías (HU-41), la evaluación de una tutoría realizada (HU-25)
-      y `/estado`, que existe desde HU-01.
+    - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14, HU-41,
+      HU-25 y HU-21: la búsqueda de tutores y el perfil público de cada tutor
+      (HU-20), los bloques de disponibilidad del tutor (HU-15), las
+      asignaturas que el usuario declara que puede enseñar (HU-14), la copia
+      de sus datos que guarda Tutorías (HU-41), la evaluación de una tutoría
+      realizada (HU-25), la solicitud de una tutoría y las reservas de cada
+      usuario (HU-21), y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
     - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
@@ -26,7 +27,8 @@ info:
     pública, el emisor `identity` y las reclamaciones `sub`, `iat`, `exp` e
     `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. Para
     saber quién hace la petición no le pregunta a Identidad: sale del token.
-    - Las rutas de disponibilidad, las de `/perfiles`, `/yo/refrescar` y
+    - Las rutas de disponibilidad, las de `/perfiles` y las de `/reservas`
+      (HU-21), `/yo/refrescar` y
       `/reservas/{reserva_id}/evaluacion` piden el token: sin él responden 401
       (`not_authenticated`).
     - `/estado`, `/tutores`, `/tutores/{usuario_id}` y
@@ -46,9 +48,10 @@ info:
     la ruta no existe (ver `GET /tutores/{usuario_id}`).
 
     **Datos.**
-    - La búsqueda, el perfil público, la disponibilidad y `GET /perfiles`
-      salen de tutoring_db, sin llamar a Identidad ni a Catálogo (AD-07): el
-      tutor y la asignatura vienen de las copias de lectura `usuario_ref` y
+    - La búsqueda, el perfil público, la disponibilidad, `GET /perfiles` y
+      los dos `GET` de `/reservas` (HU-21) salen de tutoring_db, sin llamar a
+      Identidad ni a Catálogo (AD-07): el tutor, el solicitante y la
+      asignatura vienen de las copias de lectura `usuario_ref` y
       `asignatura_ref`.
     - Esas copias se crean o se ponen al día cuando el usuario declara o
       reactiva una asignatura (HU-14, decisión T-166) y cuando la página
@@ -58,6 +61,11 @@ info:
       `GET /api/catalog/v1/carreras/{id}/asignaturas`, que es pública. Si uno
       de los dos no responde en 3 segundos, la ruta responde 503
       `servicio_no_disponible` (`components/responses/SinOtroServicio`).
+    - `POST /reservas` (HU-21) también crea o pone al día la copia del
+      solicitante en `usuario_ref`, con la misma llamada a `GET /yo` de
+      Identidad, antes de guardar la solicitud (T-166). No llama a Catálogo:
+      la asignatura ya está en `asignatura_ref`, porque el tutor la declaró.
+      Si Identidad no responde, la ruta responde 503 y no guarda nada.
     - La evaluación (`POST /reservas/{reserva_id}/evaluacion`) sale de
       tutoring_db, sin llamar a otros servicios. Al guardarla se recalcula la
       reputación del tutor en `usuario_ref` (RN-06), en la misma transacción.
@@ -110,6 +118,15 @@ info:
       hasta 100, con el esquema `EvaluacionPublica` del perfil público y su
       mismo 404.
 
+    - Próxima versión (HU-21): agrega la solicitud de una tutoría y las
+      reservas de cada usuario, con sesión: `GET` y `POST /reservas` y
+      `GET /reservas/{reserva_id}`, con la etiqueta Reservas, el parámetro
+      `ReservaId` (el de HU-25), los esquemas `NuevaSolicitud`, `Reserva`,
+      `BloqueDeLaReserva`, `AsignaturaDeLaReserva` y `PersonaDeLaReserva`, y
+      sus códigos de error (ver el esquema `Error`). `POST /reservas` crea o
+      pone al día la copia del solicitante con `GET /yo` de Identidad (ver
+      «Datos»).
+
 servers:
   - url: http://localhost:8080/api/tutoring/v1
     description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
@@ -123,6 +140,8 @@ tags:
     description: Las asignaturas que el usuario declara que puede enseñar, con su tarifa (HU-14). Con sesión.
   - name: Copia del usuario
     description: La copia de los datos del usuario que guarda Tutorías, `usuario_ref` (HU-41). Con sesión.
+  - name: Reservas
+    description: La solicitud de una tutoría y las reservas del usuario, como estudiante o como tutor (HU-21). Con sesión.
   - name: Evaluaciones
     description: Evaluación de una tutoría realizada y evaluaciones visibles de un tutor (HU-25).
   - name: Estado
@@ -1121,6 +1140,351 @@ paths:
         '503':
           $ref: '#/components/responses/SinOtroServicio'
 
+  /reservas:
+    get:
+      tags: [Reservas]
+      operationId: verMisReservas
+      summary: Mis reservas, como estudiante o como tutor
+      description: |
+        Las reservas del usuario del token (HU-21), de la más nueva a la más
+        antigua (`creada_en`), hasta 100. Son el backend de las pantallas «Mis
+        reservas y solicitudes recibidas» (HU-30) y de pago (HU-24).
+
+        - `rol=estudiante`: las reservas que solicitó. `rol=tutor`: las de
+          sus bloques, que le solicitaron otros.
+        - `estado`, si viene, deja solo las reservas en ese estado.
+        - Se revisa primero `rol` (400 `rol_invalido`) y después `estado`
+          (400 `estado_invalido`).
+        - Sale de tutoring_db en una sola consulta, sin llamar a otros
+          servicios. No pagina.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - name: rol
+          in: query
+          required: true
+          description: De qué lado se miran las reservas. Sin él, o con otro valor, responde 400 `rol_invalido`.
+          schema:
+            type: string
+            enum: [estudiante, tutor]
+          example: estudiante
+        - name: estado
+          in: query
+          required: false
+          description: |
+            Uno de los siete estados de una reserva, en mayúsculas. Si viene
+            vacío o con otro valor, responde 400 `estado_invalido`.
+          schema:
+            type: string
+            enum: [SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA, EVALUADA]
+          example: SOLICITADA
+      responses:
+        '200':
+          description: Las reservas, de la más nueva a la más antigua. La lista puede venir vacía.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/Reserva'
+              examples:
+                camila_confirmadas:
+                  summary: Camila, con ?rol=estudiante&estado=CONFIRMADA
+                  description: Datos de ejemplo de `data/seeds/demo`.
+                  value:
+                    - id: 70000000-0000-4000-8000-000000000003
+                      estado: CONFIRMADA
+                      nota: Quiero revisar mi proyecto antes de entregarlo.
+                      modalidad: EN_LINEA
+                      lugar_o_enlace: 'https://meet.example.com/tutoria-web'
+                      monto: 4000
+                      estado_pago: PENDIENTE
+                      creada_en: '2026-09-28T16:00:00Z'
+                      confirmada_en: '2026-09-29T12:00:00Z'
+                      cerrada_en: null
+                      bloque:
+                        id: 60000000-0000-4000-8000-000000000003
+                        inicio_en: '2026-10-06T22:00:00Z'
+                        fin_en: '2026-10-06T23:00:00Z'
+                      asignatura:
+                        asignatura_id: 40000000-0000-4000-8000-000000000008
+                        sigla: WEB2101
+                        nombre: Desarrollo Web
+                      tutor:
+                        usuario_id: 10000000-0000-4000-8000-000000000002
+                        nombre: Matías
+                        apellido: Fuentes
+                      solicitante:
+                        usuario_id: 10000000-0000-4000-8000-000000000004
+                        nombre: Camila
+                        apellido: Rojas
+                      rol: estudiante
+                sin_reservas:
+                  summary: Un usuario que todavía no ha solicitado tutorías, con ?rol=estudiante
+                  value: []
+        '400':
+          description: |
+            Falta `rol` o no es `estudiante` ni `tutor` (`rol_invalido`), o
+            `estado` no es uno de los siete estados (`estado_invalido`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                rol_invalido:
+                  $ref: '#/components/examples/RolInvalido'
+                estado_invalido:
+                  $ref: '#/components/examples/EstadoInvalido'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+    post:
+      tags: [Reservas]
+      operationId: solicitarTutoria
+      summary: Solicitar una tutoría
+      description: |
+        El usuario del token solicita una tutoría sobre un bloque LIBRE y
+        futuro de un tutor, en una de las asignaturas que el tutor ofrece, con
+        una nota opcional (HU-21). La reserva queda SOLICITADA y el bloque
+        sigue LIBRE para otras solicitudes, hasta que el tutor confirme una
+        (RN-03).
+
+        Se revisa en este orden:
+        1. El cuerpo, sin llamar a nadie: `bloque_id` es un uuid (400
+           `bloque_invalido`); `asignatura_id` es un uuid (400
+           `asignatura_invalida`), y `nota`, si viene, es un texto de hasta
+           500 caracteres sin contar los espacios de los lados, sin
+           caracteres que no se pueden guardar, como el nulo (400
+           `nota_invalida`).
+        2. Los datos del solicitante, con una llamada a Identidad (`GET /yo`,
+           con el mismo token), que crea o pone al día su copia,
+           `usuario_ref` (AD-07, decisión T-166). Si Identidad no reconoce la
+           cuenta: 403 `cuenta_inactiva`, y la copia queda desactivada. Si el
+           token vence entre medio: 401 `token_vencido`. Si Identidad no
+           responde: 503 `servicio_no_disponible`, sin reserva.
+        3. En una transacción que bloquea el bloque (`SELECT … FOR UPDATE`):
+           que exista y no esté ELIMINADO (404 `bloque_no_encontrado`); que no
+           sea del solicitante (400 `bloque_propio`); que no haya empezado
+           (400 `bloque_en_el_pasado`); que esté LIBRE (409
+           `bloque_no_disponible`), y que el tutor tenga un perfil activo en
+           esa asignatura y su cuenta activa en Tutorías (400
+           `asignatura_no_ofrecida`).
+        4. Crea la reserva SOLICITADA, con la asignatura, la nota y un
+           `monto` igual a la tarifa del tutor en ese momento: una copia
+           congelada, que no cambia si después cambia la tarifa (ajuste
+           A-04). Sin estado de pago. Si el solicitante ya tiene una solicitud
+           pendiente para ese bloque, la base la rechaza (restricción
+           `ux_reserva_solicitud_unica`): 409 `solicitud_duplicada`. Si la
+           anterior ya no está pendiente (por ejemplo, la rechazaron), puede
+           solicitar otra vez.
+
+        - Después de guardar, Tutorías pide a Identidad el aviso al tutor
+          (HU-16). Si el aviso no sale, la solicitud queda igual.
+        - Una nota vacía o solo con espacios se guarda en null. Otros campos
+          del cuerpo se ignoran.
+      security:
+        - tokenAcceso: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevaSolicitud'
+            examples:
+              con_nota:
+                summary: Camila pide a Valentina una tutoría de Base de Datos, con una nota
+                value:
+                  bloque_id: 60000000-0000-4000-8000-000000000013
+                  asignatura_id: 40000000-0000-4000-8000-000000000006
+                  nota: Quiero repasar normalización antes del certamen.
+              sin_nota:
+                summary: Lo mismo, sin nota
+                value:
+                  bloque_id: 60000000-0000-4000-8000-000000000013
+                  asignatura_id: 40000000-0000-4000-8000-000000000006
+      responses:
+        '201':
+          description: Solicitud creada. La reserva queda SOLICITADA y el bloque sigue LIBRE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                camila:
+                  summary: La solicitud de Camila a Valentina, con nota
+                  description: |
+                    Datos de ejemplo de `data/seeds/demo`, cargados el
+                    08-11-2026: los bloques libres futuros se calculan desde
+                    el día de la carga. El bloque 013 de Valentina queda el
+                    11-11-2026 de 18:00 a 19:00, hora de Chile.
+                  value:
+                    id: 2b6f1c3e-8a4d-4e7b-9c1f-5d3a7e9b0c2a
+                    estado: SOLICITADA
+                    nota: Quiero repasar normalización antes del certamen.
+                    modalidad: null
+                    lugar_o_enlace: null
+                    monto: 5000
+                    estado_pago: null
+                    creada_en: '2026-11-08T22:15:04Z'
+                    confirmada_en: null
+                    cerrada_en: null
+                    bloque:
+                      id: 60000000-0000-4000-8000-000000000013
+                      inicio_en: '2026-11-11T21:00:00Z'
+                      fin_en: '2026-11-11T22:00:00Z'
+                    asignatura:
+                      asignatura_id: 40000000-0000-4000-8000-000000000006
+                      sigla: BDD1101
+                      nombre: Base de Datos
+                    tutor:
+                      usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                    solicitante:
+                      usuario_id: 10000000-0000-4000-8000-000000000004
+                      nombre: Camila
+                      apellido: Rojas
+                    rol: estudiante
+        '400':
+          description: |
+            La solicitud no sirve. Los códigos posibles, en el orden en que se
+            revisan, son:
+            - `bloque_invalido`: falta `bloque_id` o no es un uuid;
+            - `asignatura_invalida`: falta `asignatura_id` o no es un uuid;
+            - `nota_invalida`: la nota no es un texto, tiene más de 500
+              caracteres o trae caracteres que no se pueden guardar;
+            - `bloque_propio`: el bloque es del mismo solicitante (RN-03);
+            - `bloque_en_el_pasado`: el bloque ya empezó;
+            - `asignatura_no_ofrecida`: el tutor no tiene un perfil activo en
+              esa asignatura, o su cuenta está desactivada en Tutorías.
+
+            Si el cuerpo no es JSON válido, responde `parse_error`, con el
+            mensaje del framework.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                bloque_invalido:
+                  $ref: '#/components/examples/BloqueInvalido'
+                asignatura_invalida:
+                  $ref: '#/components/examples/AsignaturaDeLaSolicitudInvalida'
+                nota_invalida:
+                  $ref: '#/components/examples/NotaInvalida'
+                bloque_propio:
+                  $ref: '#/components/examples/BloquePropio'
+                bloque_en_el_pasado:
+                  $ref: '#/components/examples/HorarioQueYaEmpezo'
+                asignatura_no_ofrecida:
+                  $ref: '#/components/examples/AsignaturaNoOfrecida'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/CuentaInactiva'
+        '404':
+          description: El bloque no existe o está ELIMINADO (`bloque_no_encontrado`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: bloque_no_encontrado
+                mensaje: 'No encontramos ese horario: puede que el tutor lo haya eliminado.'
+                detalles: null
+        '409':
+          description: |
+            El bloque ya tiene una tutoría confirmada (`bloque_no_disponible`),
+            o el solicitante ya tiene una solicitud pendiente para ese bloque
+            (`solicitud_duplicada`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                bloque_no_disponible:
+                  $ref: '#/components/examples/BloqueNoDisponible'
+                solicitud_duplicada:
+                  $ref: '#/components/examples/SolicitudDuplicada'
+        '503':
+          $ref: '#/components/responses/SinOtroServicio'
+
+  /reservas/{reserva_id}:
+    get:
+      tags: [Reservas]
+      operationId: verUnaReserva
+      summary: Una reserva del usuario
+      description: |
+        Una reserva en que el usuario del token es el solicitante o el tutor
+        (HU-21), con `rol` según de qué lado está.
+
+        - Si la reserva no existe o es de otras personas, responde 404
+          `reserva_no_encontrada`, como la evaluación: los dos casos
+          responden igual, para no revelar que existe.
+        - Sale de tutoring_db, sin llamar a otros servicios.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+      responses:
+        '200':
+          description: La reserva, vista por quien consulta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                matias:
+                  summary: Matías, el tutor, ve la tutoría que le confirmó a Camila
+                  description: Datos de ejemplo de `data/seeds/demo`.
+                  value:
+                    id: 70000000-0000-4000-8000-000000000003
+                    estado: CONFIRMADA
+                    nota: Quiero revisar mi proyecto antes de entregarlo.
+                    modalidad: EN_LINEA
+                    lugar_o_enlace: 'https://meet.example.com/tutoria-web'
+                    monto: 4000
+                    estado_pago: PENDIENTE
+                    creada_en: '2026-09-28T16:00:00Z'
+                    confirmada_en: '2026-09-29T12:00:00Z'
+                    cerrada_en: null
+                    bloque:
+                      id: 60000000-0000-4000-8000-000000000003
+                      inicio_en: '2026-10-06T22:00:00Z'
+                      fin_en: '2026-10-06T23:00:00Z'
+                    asignatura:
+                      asignatura_id: 40000000-0000-4000-8000-000000000008
+                      sigla: WEB2101
+                      nombre: Desarrollo Web
+                    tutor:
+                      usuario_id: 10000000-0000-4000-8000-000000000002
+                      nombre: Matías
+                      apellido: Fuentes
+                    solicitante:
+                      usuario_id: 10000000-0000-4000-8000-000000000004
+                      nombre: Camila
+                      apellido: Rojas
+                    rol: tutor
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          description: |
+            La reserva no existe o es de otras personas
+            (`reserva_no_encontrada`). Si `reserva_id` no es un uuid en
+            minúsculas, la ruta no existe y responde Django con su página 404
+            en HTML.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_no_encontrada
+                mensaje: No encontramos esa tutoría.
+                detalles: null
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
   /reservas/{reserva_id}/evaluacion:
     post:
       tags: [Evaluaciones]
@@ -1704,6 +2068,66 @@ components:
         codigo: asignatura_ya_declarada
         mensaje: 'Ya declaraste esa asignatura: puedes cambiar su tarifa en tu lista.'
         detalles: null
+    BloqueInvalido:
+      summary: Sin bloque_id, o uno que no es un uuid
+      value:
+        codigo: bloque_invalido
+        mensaje: Elige uno de los horarios disponibles del tutor.
+        detalles: null
+    AsignaturaDeLaSolicitudInvalida:
+      summary: Al solicitar, sin asignatura_id o con uno que no es un uuid
+      value:
+        codigo: asignatura_invalida
+        mensaje: Elige la asignatura de la tutoría.
+        detalles: null
+    NotaInvalida:
+      summary: Una nota de más de 500 caracteres
+      value:
+        codigo: nota_invalida
+        mensaje: La nota puede tener hasta 500 caracteres.
+        detalles: null
+    BloquePropio:
+      summary: Valentina pide una tutoría en un bloque suyo
+      value:
+        codigo: bloque_propio
+        mensaje: No puedes solicitar una tutoría en tu propio bloque.
+        detalles: null
+    HorarioQueYaEmpezo:
+      summary: Al solicitar, un bloque que ya empezó o ya terminó
+      value:
+        codigo: bloque_en_el_pasado
+        mensaje: Ese horario ya empezó. Elige otro.
+        detalles: null
+    AsignaturaNoOfrecida:
+      summary: Una asignatura que el tutor no tiene activa, o un tutor con la cuenta desactivada
+      value:
+        codigo: asignatura_no_ofrecida
+        mensaje: El tutor no ofrece esa asignatura.
+        detalles: null
+    BloqueNoDisponible:
+      summary: El bloque ya tiene una tutoría confirmada (OCUPADO)
+      value:
+        codigo: bloque_no_disponible
+        mensaje: Ese horario ya tiene una tutoría confirmada. Elige otro.
+        detalles: null
+    SolicitudDuplicada:
+      summary: Camila ya tiene una solicitud pendiente para ese bloque
+      value:
+        codigo: solicitud_duplicada
+        mensaje: Ya tienes una solicitud pendiente para ese horario.
+        detalles: null
+    RolInvalido:
+      summary: Sin ?rol=, o con otro valor
+      value:
+        codigo: rol_invalido
+        mensaje: 'Indica el rol: ?rol=estudiante o ?rol=tutor.'
+        detalles: null
+    EstadoInvalido:
+      summary: Un estado que no existe, como PENDIENTE
+      value:
+        codigo: estado_invalido
+        mensaje: 'El estado tiene que ser uno de estos: SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA o EVALUADA.'
+        detalles: null
 
   schemas:
 
@@ -2094,6 +2518,139 @@ components:
           type: boolean
           description: true si el usuario tenía copia en Tutorías y quedó al día; false si todavía no tiene copia.
 
+    NuevaSolicitud:
+      type: object
+      description: La solicitud de una tutoría (HU-21). Otros campos se ignoran.
+      required: [bloque_id, asignatura_id]
+      properties:
+        bloque_id:
+          type: string
+          format: uuid
+          description: Un bloque LIBRE y futuro del tutor, como los entrega `GET /tutores/{usuario_id}` en `bloques`.
+        asignatura_id:
+          type: string
+          format: uuid
+          description: Una de las asignaturas del tutor, como las entrega `GET /tutores/{usuario_id}` en `asignaturas`.
+        nota:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Opcional, para el tutor. Hasta 500 caracteres sin contar los espacios de los lados; vacía o en blanco se guarda en null.
+
+    Reserva:
+      type: object
+      description: |
+        Una reserva, vista por su solicitante o por su tutor (HU-21). No trae
+        el correo de nadie (RNF-07).
+      required: [id, estado, nota, modalidad, lugar_o_enlace, monto, estado_pago, creada_en, confirmada_en, cerrada_en, bloque, asignatura, tutor, solicitante, rol]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador de la reserva. Es el que piden `GET /reservas/{reserva_id}` y la evaluación.
+        estado:
+          type: string
+          enum: [SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA, EVALUADA]
+          description: Nace SOLICITADA. Los cambios de estado los hacen otras historias (anexo A, sección 9).
+        nota:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: La nota del solicitante para el tutor. Puede venir en null.
+        modalidad:
+          type: string
+          enum: [PRESENCIAL, EN_LINEA]
+          nullable: true
+          description: La fija el tutor al confirmar (HU-22). En null mientras no se confirma.
+        lugar_o_enlace:
+          type: string
+          maxLength: 300
+          nullable: true
+          description: La sala o el enlace de la sesión, que fija el tutor al confirmar. En null mientras no se confirma.
+        monto:
+          type: integer
+          minimum: 0
+          description: La tarifa del tutor en esa asignatura al solicitar, en pesos chilenos. Es una copia congelada (ajuste A-04). 0 es una tutoría gratuita, sin pago (RN-05).
+        estado_pago:
+          type: string
+          enum: [PENDIENTE, PAGADO, FALLIDO, REEMBOLSADO]
+          nullable: true
+          description: Lo informa Pagos (HU-23). En null al solicitar y mientras no haya un pago. Una tutoría gratuita no tiene.
+        creada_en:
+          type: string
+          format: date-time
+          description: Cuándo se solicitó. En ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+        confirmada_en:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo la confirmó el tutor (HU-22), en UTC con `Z`. En null mientras no se confirma.
+        cerrada_en:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo se cerró la reserva, por ejemplo al rechazarla o al evaluarla, en UTC con `Z`. En null mientras sigue abierta.
+        bloque:
+          $ref: '#/components/schemas/BloqueDeLaReserva'
+        asignatura:
+          $ref: '#/components/schemas/AsignaturaDeLaReserva'
+        tutor:
+          $ref: '#/components/schemas/PersonaDeLaReserva'
+        solicitante:
+          $ref: '#/components/schemas/PersonaDeLaReserva'
+        rol:
+          type: string
+          enum: [estudiante, tutor]
+          description: De qué lado está quien consulta. `estudiante` si la solicitó; `tutor` si es el dueño del bloque.
+
+    BloqueDeLaReserva:
+      type: object
+      description: El bloque de la reserva. Su dueño es el tutor.
+      required: [id, inicio_en, fin_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+        inicio_en:
+          type: string
+          format: date-time
+          description: Inicio, en ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+        fin_en:
+          type: string
+          format: date-time
+          description: Término, posterior al inicio. En ISO 8601 y en UTC, con `Z` y sin fracción de segundo.
+
+    AsignaturaDeLaReserva:
+      type: object
+      description: La asignatura de la tutoría, de la copia de lectura de Catálogo (`asignatura_ref`).
+      required: [asignatura_id, sigla, nombre]
+      properties:
+        asignatura_id:
+          type: string
+          format: uuid
+        sigla:
+          type: string
+          maxLength: 15
+        nombre:
+          type: string
+          maxLength: 150
+
+    PersonaDeLaReserva:
+      type: object
+      description: El tutor o el solicitante de la reserva, de la copia de lectura de Identidad (`usuario_ref`). Sin el correo (RNF-07).
+      required: [usuario_id, nombre, apellido]
+      properties:
+        usuario_id:
+          type: string
+          format: uuid
+          description: Identificador del usuario en Identidad.
+        nombre:
+          type: string
+          maxLength: 80
+        apellido:
+          type: string
+          maxLength: 80
+
     NuevaEvaluacion:
       type: object
       description: Datos para evaluar una tutoría realizada (HU-25). Otros campos se ignoran.
@@ -2176,6 +2733,12 @@ components:
           comentario_invalido (400), solo_el_solicitante (403),
           reserva_no_encontrada (404) y reserva_ya_evaluada,
           reserva_no_realizada y tutoria_no_terminada (409).
+        - Con la solicitud y las reservas (HU-21) se suman bloque_invalido,
+          nota_invalida, bloque_propio, asignatura_no_ofrecida, rol_invalido
+          y estado_invalido (400); bloque_no_encontrado (404), y
+          bloque_no_disponible y solicitud_duplicada (409).
+          asignatura_invalida también sale al solicitar una tutoría, y
+          bloque_en_el_pasado, al solicitar un bloque que ya empezó.
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.

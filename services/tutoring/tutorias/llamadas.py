@@ -42,7 +42,7 @@ from rest_framework import status
 from rest_framework.exceptions import APIException, AuthenticationFailed
 
 from .autenticacion import VENCIDO
-from .bloques import Rechazo
+from .bloques import Rechazo, instante_json
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +195,92 @@ def datos_del_usuario(autorizacion):
         raise AuthenticationFailed(VENCIDO, code="token_vencido")
     logger.error("Identidad respondió %s (codigo %s) a GET /yo", estado, codigo)
     raise no_disponible(IDENTIDAD)
+
+
+def _cuerpo_del_aviso(destinatario, plantilla, reserva):
+    """El cuerpo JSON de POST /internal/avisos (ver pedir_aviso)."""
+    bloque = reserva.bloque
+    # La otra parte de la reserva. El tutor es el dueno del bloque (3FN).
+    if destinatario == bloque.usuario_id:
+        otra_persona = reserva.solicitante_usuario
+    else:
+        otra_persona = bloque.usuario
+    return {
+        "usuario_id": str(destinatario),
+        "plantilla": plantilla,
+        "referencia_id": str(reserva.id),
+        "datos": {
+            "asignatura": {
+                "sigla": reserva.asignatura.sigla,
+                "nombre": reserva.asignatura.nombre,
+            },
+            "inicio_en": instante_json(bloque.inicio_en),
+            "fin_en": instante_json(bloque.fin_en),
+            "otra_persona": {
+                "nombre": otra_persona.nombre,
+                "apellido": otra_persona.apellido,
+            },
+            "nota": reserva.nota,
+            "modalidad": reserva.modalidad,
+            "lugar_o_enlace": reserva.lugar_o_enlace,
+        },
+    }
+
+
+def pedir_aviso(usuario_id, plantilla, reserva):
+    """Pide a Identidad el aviso por correo de una reserva (HU-16).
+
+    Contrato provisional para HU-16, que construye la ruta en Identidad:
+    POST /api/identity/v1/internal/avisos, con la clave de servicio (la pone
+    _pedir, por ser una ruta /internal) y sin Authorization. El cuerpo:
+
+        {"usuario_id": "<destinatario>",
+         "plantilla": "SOLICITUD_RECIBIDA",
+         "referencia_id": "<id de la reserva>",
+         "datos": {"asignatura": {"sigla": "BDD1101", "nombre": "Base de Datos"},
+                   "inicio_en": "2026-11-11T21:00:00Z",
+                   "fin_en": "2026-11-11T22:00:00Z",
+                   "otra_persona": {"nombre": "Camila", "apellido": "Rojas"},
+                   "nota": "...", "modalidad": null, "lugar_o_enlace": null}}
+
+    - usuario_id y referencia_id van como texto: _pedir escribe el cuerpo con
+      json.dumps, que no sabe escribir un uuid.UUID.
+    - plantilla es una del anexo A: SOLICITUD_RECIBIDA, RESERVA_CONFIRMADA,
+      RESERVA_RECHAZADA o RESERVA_CANCELADA.
+    - otra_persona es la otra parte de la reserva: el solicitante si el
+      destinatario es el tutor (el dueno del bloque), y el tutor si es el
+      solicitante.
+    - referencia_id permite que Identidad no mande dos veces el mismo aviso
+      (ux_aviso_idempotente).
+    - Las fechas van en UTC con Z; la hora de Chile la pone el correo.
+
+    Nunca lanza una excepcion: un aviso que no sale no puede deshacer la
+    operacion que lo pidio. Si Identidad no responde o no responde un 2xx,
+    deja una linea en el log y devuelve False. Devuelve True si Identidad
+    acepto el aviso.
+    """
+    referencia = getattr(reserva, "id", None)
+    try:
+        destinatario = uuid.UUID(str(usuario_id))
+        url = f"{settings.URL_IDENTIDAD}/api/identity/v1/internal/avisos"
+        cuerpo = _cuerpo_del_aviso(destinatario, plantilla, reserva)
+        estado, respuesta = _pedir(IDENTIDAD, url, metodo="POST", cuerpo=cuerpo)
+    except Exception as error:
+        logger.warning(
+            "No salió el aviso %s de la reserva %s: %r", plantilla, referencia, error
+        )
+        return False
+    if not 200 <= estado < 300:
+        logger.warning(
+            "No salió el aviso %s de la reserva %s: Identidad respondió %s "
+            "(codigo %s)",
+            plantilla,
+            referencia,
+            estado,
+            _codigo(respuesta),
+        )
+        return False
+    return True
 
 
 def usuario_por_id(usuario_id):
