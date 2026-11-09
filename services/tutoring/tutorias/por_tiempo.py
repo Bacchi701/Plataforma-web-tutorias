@@ -42,3 +42,32 @@ def expirar_solicitudes(ahora=None):
         estado=EstadoReserva.SOLICITADA,
         bloque_id__in=empezados.values("id"),
     ).update(estado=EstadoReserva.EXPIRADA, cerrada_en=ahora)
+
+
+def cerrar_realizadas(ahora=None):
+    """Pasa a REALIZADA cada tutoria CONFIRMADA que ya termino. Devuelve cuantas.
+
+    Criterio 1 de HU-29 (CA6, anexo A, seccion 9): cada reserva CONFIRMADA
+    cuyo bloque tiene fin_en <= ahora queda REALIZADA, y desde ahi el
+    estudiante la puede evaluar (HU-25). Si ahora es None, usa timezone.now().
+
+    Solo escribe estado. cerrada_en no, porque REALIZADA no es un estado
+    terminal: cerrada_en la escribe EVALUADA (HU-25). El bloque sigue OCUPADO,
+    porque ux_reserva_bloque_ocupado cubre tambien REALIZADA. No mira
+    estado_pago: un pago pendiente o fallido no bloquea la sesion (RN-05). No
+    avisa a nadie y no escribe ejecucion_tarea: esa fila la escribe el comando
+    cerrar_y_expirar.
+
+    Es un solo UPDATE, con el estado en la tabla que se actualiza y el bloque
+    en una subconsulta, por lo que explica expirar_solicitudes. Asi, dos
+    ejecuciones seguidas, o al mismo tiempo (el programador y una a mano), no
+    cierran dos veces la misma reserva: la segunda, que espera a la primera en
+    esa fila, vuelve a revisar el estado y ya no la encuentra CONFIRMADA.
+    """
+    if ahora is None:
+        ahora = timezone.now()
+    terminados = BloqueDisponibilidad.objects.filter(fin_en__lte=ahora)
+    return Reserva.objects.filter(
+        estado=EstadoReserva.CONFIRMADA,
+        bloque_id__in=terminados.values("id"),
+    ).update(estado=EstadoReserva.REALIZADA)

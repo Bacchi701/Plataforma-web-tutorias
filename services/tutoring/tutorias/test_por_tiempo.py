@@ -1,5 +1,9 @@
 """Pruebas de HU-28 (parte A), criterio 5: la expiracion de las solicitudes.
 
+Y de HU-29, criterio 1: cerrar_realizadas, el cierre de las tutorias que ya
+terminaron. Las dos las llama el comando cerrar_y_expirar, que se prueba en
+test_cerrar_y_expirar.py.
+
 expirar_solicitudes (por_tiempo.py) no es una ruta: la ejecuta el comando del
 programador (HU-29). Corren contra PostgreSQL. Los bloques que ya empezaron se
 crean directo en la base, porque la API no los acepta, sin solaparse con otros
@@ -25,12 +29,13 @@ from .models import (
     AsignaturaRef,
     BloqueDisponibilidad,
     EstadoBloque,
+    EstadoPago,
     EstadoReserva,
     Modalidad,
     Reserva,
     UsuarioRef,
 )
-from .por_tiempo import expirar_solicitudes
+from .por_tiempo import cerrar_realizadas, expirar_solicitudes
 
 DISPONIBILIDAD = "/api/tutoring/v1/disponibilidad"
 
@@ -302,3 +307,167 @@ def test_es_un_solo_update_con_el_estado_en_la_tabla_que_se_actualiza(
     assert sql.startswith('UPDATE "reserva" ')
     assert '"reserva"."id" IN' not in sql
     assert '"reserva"."estado"' in sql
+
+
+# ------------------------------------------------------------ HU-29, criterio 1 (CA6)
+
+
+@pytest.mark.django_db
+def test_la_confirmada_de_un_bloque_que_ya_termino_queda_realizada(
+    tutora, camila, asignatura
+):
+    ahora = timezone.now()
+    terminado = bloque(tutora, ahora - timedelta(hours=2), estado=EstadoBloque.OCUPADO)
+    confirmada = reserva(terminado, camila, asignatura, EstadoReserva.CONFIRMADA)
+    antes = Reserva.objects.filter(pk=confirmada.pk).values().get()
+    bloque_antes = como_esta_el_bloque(terminado)
+
+    cambiadas = cerrar_realizadas(ahora=ahora)
+
+    assert cambiadas == 1
+    # Solo cambia el estado. cerrada_en sigue en NULL: REALIZADA no es un
+    # estado terminal (cerrada_en la escribe EVALUADA, HU-25).
+    despues = Reserva.objects.filter(pk=confirmada.pk).values().get()
+    assert despues == {**antes, "estado": EstadoReserva.REALIZADA}
+    assert como_esta(confirmada) == (EstadoReserva.REALIZADA, None)
+    # El bloque sigue OCUPADO y no cambia.
+    assert bloque_antes[0] == EstadoBloque.OCUPADO
+    assert como_esta_el_bloque(terminado) == bloque_antes
+
+
+@pytest.mark.django_db
+def test_la_confirmada_en_curso_o_futura_no_cambia(tutora, camila, asignatura):
+    ahora = timezone.now()
+    # Uno empezo hace media hora y termina en media hora; el otro es futuro.
+    en_curso = bloque(
+        tutora, ahora - timedelta(minutes=30), estado=EstadoBloque.OCUPADO
+    )
+    futuro = bloque(tutora, ahora + timedelta(hours=1), estado=EstadoBloque.OCUPADO)
+    confirmadas = [
+        reserva(en_curso, camila, asignatura, EstadoReserva.CONFIRMADA),
+        reserva(futuro, camila, asignatura, EstadoReserva.CONFIRMADA),
+    ]
+
+    assert cerrar_realizadas(ahora=ahora) == 0
+    assert [como_esta(r) for r in confirmadas] == [
+        (EstadoReserva.CONFIRMADA, None),
+        (EstadoReserva.CONFIRMADA, None),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "estado_pago",
+    [EstadoPago.PENDIENTE, EstadoPago.FALLIDO, None],
+    ids=["pendiente", "fallido", "sin_informar"],
+)
+def test_un_pago_pendiente_fallido_o_sin_informar_no_impide_cerrarla(
+    tutora, camila, asignatura, estado_pago
+):
+    """RN-05: un pago que no se completo no bloquea la sesion."""
+    ahora = timezone.now()
+    terminado = bloque(tutora, ahora - timedelta(hours=2), estado=EstadoBloque.OCUPADO)
+    confirmada = reserva(
+        terminado,
+        camila,
+        asignatura,
+        EstadoReserva.CONFIRMADA,
+        monto=Decimal("5000"),
+        estado_pago=estado_pago,
+    )
+
+    assert cerrar_realizadas(ahora=ahora) == 1
+    assert como_esta(confirmada) == (EstadoReserva.REALIZADA, None)
+    # El estado del pago no cambia.
+    assert confirmada.estado_pago == estado_pago
+
+
+@pytest.mark.django_db
+def test_lo_que_no_es_una_confirmada_de_un_bloque_que_termino_no_cambia(
+    tutora, camila, asignatura
+):
+    ahora = timezone.now()
+    diego = persona("Diego", "Herrera")
+    fernanda = persona("Fernanda", "Castro")
+    josefa = persona("Josefa", "Morales")
+    # En un bloque LIBRE que ya termino: la solicitud de Camila, que es de
+    # expirar_solicitudes y no de cerrar_realizadas, y las de Diego, Fernanda y
+    # Josefa, que ya se cerraron.
+    libre = bloque(tutora, ahora - timedelta(hours=6))
+    otras = [
+        reserva(libre, camila, asignatura),
+        reserva(libre, diego, asignatura, EstadoReserva.RECHAZADA),
+        reserva(libre, fernanda, asignatura, EstadoReserva.CANCELADA),
+        reserva(libre, josefa, asignatura, EstadoReserva.EXPIRADA),
+    ]
+    # Una REALIZADA y una EVALUADA, cada una con su bloque OCUPADO.
+    realizado = bloque(tutora, ahora - timedelta(hours=4), estado=EstadoBloque.OCUPADO)
+    evaluado = bloque(tutora, ahora - timedelta(hours=2), estado=EstadoBloque.OCUPADO)
+    otras.append(reserva(realizado, camila, asignatura, EstadoReserva.REALIZADA))
+    otras.append(
+        reserva(
+            evaluado,
+            camila,
+            asignatura,
+            EstadoReserva.EVALUADA,
+            cerrada_en=ahora - timedelta(minutes=30),
+        )
+    )
+    antes = [como_esta(r) for r in otras]
+
+    assert cerrar_realizadas(ahora=ahora) == 0
+    assert [como_esta(r) for r in otras] == antes
+
+
+@pytest.mark.django_db
+def test_cerrar_usa_el_ahora_que_recibe_y_no_la_hora_del_reloj(
+    tutora, camila, asignatura
+):
+    reloj = timezone.now()
+    # Segun el reloj, termino hace una hora.
+    terminado = bloque(tutora, reloj - timedelta(hours=2), estado=EstadoBloque.OCUPADO)
+    confirmada = reserva(terminado, camila, asignatura, EstadoReserva.CONFIRMADA)
+
+    # Un minuto antes de su fin_en, todavia no habia terminado.
+    assert cerrar_realizadas(ahora=terminado.fin_en - timedelta(minutes=1)) == 0
+    assert como_esta(confirmada) == (EstadoReserva.CONFIRMADA, None)
+
+    # Justo en su fin_en, ya termino (fin_en <= ahora).
+    assert cerrar_realizadas(ahora=terminado.fin_en) == 1
+    assert como_esta(confirmada) == (EstadoReserva.REALIZADA, None)
+
+
+@pytest.mark.django_db
+def test_cerrar_sin_ahora_usa_la_hora_del_reloj(tutora, camila, asignatura):
+    ahora = timezone.now()
+    terminado = bloque(tutora, ahora - timedelta(hours=2), estado=EstadoBloque.OCUPADO)
+    futuro = bloque(tutora, ahora + timedelta(hours=1), estado=EstadoBloque.OCUPADO)
+    terminada = reserva(terminado, camila, asignatura, EstadoReserva.CONFIRMADA)
+    futura = reserva(futuro, camila, asignatura, EstadoReserva.CONFIRMADA)
+
+    assert cerrar_realizadas() == 1
+
+    assert como_esta(terminada) == (EstadoReserva.REALIZADA, None)
+    assert como_esta(futura) == (EstadoReserva.CONFIRMADA, None)
+
+
+@pytest.mark.django_db
+def test_cerrar_es_un_solo_update_con_el_estado_en_la_tabla_que_se_actualiza(
+    tutora, camila, asignatura
+):
+    """La misma forma que se le pide a expirar_solicitudes, sin "reserva"."id" IN."""
+    ahora = timezone.now()
+    terminado = bloque(tutora, ahora - timedelta(hours=2), estado=EstadoBloque.OCUPADO)
+    reserva(terminado, camila, asignatura, EstadoReserva.CONFIRMADA)
+
+    with CaptureQueriesContext(connection) as consultas:
+        cambiadas = cerrar_realizadas(ahora=ahora)
+
+    assert cambiadas == 1
+    assert len(consultas) == 1
+    sql = consultas[0]["sql"]
+    assert sql.startswith('UPDATE "reserva" ')
+    assert '"reserva"."id" IN' not in sql
+    assert '"reserva"."estado"' in sql
+    # Solo escribe estado.
+    assert '"cerrada_en"' not in sql
