@@ -213,6 +213,10 @@ services:
       CLAVE_SERVICIO: ${CLAVE_SERVICIO:-clave-interna-de-desarrollo}
     depends_on:
       payment_db: { condition: service_healthy }
+    # Clave publica de los tokens (Pilar 2, seccion 10): Pagos solo verifica
+    # la firma (HU-23); la privada se monta solo en Identidad.
+    volumes:
+      - ./keys/jwt_public.pem:/app/keys/jwt_public.pem:ro
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8000/api/payments/v1/estado"]
       interval: 10s

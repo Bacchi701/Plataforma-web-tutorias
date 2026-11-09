@@ -149,7 +149,7 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 docker compose build identity
 docker compose run --rm --no-deps -v "${PWD}\keys:/claves" --entrypoint python identity manage.py generar_claves_jwt --carpeta /claves
 docker compose up -d --build --wait
-docker compose up -d --force-recreate --wait identity tutoring
+docker compose up -d --force-recreate --wait identity tutoring payments
 docker compose restart gateway
 powershell -ExecutionPolicy Bypass -File .\scripts\cargar_datos_demo.ps1
 ```
@@ -166,10 +166,10 @@ sh scripts/levantar_demo.sh
   `.gitignore`); la pública cambia, y Git la mostrará modificada: es normal y
   no hay que subirla. Si ya existe una clave privada, el comando no la
   reemplaza; con `--forzar` la reemplaza y cierra todas las sesiones.
-- `docker compose up -d --force-recreate --wait identity tutoring` hace que
-  Identidad y Tutorías lean las claves recién generadas: las guardan en memoria
-  al arrancar. Después de un `--forzar` hay que repetirlo, junto con el reinicio
-  del gateway.
+- `docker compose up -d --force-recreate --wait identity tutoring payments`
+  hace que Identidad, Tutorías y Pagos lean las claves recién generadas: las
+  guardan en memoria al arrancar. Después de un `--forzar` hay que repetirlo,
+  junto con el reinicio del gateway.
 - `docker compose restart gateway` hace que el gateway vuelva a encontrar a
   los servicios: Nginx busca su dirección solo al arrancar.
 - La carga de los datos de ejemplo vacía y vuelve a llenar las cuatro bases.
@@ -452,7 +452,7 @@ Decisiones que sostienen el diseño:
     con una clave de servicio en una cabecera.
 - **Autenticación distribuida.** Solo Identidad emite los tokens JWT, firmados
   con RS256. Los servicios con rutas que piden sesión verifican la firma con la
-  clave pública: hoy Tutorías, y Pagos desde HU-23. Catálogo es de solo
+  clave pública: Tutorías y Pagos. Catálogo es de solo
   lectura y no pide token.
 - **Copias de lectura.** Tutorías guarda una copia de los datos del usuario y
   de la asignatura que necesita para resolver la búsqueda de tutores sin una
@@ -580,7 +580,7 @@ levantar. La bandeja queda en <http://localhost:8026>.
 
 **En la demo, el inicio de sesión dice «No existe /app/keys/jwt_private.pem».**
 Faltan las claves de los tokens. En Windows, corre el comando de las claves de
-«Probar la demo», después `docker compose up -d --force-recreate --wait identity tutoring`
+«Probar la demo», después `docker compose up -d --force-recreate --wait identity tutoring payments`
 y `docker compose restart gateway`. En macOS o Linux, `sh scripts/levantar_demo.sh`
 hace todo.
 

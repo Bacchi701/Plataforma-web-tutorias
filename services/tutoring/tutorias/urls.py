@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 
 from . import bloques, busqueda, copias, evaluaciones, perfiles, reservas
 
@@ -25,3 +25,6 @@ urlpatterns = [
     path("reservas/<uuid:reserva_id>/confirmar", reservas.confirmar, name="confirmar"),
     path("reservas/<uuid:reserva_id>/rechazar", reservas.rechazar, name="rechazar"),
 ]
+
+# Las rutas internas que usa Pagos (HU-23) estan en tutorias/internas.py.
+urlpatterns += [path("", include("tutorias.internas"))]
