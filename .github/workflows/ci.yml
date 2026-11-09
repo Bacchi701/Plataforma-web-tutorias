@@ -18,10 +18,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
+      # pruebas_e2e (HU-34) se revisa aqui, pero no se corre en la integracion
+      # continua: necesita el sistema levantado y la carga de 500 usuarios.
       - name: ruff
-        run: ruff check services
+        run: ruff check services pruebas_e2e
       - name: black
-        run: black --check services
+        run: black --check services pruebas_e2e
       - name: ESLint y Prettier
         # El frontend llega con HU-06. Hasta entonces este paso se salta
         # solo y el trabajo igual queda en verde.
