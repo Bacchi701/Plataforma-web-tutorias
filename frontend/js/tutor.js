@@ -1,19 +1,25 @@
-// Perfil publico de un tutor (HU-18, criterio 3) con la API de Tutorias (HU-20):
-//   GET /api/tutoring/v1/tutores/{id}      -> reputacion, asignaturas, bloques y evaluaciones
-//   GET /api/catalog/v1/carreras y /sedes  -> nombres de carrera y sede, una vez
+// Perfil publico de un tutor (HU-18, criterio 3) con la API de Tutorias (HU-20),
+// y desde el, la solicitud de una tutoria (HU-21):
+//   GET  /api/tutoring/v1/tutores/{id}      -> reputacion, asignaturas, bloques y evaluaciones
+//   GET  /api/catalog/v1/carreras y /sedes  -> nombres de carrera y sede, una vez
+//   POST /api/tutoring/v1/reservas          -> la solicitud, con el token de acceso
 // El id llega en la direccion: tutor.html?id=<usuario_id>, desde la busqueda.
 // Las fechas llegan en UTC y se muestran en hora de Chile (America/Santiago).
 //
-// La peticion a Tutorias va sin la cabecera Authorization, a proposito: es un
+// La peticion del perfil va sin la cabecera Authorization, a proposito: es un
 // dato publico, y desde HU-17 Tutorias autentica en todas sus rutas, asi que un
 // token vencido o invalido haria responder 401 tambien a este perfil.
-// Tampoco se llama a Sesion.yo() ni a Sesion.renovar(): el encabezado
-// (sesion.js) ya renueva la sesion al abrir la pagina, y dos renovaciones a la
-// vez con la misma cookie dejarian a una de las dos sin sesion.
 //
-// Solicitar una tutoria llega con HU-21: por ahora el boton esta deshabilitado
-// en tutor.html. Los datos se escriben con textContent y nodos de
-// createElement, nunca con innerHTML.
+// Quien tiene la sesion sale de Sesion.yo(), que se pide al abrir la pagina, a
+// la vez que el encabezado: sesion.js comparte la renovacion en curso, asi que
+// las dos llamadas hacen un solo /refresh. Si POST /reservas responde 401 (el
+// token dura 30 minutos), se renueva una vez con Sesion.renovar() y se
+// reintenta, como en disponibilidad.js.
+//
+// Las paginas cargan scripts clasicos, que comparten los nombres globales: aqui
+// no se declara ninguno de sesion.js (Sesion, IDENTIDAD, mensajeDeError, avisar,
+// mostrarSesionEnEncabezado, activarMenuMovil). Los datos se escriben con
+// textContent y nodos de createElement, nunca con innerHTML.
 
 const CATALOGO = "/api/catalog/v1";
 const TUTORIAS = "/api/tutoring/v1";
@@ -21,11 +27,24 @@ const ZONA_CHILE = "America/Santiago";
 const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // La API manda como maximo 10 evaluaciones, las mas nuevas.
 const MAXIMO_EVALUACIONES = 10;
+// La nota de una solicitud: hasta 500 caracteres (HU-21).
+const LARGO_NOTA = 500;
 
 document.addEventListener("DOMContentLoaded", () => {
     prepararVolver();
-    cargarPerfil();
+    // Junto con el encabezado (sesion.js), para compartir la misma renovacion.
+    const sesion = usuarioConSesion();
+    cargarPerfil(sesion);
 });
+
+// El usuario de la sesion, o null si no hay sesion o Identidad no responde.
+async function usuarioConSesion() {
+    try {
+        return await Sesion.yo();
+    } catch {
+        return null;
+    }
+}
 
 async function pedir(url) {
     // Sin cabecera Authorization: ver el comentario del principio.
@@ -58,7 +77,7 @@ function prepararVolver() {
     }
 }
 
-async function cargarPerfil() {
+async function cargarPerfil(sesion) {
     const id = new URLSearchParams(window.location.search).get("id") || "";
     if (!FORMATO_UUID.test(id)) {
         mostrarAviso(
@@ -91,6 +110,7 @@ async function cargarPerfil() {
         return;
     }
     mostrarPerfil(perfil, await nombres);
+    prepararSolicitud(perfil, await sesion);
 }
 
 // Carreras y sedes se piden una vez. Si Catalogo no responde, el perfil igual
@@ -185,17 +205,11 @@ function asignaturaDelPerfil(asignatura) {
 function bloqueDisponible(bloque) {
     const inicio = new Date(bloque.inicio_en);
     const fin = new Date(bloque.fin_en);
-    const dia = inicio.toLocaleString("es-CL", {
-        timeZone: ZONA_CHILE,
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-    });
 
     const fila = elemento("li", "perfil-bloque");
     const textos = elemento("div");
     textos.append(
-        elemento("strong", null, conMayuscula(dia)),
+        elemento("strong", null, diaEnChile(inicio)),
         elemento("span", null, `${hora(inicio)} a ${hora(fin)}`)
     );
     fila.append(icono("fa-regular fa-calendar"), textos);
@@ -248,7 +262,191 @@ function mostrarAviso(claseIcono, titulo, texto) {
     document.getElementById("avisoPerfil").classList.remove("hidden");
 }
 
+// ------------------------------------------------ solicitar una tutoria (HU-21)
+
+// Una sola de las partes de #solicitud, segun quien mira: sin sesion, el
+// enlace para iniciarla; el propio tutor, el aviso de que es su perfil; si el
+// tutor no tiene horarios disponibles, ninguna (basta el aviso de "Horarios
+// disponibles"); si no, el formulario.
+function prepararSolicitud(perfil, usuario) {
+    if (!usuario) {
+        mostrarParteDeSolicitud("solicitudSinSesion");
+        return;
+    }
+    if (String(usuario.id).toLowerCase() === String(perfil.usuario_id).toLowerCase()) {
+        mostrarParteDeSolicitud("solicitudPropia");
+        return;
+    }
+    if (perfil.bloques.length === 0) {
+        return;
+    }
+
+    // Los mismos bloques que muestra el perfil, en hora de Chile.
+    document
+        .getElementById("bloqueSolicitud")
+        .replaceChildren(
+            opcion("", "Elige un horario"),
+            ...perfil.bloques.map((bloque) => opcion(bloque.id, textoDelBloque(bloque)))
+        );
+
+    // Cada asignatura con su tarifa a la vista. Si ensena una sola, ya va elegida.
+    const asignaturas = perfil.asignaturas.map((asignatura) =>
+        opcion(
+            asignatura.asignatura_id,
+            `${asignatura.sigla} · ${asignatura.nombre} · ${tarifaEnTexto(asignatura.tarifa)}`
+        )
+    );
+    const selector = document.getElementById("asignaturaSolicitud");
+    if (asignaturas.length === 1) {
+        selector.replaceChildren(...asignaturas);
+    } else {
+        selector.replaceChildren(opcion("", "Elige una asignatura"), ...asignaturas);
+    }
+    selector.addEventListener("change", () => mostrarTarifaElegida(perfil.asignaturas));
+    mostrarTarifaElegida(perfil.asignaturas);
+
+    document.getElementById("notaTutoria").addEventListener("input", contarNota);
+    contarNota();
+    document.getElementById("formSolicitud").addEventListener("submit", enviarSolicitud);
+    mostrarParteDeSolicitud("formSolicitud");
+}
+
+function mostrarParteDeSolicitud(id) {
+    document.getElementById(id).classList.remove("hidden");
+    document.getElementById("solicitud").classList.remove("hidden");
+}
+
+// "Tarifa: $5.000" o "Tarifa: Gratis", bajo la asignatura elegida.
+function mostrarTarifaElegida(asignaturas) {
+    const elegida = document.getElementById("asignaturaSolicitud").value;
+    const asignatura = asignaturas.find((a) => a.asignatura_id === elegida);
+    const ayuda = document.getElementById("tarifaSolicitud");
+    ayuda.textContent = asignatura ? `Tarifa: ${tarifaEnTexto(asignatura.tarifa)}` : "";
+    ayuda.classList.toggle("hidden", !asignatura);
+}
+
+function contarNota() {
+    const largo = document.getElementById("notaTutoria").value.length;
+    document.getElementById("contadorNota").textContent = `${largo}/${LARGO_NOTA}`;
+}
+
+async function enviarSolicitud(evento) {
+    evento.preventDefault();
+    const bloqueId = document.getElementById("bloqueSolicitud").value;
+    const asignaturaId = document.getElementById("asignaturaSolicitud").value;
+    if (!bloqueId) {
+        avisarSolicitud("error", "Elige uno de los horarios disponibles del tutor.");
+        return;
+    }
+    if (!asignaturaId) {
+        avisarSolicitud("error", "Elige la asignatura de la tutoría.");
+        return;
+    }
+
+    const nota = document.getElementById("notaTutoria");
+    const boton = document.getElementById("botonSolicitar");
+    boton.disabled = true;
+    try {
+        const r = await pedirReserva(
+            JSON.stringify({ bloque_id: bloqueId, asignatura_id: asignaturaId, nota: nota.value })
+        );
+        if (r.ok) {
+            nota.value = "";
+            contarNota();
+            avisarSolicitud(
+                "success",
+                "Solicitud enviada. Queda pendiente hasta que el tutor la confirme o la rechace."
+            );
+        } else if (r.estado === 401) {
+            avisarSolicitud(
+                "error",
+                "Tu sesión venció. Vuelve a iniciar sesión para enviar la solicitud."
+            );
+        } else {
+            avisarSolicitud(
+                "error",
+                mensajeDeError(r.cuerpo, "No se pudo enviar la solicitud. Inténtalo de nuevo.")
+            );
+        }
+    } catch {
+        avisarSolicitud(
+            "error",
+            "No hay conexión con el servicio de Tutorías. Inténtalo de nuevo en unos minutos."
+        );
+    } finally {
+        boton.disabled = false;
+    }
+}
+
+// POST /reservas con el token de acceso. Si vencio (dura 30 minutos), se
+// renueva una vez con la cookie y se reintenta, como en disponibilidad.js.
+async function pedirReserva(cuerpo) {
+    const enviar = () =>
+        fetch(`${TUTORIAS}/reservas`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Sesion.tokenAcceso}`,
+            },
+            body: cuerpo,
+        });
+    let respuesta = await enviar();
+    if (respuesta.status === 401 && (await Sesion.renovar())) {
+        respuesta = await enviar();
+    }
+    let datos = null;
+    try {
+        datos = await respuesta.json();
+    } catch {
+        datos = null;
+    }
+    return { ok: respuesta.ok, estado: respuesta.status, cuerpo: datos };
+}
+
+// Con avisar() de sesion.js. En el telefono la caja puede quedar fuera de la
+// pantalla: se lleva a la vista.
+function avisarSolicitud(tipo, texto) {
+    const caja = document.getElementById("mensajeSolicitud");
+    avisar(caja, tipo, texto);
+    caja.scrollIntoView({ block: "nearest" });
+}
+
 // ------------------------------------------------ utilidades
+
+// "Viernes, 23 de octubre": el dia de un instante, en hora de Chile.
+function diaEnChile(fecha) {
+    return conMayuscula(
+        fecha.toLocaleString("es-CL", {
+            timeZone: ZONA_CHILE,
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+        })
+    );
+}
+
+// Un bloque en una linea, para el selector: "Vie, 23 oct · 17:00 a 18:00".
+// Va corto para que el selector cerrado muestre la hora completa.
+function textoDelBloque(bloque) {
+    const inicio = new Date(bloque.inicio_en);
+    const dia = conMayuscula(
+        inicio.toLocaleString("es-CL", {
+            timeZone: ZONA_CHILE,
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+        })
+    );
+    return `${dia} · ${hora(inicio)} a ${hora(new Date(bloque.fin_en))}`;
+}
+
+function opcion(valor, texto) {
+    const nodo = document.createElement("option");
+    nodo.value = valor;
+    nodo.textContent = texto;
+    return nodo;
+}
 
 function hora(fecha) {
     return fecha.toLocaleString("es-CL", {

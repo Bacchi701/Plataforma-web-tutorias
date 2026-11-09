@@ -69,13 +69,41 @@
                 <ul class="perfil-etiquetas" id="etiquetasTutor" aria-label="Asignaturas que imparte"></ul>
             </div>
 
-            <!-- La solicitud llega con HU-21: por ahora el botón queda deshabilitado -->
-            <div class="perfil-accion">
-                <button type="button" class="btn-primary perfil-solicitar" disabled aria-describedby="notaSolicitud">
-                    Solicitar tutoría
-                    <span class="perfil-solicitar-estado">Disponible pronto</span>
-                </button>
-                <p class="perfil-nota" id="notaSolicitud">La solicitud de tutorías llega con la historia HU-21.</p>
+            <!-- Solicitar una tutoría (HU-21). js/tutor.js muestra una sola de estas
+                 partes, según la sesión: el enlace para iniciarla, el aviso de que es
+                 el propio perfil o el formulario. Si el tutor no tiene horarios
+                 disponibles, ninguna: basta el aviso de «Horarios disponibles». -->
+            <div class="perfil-solicitud hidden" id="solicitud">
+                <p class="perfil-solicitud-texto hidden" id="solicitudSinSesion">
+                    <a href="login.html" class="enlace-texto">Inicia sesión</a> para solicitar una tutoría.
+                </p>
+
+                <p class="perfil-solicitud-texto hidden" id="solicitudPropia">Este es tu perfil público.</p>
+
+                <form class="perfil-solicitud-form hidden" id="formSolicitud" novalidate>
+                    <h2 class="perfil-solicitud-titulo">Solicitar una tutoría</h2>
+
+                    <div class="login-message" id="mensajeSolicitud" role="status" aria-live="polite"></div>
+
+                    <label class="perfil-campo" for="bloqueSolicitud">
+                        <span>Horario, en hora de Chile</span>
+                        <select id="bloqueSolicitud" required></select>
+                    </label>
+
+                    <label class="perfil-campo" for="asignaturaSolicitud">
+                        <span>Asignatura</span>
+                        <select id="asignaturaSolicitud" required aria-describedby="tarifaSolicitud"></select>
+                    </label>
+                    <small class="perfil-campo-ayuda hidden" id="tarifaSolicitud"></small>
+
+                    <label class="perfil-campo" for="notaTutoria">
+                        <span>Nota para el tutor (opcional)</span>
+                        <textarea id="notaTutoria" rows="3" maxlength="500" aria-describedby="contadorNota"></textarea>
+                    </label>
+                    <small class="perfil-campo-ayuda perfil-contador" id="contadorNota">0/500</small>
+
+                    <button type="submit" class="btn-primary" id="botonSolicitar">Enviar solicitud</button>
+                </form>
             </div>
         </div>
     </div>
