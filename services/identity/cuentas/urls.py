@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import internas, vistas
+from . import administracion, internas, vistas
 
 urlpatterns = [
     path("registro", vistas.registro, name="registro"),
@@ -9,6 +9,12 @@ urlpatterns = [
     path("refresh", vistas.refresh, name="refresh"),
     path("logout", vistas.logout, name="logout"),
     path("yo", vistas.yo, name="yo"),
+    path("admin/usuarios", administracion.listar_usuarios, name="admin-usuarios"),
+    path(
+        "admin/usuarios/<uuid:usuario_id>",
+        administracion.cambiar_estado,
+        name="admin-usuario",
+    ),
     path(
         "internal/usuarios/<uuid:usuario_id>",
         internas.un_usuario,
