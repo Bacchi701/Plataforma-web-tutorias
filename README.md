@@ -203,6 +203,7 @@ Cuentas de ejemplo, todas con la clave `Tutorias2026`:
 | `diego.demo@duocuc.cl`     | Estudiante de primer semestre: todavía no puede ofrecer tutorías.           |
 | `tomas.demo@duocuc.cl`     | Cuenta sin verificar: no puede iniciar sesión.                              |
 | `josefa.demo@duocuc.cl`    | Cuenta desactivada: «Tu cuenta está desactivada.»                           |
+| `admin.demo@duocuc.cl`     | Administrador: usa las rutas /admin de Identidad (HU-31) y, cuando llegue, el panel de administración (HU-33). |
 
 Una cuenta nueva se crea en el registro con cualquier correo que termine en
 `@duocuc.cl`; el enlace de verificación llega a la bandeja de desarrollo, no a

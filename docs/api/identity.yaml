@@ -6,8 +6,9 @@ info:
   description: |
     Contrato de la API pública de Identidad (HU-03; Pilar 2, sección 4.1).
 
-    - Describe lo que hacen los PR #5 (HU-04) y #11 (HU-05) al 21-10-2026 y,
-      desde la versión 1.1.0, el `PATCH /yo` del perfil (HU-10).
+    - Describe lo que hacen los PR #5 (HU-04) y #11 (HU-05) al 21-10-2026;
+      desde la versión 1.1.0, el `PATCH /yo` del perfil (HU-10), y desde la
+      próxima, las rutas `/admin/usuarios` del administrador (HU-31).
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión del
       servicio: `/api/identity/v1/`.
     - Las rutas `/internal` no son parte de este contrato: el gateway no las
@@ -17,10 +18,12 @@ info:
       en «Cambios», al final de esta descripción.
 
     **Formato de error (Pilar 2, sección 11).** Toda respuesta de error de los
-    endpoints de Cuenta, Sesión y Perfil trae `codigo`, `mensaje` y `detalles`
-    (ver el esquema `Error`). No lo traen el 503 de `/estado`, que responde con
-    su propio esquema, ni lo que el gateway corta antes de llegar a Identidad:
-    el límite de intentos de `/login` y las rutas `/internal`.
+    endpoints de Cuenta, Sesión, Perfil y Administración trae `codigo`,
+    `mensaje` y `detalles` (ver el esquema `Error`). No lo traen el 503 de
+    `/estado`, que responde con su propio esquema, lo que el gateway corta
+    antes de llegar a Identidad (el límite de intentos de `/login` y las rutas
+    `/internal`), ni la página 404 de Django cuando `usuario_id` no es un uuid
+    en minúsculas (ver `components/parameters/UsuarioId`).
 
     **Sesión (Pilar 2, sección 5; AD-06).**
     - El token de acceso es un JWT firmado con RS256 que dura 30 minutos. Lleva
@@ -33,12 +36,36 @@ info:
     - En la base se guarda solo el sha256 de la renovación y del enlace de
       verificación.
 
+    **Administración (HU-31).**
+    - Las rutas `/admin/usuarios` son solo para un administrador: quien trae
+      un token de acceso con la marca `es_admin` en `true` (AD-09), la misma
+      que piden las rutas `/admin` de Tutorías. La marca se toma de la cuenta
+      (`usuario.es_admin`) al emitir el token, así que un cambio de la marca
+      rige con el siguiente token de acceso: al iniciar sesión o al renovar la
+      sesión. Sin un token válido responden 401, como `/yo`; con un token sin
+      la marca, 403 `no_es_administrador`.
+    - Desactivar una cuenta revoca en el mismo paso todas sus renovaciones
+      abiertas: no puede renovar la sesión ni volver a iniciarla.
+    - El token de acceso de una cuenta desactivada deja de servir de inmediato
+      en Identidad, que busca la cuenta activa en cada petición, pero sirve
+      hasta que vence (como mucho 30 minutos) en los otros servicios, que solo
+      verifican la firma (Pilar 2, sección 5.3).
+
     **Cambios**
     - 1.0.0 (21-10-2026): primera versión.
     - 1.1.0 (22-10-2026): agrega `PATCH /yo` para completar y editar
       el perfil (HU-10), con el esquema `Perfil`. `GET /yo` muestra también un
       perfil completo, y su respuesta 401 pasa sin cambios a
       `components/responses/SinTokenValido`, que usan los dos métodos.
+    - Próxima versión (HU-31): agrega la administración de usuarios, con la
+      etiqueta Administración: `GET /admin/usuarios`, que lista y busca las
+      cuentas por páginas, y `PATCH /admin/usuarios/{usuario_id}`, que activa
+      o desactiva una. Suma el parámetro `UsuarioId`, los esquemas
+      `UsuarioAdministrado`, `ListaDeUsuarios`, `CambioDeEstado` y
+      `EstadoCambiado`, las respuestas `NoEsAdministrador` y
+      `UsuarioNoEncontrado`, y sus códigos de error (ver el esquema `Error`).
+      `GET /yo` aclara que las rutas `/admin` también entregan el correo, solo
+      a un administrador.
 
 servers:
   - url: http://localhost:8080
@@ -51,6 +78,8 @@ tags:
     description: Inicio, renovación y cierre de sesión (HU-05).
   - name: Perfil
     description: Nombre, carrera, nivel y sede del usuario con sesión (HU-10).
+  - name: Administración
+    description: Usuarios del panel de administración (HU-31). Solo con la marca de administrador.
   - name: Estado
     description: Estado del servicio y de su base (HU-01).
 
@@ -375,7 +404,8 @@ paths:
       summary: Datos del usuario con sesión
       description: |
         Devuelve los datos de la cuenta dueña del token. Aparte de `/registro`,
-        que devuelve el correo recién registrado, es el único endpoint que
+        que devuelve el correo recién registrado, y de las rutas `/admin`, que
+        lo entregan solo a un administrador (HU-31), es el único endpoint que
         entrega el correo (con `GET` y con `PATCH`); el token no lo lleva
         (RNF-07). `carrera_id`, `nivel` y `sede_id` vienen en `null` hasta que
         el usuario completa su perfil con `PATCH /yo` (HU-10). Carrera y sede
@@ -537,6 +567,311 @@ paths:
         '401':
           $ref: '#/components/responses/SinTokenValido'
 
+  /api/identity/v1/admin/usuarios:
+    get:
+      tags: [Administración]
+      operationId: listarUsuarios
+      summary: Listar y buscar las cuentas
+      description: |
+        Las cuentas de la plataforma, de la más nueva a la más antigua
+        (`creado_en` descendente y después `id`), por páginas (HU-31,
+        criterio 1). Solo para un administrador.
+
+        - `buscar` deja las cuentas en que cada palabra aparece en el nombre o
+          en el apellido, sin distinguir mayúsculas. Las tildes sí cuentan:
+          «matias» no encuentra a «Matías».
+        - `activo` deja solo las cuentas activas (`true`) o solo las
+          desactivadas (`false`). Sin el parámetro trae las dos.
+        - Las cuentas vienen en `resultados`, con los mismos nombres de la
+          búsqueda paginada de Catálogo: `total`, `pagina`, `total_paginas`,
+          `limite` y `resultados`. Una página más allá de la última responde
+          200 con `resultados` vacío.
+        - Los parámetros se revisan en este orden: `buscar`, `activo`,
+          `pagina` y `limite`. Si `activo`, `pagina` o `limite` vienen vacíos
+          (por ejemplo `?activo=`), responden 400: para no usarlos, no se
+          mandan. `buscar` vacío o con solo espacios trae todas las cuentas.
+        - Cada cuenta trae su correo: es lo que distingue dos cuentas con el
+          mismo nombre. Solo lo ve un administrador y no sale de Identidad
+          (RNF-07).
+      security:
+        - tokenAcceso: []
+      parameters:
+        - name: buscar
+          in: query
+          required: false
+          description: |
+            Nombre, apellido o los dos. Se recortan los espacios y se parte en
+            palabras; cada palabra tiene que aparecer en el nombre o en el
+            apellido. Hasta 80 caracteres y sin el carácter nulo (`%00`); si
+            no, 400 `busqueda_invalida`.
+          schema:
+            type: string
+            maxLength: 80
+          example: rojas
+        - name: activo
+          in: query
+          required: false
+          description: '`true` o `false`, en minúsculas. Otro valor responde 400 `activo_invalido`.'
+          schema:
+            type: string
+            enum: ['true', 'false']
+          example: 'false'
+        - name: pagina
+          in: query
+          required: false
+          description: La página, un número entero desde 1. Otro valor responde 400 `pagina_invalida`.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limite
+          in: query
+          required: false
+          description: Cuentas por página, un número entero de 1 a 100. Otro valor responde 400 `limite_invalido`.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: |
+            La página pedida. `total` cuenta todas las cuentas que cumplen el
+            filtro, no solo las de esta página. Los ejemplos son de los datos
+            de ejemplo (`data/seeds/demo`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaDeUsuarios'
+              examples:
+                buscar_rojas:
+                  summary: '?buscar=rojas'
+                  value:
+                    total: 1
+                    pagina: 1
+                    total_paginas: 1
+                    limite: 50
+                    resultados:
+                      - id: 10000000-0000-4000-8000-000000000004
+                        email: camila.demo@duocuc.cl
+                        nombre: Camila
+                        apellido: Rojas
+                        carrera_id: 20000000-0000-4000-8000-000000000001
+                        sede_id: 30000000-0000-4000-8000-000000000011
+                        nivel: 2
+                        email_verificado: true
+                        activo: true
+                        es_admin: false
+                        creado_en: '2026-09-12T16:40:00Z'
+                primera_pagina:
+                  summary: '?limite=2: las dos cuentas más nuevas de las ocho'
+                  value:
+                    total: 8
+                    pagina: 1
+                    total_paginas: 4
+                    limite: 2
+                    resultados:
+                      - id: 10000000-0000-4000-8000-000000000007
+                        email: tomas.demo@duocuc.cl
+                        nombre: Tomás
+                        apellido: Vidal
+                        carrera_id: null
+                        sede_id: null
+                        nivel: null
+                        email_verificado: false
+                        activo: true
+                        es_admin: false
+                        creado_en: '2026-09-29T23:00:00Z'
+                      - id: 10000000-0000-4000-8000-000000000006
+                        email: josefa.demo@duocuc.cl
+                        nombre: Josefa
+                        apellido: Morales
+                        carrera_id: 20000000-0000-4000-8000-000000000003
+                        sede_id: 30000000-0000-4000-8000-000000000003
+                        nivel: 5
+                        email_verificado: true
+                        activo: false
+                        es_admin: false
+                        creado_en: '2026-09-14T11:20:00Z'
+                sin_coincidencias:
+                  summary: '?buscar=zzz: ninguna cuenta'
+                  value:
+                    total: 0
+                    pagina: 1
+                    total_paginas: 1
+                    limite: 50
+                    resultados: []
+        '400':
+          description: |
+            Un parámetro no es válido. Los códigos posibles, en el orden en
+            que se revisan, son `busqueda_invalida`, `activo_invalido`,
+            `pagina_invalida` y `limite_invalido`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                busqueda_invalida:
+                  summary: '`buscar` con más de 80 caracteres o con el carácter nulo'
+                  value:
+                    codigo: busqueda_invalida
+                    mensaje: Escribe hasta 80 caracteres para buscar a un usuario.
+                    detalles: null
+                activo_invalido:
+                  summary: '`activo` no es true ni false, por ejemplo ?activo=si'
+                  value:
+                    codigo: activo_invalido
+                    mensaje: El filtro activo tiene que ser true o false.
+                    detalles: null
+                pagina_invalida:
+                  summary: '`pagina` no es un entero desde 1, por ejemplo ?pagina=0'
+                  value:
+                    codigo: pagina_invalida
+                    mensaje: La página tiene que ser un número entero desde 1.
+                    detalles: null
+                limite_invalido:
+                  summary: '`limite` no es un entero de 1 a 100, por ejemplo ?limite=101'
+                  value:
+                    codigo: limite_invalido
+                    mensaje: El límite tiene que ser un número entero de 1 a 100.
+                    detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/NoEsAdministrador'
+
+  /api/identity/v1/admin/usuarios/{usuario_id}:
+    patch:
+      tags: [Administración]
+      operationId: cambiarEstadoDeUsuario
+      summary: Activar o desactivar una cuenta
+      description: |
+        Desactiva una cuenta o la vuelve a activar (HU-31, criterio 2; Pilar 2,
+        sección 4.1). Solo para un administrador. El cuerpo trae solo
+        `activo`: desde el panel no se cambia nada más de una cuenta.
+
+        Se revisa en este orden:
+        - que el cuerpo sea exactamente `{"activo": true}` o
+          `{"activo": false}` (400 `activo_invalido`);
+        - después, en una transacción con la cuenta bloqueada, que la cuenta
+          exista (404 `usuario_no_encontrado`) y que el administrador no esté
+          desactivando su propia cuenta (409 `cuenta_propia`), para que el
+          panel no se quede sin administrador por un clic.
+
+        Lo que hace:
+        - Con `false`, la cuenta queda desactivada y, en la misma transacción,
+          todas sus renovaciones sin revocar quedan revocadas (RN-08, CA7):
+          `sesiones_revocadas` dice cuántas. Las que ya estaban revocadas
+          conservan su fecha. Desde ahí, `/login` responde 403
+          `cuenta_desactivada` y `/refresh` con una de sus cookies, 401
+          `sesion_invalida`.
+        - Con `true`, la cuenta vuelve a estar activa, con
+          `sesiones_revocadas` en 0. No se crea ninguna sesión: la persona
+          vuelve a iniciar sesión.
+        - Si la cuenta ya estaba en ese estado, no cambia nada y responde
+          igual, con `sesiones_revocadas` en 0.
+        - El token de acceso que la cuenta ya tenía deja de servir de
+          inmediato en Identidad (401 `cuenta_inactiva`), pero sirve hasta
+          que vence en Tutorías y Pagos, que solo verifican la firma (Pilar 2,
+          sección 5.3). La búsqueda de tutores deja fuera la cuenta
+          desactivada tras la siguiente sincronización de las copias de
+          Tutorías (HU-19).
+        - No envía ningún correo.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambioDeEstado'
+            examples:
+              desactivar:
+                summary: Desactivar la cuenta
+                value:
+                  activo: false
+              activar:
+                summary: Volver a activarla
+                value:
+                  activo: true
+      responses:
+        '200':
+          description: La cuenta, ya guardada, y cuántas renovaciones revocó esta petición.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoCambiado'
+              examples:
+                desactivada:
+                  summary: Camila desactivada, con una sesión abierta
+                  value:
+                    id: 10000000-0000-4000-8000-000000000004
+                    email: camila.demo@duocuc.cl
+                    nombre: Camila
+                    apellido: Rojas
+                    carrera_id: 20000000-0000-4000-8000-000000000001
+                    sede_id: 30000000-0000-4000-8000-000000000011
+                    nivel: 2
+                    email_verificado: true
+                    activo: false
+                    es_admin: false
+                    creado_en: '2026-09-12T16:40:00Z'
+                    sesiones_revocadas: 1
+                activada:
+                  summary: Camila activada otra vez
+                  value:
+                    id: 10000000-0000-4000-8000-000000000004
+                    email: camila.demo@duocuc.cl
+                    nombre: Camila
+                    apellido: Rojas
+                    carrera_id: 20000000-0000-4000-8000-000000000001
+                    sede_id: 30000000-0000-4000-8000-000000000011
+                    nivel: 2
+                    email_verificado: true
+                    activo: true
+                    es_admin: false
+                    creado_en: '2026-09-12T16:40:00Z'
+                    sesiones_revocadas: 0
+        '400':
+          description: |
+            El cuerpo no es exactamente `{"activo": true}` o
+            `{"activo": false}`: falta `activo`, viene como texto (`"false"`),
+            como número (`0`) o en `null`, trae otro campo (como `es_admin` o
+            `email`) o no es un objeto. No se cambia nada. Con el JSON mal
+            formado responde `parse_error`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                activo_invalido:
+                  summary: 'El cuerpo trae {"activo": false, "es_admin": true}'
+                  value:
+                    codigo: activo_invalido
+                    mensaje: Envía solo el campo activo, con true o false.
+                    detalles: null
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '403':
+          $ref: '#/components/responses/NoEsAdministrador'
+        '404':
+          $ref: '#/components/responses/UsuarioNoEncontrado'
+        '409':
+          description: El administrador intenta desactivar su propia cuenta. No se cambia nada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                cuenta_propia:
+                  summary: admin.demo se desactiva a sí mismo
+                  value:
+                    codigo: cuenta_propia
+                    mensaje: No puedes desactivar tu propia cuenta.
+                    detalles: null
+
   /api/identity/v1/estado:
     get:
       tags: [Estado]
@@ -593,6 +928,23 @@ components:
         type: string
       example: 'refresh_token=Vb3kZ0pQx7...; expires=Wed, 28 Oct 2026 03:00:00 GMT; HttpOnly; Max-Age=604800; Path=/api/identity/v1/; SameSite=Strict; Secure'
 
+  parameters:
+    UsuarioId:
+      name: usuario_id
+      in: path
+      required: true
+      description: |
+        Identificador de la cuenta, el `id` que entrega
+        `GET /admin/usuarios`: un uuid en minúsculas y con guiones. Con otra
+        forma (por ejemplo, en mayúsculas o mal escrito) la ruta no existe y
+        responde Django con su página 404, en HTML y sin el formato de error
+        de la API (ver `components/responses/UsuarioNoEncontrado`).
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      example: 10000000-0000-4000-8000-000000000004
+
   responses:
     ClavesNoConfiguradas:
       description: |
@@ -639,6 +991,46 @@ components:
                 codigo: token_vencido
                 mensaje: El token de acceso venció.
                 detalles: null
+    NoEsAdministrador:
+      description: |
+        El token no trae `es_admin` en `true`: la cuenta no es administradora
+        (AD-09). Es el mismo código y el mismo mensaje de las rutas `/admin`
+        de Tutorías. La marca sale del token, así que un cambio de
+        `usuario.es_admin` rige con el siguiente token de acceso, al iniciar
+        sesión o al renovar la sesión.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            no_es_administrador:
+              summary: valentina.demo, que no es administradora
+              value:
+                codigo: no_es_administrador
+                mensaje: Esta sección es solo para administradores.
+                detalles: null
+    UsuarioNoEncontrado:
+      description: |
+        No existe una cuenta con ese identificador.
+
+        Si `usuario_id` no es un uuid en minúsculas, la ruta no existe y
+        responde Django con su página 404, en HTML y sin el formato de error
+        de la API, como en Tutorías con `bloque_id`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: usuario_no_encontrado
+            mensaje: El usuario no existe.
+            detalles: null
+        text/html:
+          schema:
+            type: string
+          examples:
+            ruta_inexistente:
+              summary: PATCH /admin/usuarios/abc con DJANGO_DEBUG=1 (recortada)
+              value: '<!DOCTYPE html><html lang="en"><head>...<title>Page not found at /api/identity/v1/admin/usuarios/abc</title>...</html>'
 
   schemas:
 
@@ -795,6 +1187,107 @@ components:
           maximum: 12
           description: Semestre que cursa, de 1 a 12. No puede venir en null.
 
+    UsuarioAdministrado:
+      type: object
+      description: |
+        Una cuenta como la ve el panel de administración (HU-31), con las
+        claves en este orden. Nunca trae el hash de la clave. El correo va
+        porque distingue dos cuentas con el mismo nombre: solo lo ve un
+        administrador y no sale de Identidad (RNF-07).
+      required: [id, email, nombre, apellido, carrera_id, sede_id, nivel, email_verificado, activo, es_admin, creado_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nombre:
+          type: string
+        apellido:
+          type: string
+        carrera_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la carrera en Catálogo, como en `GET /yo`. null si el perfil está incompleto.
+        sede_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identificador de la sede en Catálogo. null si el perfil está incompleto.
+        nivel:
+          type: integer
+          minimum: 1
+          maximum: 12
+          nullable: true
+          description: Semestre que cursa. null si el perfil está incompleto.
+        email_verificado:
+          type: boolean
+          description: false si la persona todavía no abre el enlace del correo de verificación.
+        activo:
+          type: boolean
+          description: false si la cuenta está desactivada.
+        es_admin:
+          type: boolean
+        creado_en:
+          type: string
+          format: date-time
+          description: Cuándo se creó la cuenta, en UTC con `Z` y sin fracción de segundo, por ejemplo `2026-09-12T16:40:00Z`.
+
+    ListaDeUsuarios:
+      type: object
+      description: Una página de cuentas, con los nombres de la búsqueda paginada de Catálogo.
+      required: [total, pagina, total_paginas, limite, resultados]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Cuántas cuentas cumplen el filtro, sumando todas las páginas.
+        pagina:
+          type: integer
+          minimum: 1
+          description: La página pedida.
+        total_paginas:
+          type: integer
+          minimum: 1
+          description: Cuántas páginas hay. Al menos 1, aunque no haya cuentas.
+        limite:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Cuentas por página.
+        resultados:
+          type: array
+          description: Las cuentas de esta página, de la más nueva a la más antigua. Vacía si la página está más allá de la última.
+          items:
+            $ref: '#/components/schemas/UsuarioAdministrado'
+
+    CambioDeEstado:
+      type: object
+      additionalProperties: false
+      required: [activo]
+      description: |
+        El cuerpo de `PATCH /admin/usuarios/{usuario_id}`: solo `activo`, un
+        booleano de JSON. Con cualquier otro campo, o con `activo` como texto,
+        número o null, responde 400 `activo_invalido`.
+      properties:
+        activo:
+          type: boolean
+          description: false desactiva la cuenta y revoca sus renovaciones; true la vuelve a activar.
+
+    EstadoCambiado:
+      description: La cuenta ya guardada, como en `UsuarioAdministrado`, más `sesiones_revocadas`.
+      allOf:
+        - $ref: '#/components/schemas/UsuarioAdministrado'
+        - type: object
+          required: [sesiones_revocadas]
+          properties:
+            sesiones_revocadas:
+              type: integer
+              minimum: 0
+              description: Cuántas renovaciones revocó esta petición. 0 al activar, o si la cuenta ya estaba desactivada.
+
     Estado:
       type: object
       required: [servicio, estado, base_de_datos, version]
@@ -823,7 +1316,9 @@ components:
           token_usado, token_vencido, credenciales_invalidas,
           cuenta_desactivada, correo_no_verificado, sesion_invalida,
           claves_no_configuradas, not_authenticated, authentication_failed y
-          cuenta_inactiva.
+          cuenta_inactiva. Las rutas de administración (HU-31) suman
+          no_es_administrador, usuario_no_encontrado, busqueda_invalida,
+          activo_invalido, pagina_invalida, limite_invalido y cuenta_propia.
         - Otros códigos los pone el framework: parse_error (JSON mal formado,
           400), method_not_allowed (405) y unsupported_media_type (415).
       required: [codigo, mensaje, detalles]
