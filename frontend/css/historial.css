@@ -362,3 +362,15 @@
         padding: 14px 12px;
     }
 }
+
+
+/* «Ver pago» (HU-24): el detalle y el pago de una tutoría con monto */
+
+.hist-ver-pago {
+    justify-self: start;
+}
+
+.hist-ver-pago:focus-visible {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 2px;
+}

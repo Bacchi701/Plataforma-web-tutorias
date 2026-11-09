@@ -176,6 +176,10 @@
         if (sePuedeEvaluar(reserva, rol)) {
             item.appendChild(evaluacion(reserva));
         }
+        // HU-24: el pago de una tutoria con monto, tambien de una que ya paso.
+        if (Number(reserva.monto) > 0) {
+            item.appendChild(enlaceAlPago(reserva));
+        }
         return item;
     }
 
@@ -465,5 +469,23 @@
         const texto = `${fechaDeChile(inicio)}, de ${horaDeChile(inicio)} a ${horaDeChile(fin)}`;
         const otroDia = fechaDeChile(fin) !== fechaDeChile(inicio);
         return otroDia ? `${texto} (termina el ${fechaDeChile(fin)})` : texto;
+    }
+
+    // ------------------------------------------------------------ el pago (HU-24)
+
+    // «Ver pago»: el detalle de la tutoria y su pago simulado, en pago.html.
+    // Por aqui se paga una tutoria que ya paso, porque «Mis reservas» (HU-30)
+    // muestra solo lo vigente.
+    function enlaceAlPago(reserva) {
+        const enlace = elemento("a", "hist-boton hist-ver-pago");
+        enlace.href = `pago.html?reserva=${encodeURIComponent(reserva.id)}`;
+        enlace.setAttribute(
+            "aria-label",
+            `Ver pago de la tutoría de ${reserva.asignatura.nombre}, ${describir(reserva.bloque)}`
+        );
+        const icono = elemento("i", "fa-solid fa-receipt");
+        icono.setAttribute("aria-hidden", "true");
+        enlace.append(icono, elemento("span", null, "Ver pago"));
+        return enlace;
     }
 })();
