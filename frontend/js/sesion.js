@@ -159,6 +159,16 @@ async function mostrarSesionEnEncabezado() {
     });
 
     acciones.replaceChildren(perfil, disponibilidad, reservas, historial, saludo, salir);
+
+    // El panel de administracion (HU-33), solo con la marca de administrador:
+    // justo antes del saludo, despues del ultimo enlace de la cuenta.
+    if (usuario.es_admin === true) {
+        const administracion = document.createElement("a");
+        administracion.href = "admin.html";
+        administracion.className = "btn-login";
+        administracion.textContent = "Administración";
+        saludo.before(administracion);
+    }
 }
 
 document.addEventListener("DOMContentLoaded", mostrarSesionEnEncabezado);
