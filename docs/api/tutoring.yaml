@@ -7,12 +7,13 @@ info:
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
     - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14, HU-41,
-      HU-25 y HU-21: la búsqueda de tutores y el perfil público de cada tutor
-      (HU-20), los bloques de disponibilidad del tutor (HU-15), las
+      HU-25, HU-21 y HU-22: la búsqueda de tutores y el perfil público de
+      cada tutor (HU-20), los bloques de disponibilidad del tutor (HU-15), las
       asignaturas que el usuario declara que puede enseñar (HU-14), la copia
       de sus datos que guarda Tutorías (HU-41), la evaluación de una tutoría
       realizada (HU-25), la solicitud de una tutoría y las reservas de cada
-      usuario (HU-21), y `/estado`, que existe desde HU-01.
+      usuario (HU-21), la confirmación o el rechazo de una solicitud por el
+      tutor (HU-22), y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
     - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
@@ -127,6 +128,15 @@ info:
       pone al día la copia del solicitante con `GET /yo` de Identidad (ver
       «Datos»).
 
+    - Próxima versión (HU-22): agrega la confirmación y el rechazo de una
+      solicitud por el tutor, con sesión:
+      `POST /reservas/{reserva_id}/confirmar` y
+      `POST /reservas/{reserva_id}/rechazar`, con la etiqueta Reservas, el
+      parámetro `ReservaId`, el esquema `Confirmacion` y sus códigos de error
+      (ver el esquema `Error`). Las dos responden la reserva con el esquema
+      `Reserva` de HU-21. Al confirmar, el bloque queda OCUPADO y las demás
+      solicitudes pendientes del bloque quedan rechazadas.
+
 servers:
   - url: http://localhost:8080/api/tutoring/v1
     description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
@@ -141,7 +151,7 @@ tags:
   - name: Copia del usuario
     description: La copia de los datos del usuario que guarda Tutorías, `usuario_ref` (HU-41). Con sesión.
   - name: Reservas
-    description: La solicitud de una tutoría y las reservas del usuario, como estudiante o como tutor (HU-21). Con sesión.
+    description: La solicitud de una tutoría, su confirmación o su rechazo por el tutor, y las reservas del usuario, como estudiante o como tutor (HU-21 y HU-22). Con sesión.
   - name: Evaluaciones
     description: Evaluación de una tutoría realizada y evaluaciones visibles de un tutor (HU-25).
   - name: Estado
@@ -1485,6 +1495,284 @@ paths:
         '503':
           $ref: '#/components/responses/ClavesNoConfiguradas'
 
+  /reservas/{reserva_id}/confirmar:
+    post:
+      tags: [Reservas]
+      operationId: confirmarSolicitud
+      summary: Confirmar una solicitud
+      description: |
+        El tutor confirma una solicitud que recibió, con la modalidad y el
+        lugar o el enlace de la sesión (HU-22). Solo puede hacerlo el tutor de
+        la reserva, que es el dueño de su bloque.
+
+        Se revisa en este orden:
+        1. El cuerpo, antes de tocar la base (RN-07): `modalidad` es
+           `PRESENCIAL` o `EN_LINEA` (400 `modalidad_invalida`), y
+           `lugar_o_enlace` es un texto de 1 a 300 caracteres sin contar los
+           espacios de los lados, sin caracteres que no se pueden guardar,
+           como el nulo, y que en línea empieza con `http://` o `https://`
+           (400 `lugar_o_enlace_invalido`). El mensaje dice qué falta.
+        2. En una transacción, siempre en este orden: lee la reserva sin
+           bloquearla, solo para saber su bloque y que el bloque es del
+           usuario del token (si la reserva no existe o el bloque no es suyo,
+           por ejemplo porque es quien la solicitó: 404
+           `reserva_no_encontrada`); bloquea el bloque
+           (`SELECT … FOR UPDATE`), y vuelve a leer la reserva, ahora
+           bloqueada. Así dos confirmaciones del mismo bloque, o una
+           confirmación y un rechazo, se esperan: la segunda ve lo que dejó
+           la primera. Recién ahí revisa:
+           - que la reserva siga SOLICITADA (409 `reserva_no_pendiente`);
+           - que el bloque no haya empezado (400 `bloque_en_el_pasado`);
+           - que el bloque no esté OCUPADO (409 `bloque_ocupado`).
+        3. La reserva pasa a CONFIRMADA, con la modalidad, el lugar o el
+           enlace y `confirmada_en`; el bloque pasa a OCUPADO, y las demás
+           solicitudes SOLICITADA del bloque pasan a RECHAZADA, con
+           `cerrada_en` (RN-03). Si aun así la base ya tiene otra reserva que
+           ocupa el bloque, la rechaza (restricción
+           `ux_reserva_bloque_ocupado`): 409 `bloque_ocupado`, sin cambiar
+           nada.
+
+        - `estado_pago` queda en null al confirmar, también si la tutoría
+          tiene tarifa: pasa a PENDIENTE cuando Pagos crea el pago (HU-23,
+          decisión T-174).
+        - Después de guardar, Tutorías pide a Identidad el aviso
+          RESERVA_CONFIRMADA para el estudiante, y RESERVA_RECHAZADA para
+          cada estudiante cuya solicitud quedó rechazada (HU-16). Si un aviso
+          no sale, la confirmación queda igual.
+        - Otros campos del cuerpo se ignoran.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Confirmacion'
+            examples:
+              en_linea:
+                summary: Valentina confirma en línea, con el enlace de la sesión
+                value:
+                  modalidad: EN_LINEA
+                  lugar_o_enlace: 'https://meet.google.com/abc-defg-hij'
+              presencial:
+                summary: Valentina confirma presencial, con el lugar
+                value:
+                  modalidad: PRESENCIAL
+                  lugar_o_enlace: Sede Alameda, biblioteca, sala de estudio 2
+      responses:
+        '200':
+          description: La reserva CONFIRMADA, vista por el tutor. El bloque queda OCUPADO.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                camila:
+                  summary: Valentina confirma en línea la solicitud de Camila
+                  description: |
+                    La solicitud del ejemplo de `POST /reservas`, con los datos
+                    de `data/seeds/demo` cargados el 08-11-2026. Tiene tarifa,
+                    y `estado_pago` sigue en null (T-174).
+                  value:
+                    id: 2b6f1c3e-8a4d-4e7b-9c1f-5d3a7e9b0c2a
+                    estado: CONFIRMADA
+                    nota: Quiero repasar normalización antes del certamen.
+                    modalidad: EN_LINEA
+                    lugar_o_enlace: 'https://meet.google.com/abc-defg-hij'
+                    monto: 5000
+                    estado_pago: null
+                    creada_en: '2026-11-08T22:15:04Z'
+                    confirmada_en: '2026-11-08T22:40:31Z'
+                    cerrada_en: null
+                    bloque:
+                      id: 60000000-0000-4000-8000-000000000013
+                      inicio_en: '2026-11-11T21:00:00Z'
+                      fin_en: '2026-11-11T22:00:00Z'
+                    asignatura:
+                      asignatura_id: 40000000-0000-4000-8000-000000000006
+                      sigla: BDD1101
+                      nombre: Base de Datos
+                    tutor:
+                      usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                    solicitante:
+                      usuario_id: 10000000-0000-4000-8000-000000000004
+                      nombre: Camila
+                      apellido: Rojas
+                    rol: tutor
+        '400':
+          description: |
+            La confirmación no sirve. Los códigos posibles, en el orden en que
+            se revisan, son:
+            - `modalidad_invalida`: falta `modalidad` o no es `PRESENCIAL` ni
+              `EN_LINEA`;
+            - `lugar_o_enlace_invalido`: falta `lugar_o_enlace`, está vacío o
+              solo con espacios, no es un texto, tiene más de 300 caracteres
+              o caracteres que no se pueden guardar, o, en línea, no empieza
+              con `http://` o `https://`. Si falta, el mensaje pide el lugar o
+              el enlace, según la modalidad;
+            - `bloque_en_el_pasado`: el bloque de la reserva ya empezó.
+
+            Si el cuerpo no es JSON válido, responde `parse_error`, con el
+            mensaje del framework.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                modalidad_invalida:
+                  $ref: '#/components/examples/ModalidadInvalida'
+                sin_lugar:
+                  $ref: '#/components/examples/SinLugar'
+                sin_enlace:
+                  $ref: '#/components/examples/SinEnlace'
+                lugar_no_es_texto:
+                  $ref: '#/components/examples/LugarNoEsTexto'
+                lugar_con_caracteres:
+                  $ref: '#/components/examples/LugarConCaracteres'
+                lugar_largo:
+                  $ref: '#/components/examples/LugarLargo'
+                enlace_invalido:
+                  $ref: '#/components/examples/EnlaceInvalido'
+                bloque_en_el_pasado:
+                  $ref: '#/components/examples/TutoriaQueYaEmpezo'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          description: |
+            La reserva no existe o su bloque no es del usuario del token, por
+            ejemplo si es quien la solicitó (`reserva_no_encontrada`). Los
+            casos responden igual, para no revelar que existe. Si
+            `reserva_id` no es un uuid en minúsculas, la ruta no existe y
+            responde Django con su página 404 en HTML.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_no_encontrada
+                mensaje: No encontramos esa tutoría.
+                detalles: null
+        '409':
+          description: |
+            La reserva ya no está SOLICITADA, por ejemplo porque ya se
+            confirmó, se rechazó o se canceló (`reserva_no_pendiente`), o el
+            bloque ya tiene otra tutoría confirmada (`bloque_ocupado`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                reserva_no_pendiente:
+                  $ref: '#/components/examples/ReservaNoPendiente'
+                bloque_ocupado:
+                  $ref: '#/components/examples/BloqueOcupado'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
+  /reservas/{reserva_id}/rechazar:
+    post:
+      tags: [Reservas]
+      operationId: rechazarSolicitud
+      summary: Rechazar una solicitud
+      description: |
+        El tutor rechaza una solicitud que recibió (HU-22). Sin cuerpo: si
+        viene uno, se ignora. Solo puede hacerlo el tutor de la reserva, que es
+        el dueño de su bloque.
+
+        - Bloquea en el mismo orden que la confirmación (la reserva sin
+          bloquear, el bloque y la reserva bloqueada), porque un rechazo puede
+          llegar al mismo tiempo que una confirmación del mismo bloque.
+        - Si la reserva no existe o su bloque no es del usuario del token: 404
+          `reserva_no_encontrada`. Si ya no está SOLICITADA: 409
+          `reserva_no_pendiente`.
+        - La reserva pasa a RECHAZADA, con `cerrada_en`. El bloque no cambia:
+          sigue LIBRE y acepta otras solicitudes. No revisa la hora del
+          bloque: también se puede rechazar una solicitud cuyo bloque ya
+          empezó.
+        - Después de guardar, Tutorías pide a Identidad el aviso
+          RESERVA_RECHAZADA para el estudiante (HU-16). Si el aviso no sale,
+          el rechazo queda igual.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+      responses:
+        '200':
+          description: La reserva RECHAZADA, vista por el tutor. El bloque no cambia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                diego:
+                  summary: Valentina rechaza la solicitud antigua de Diego
+                  description: |
+                    Datos de ejemplo de `data/seeds/demo`: la reserva 004, en
+                    un bloque de Valentina del 05-10-2026, que sigue
+                    SOLICITADA.
+                  value:
+                    id: 70000000-0000-4000-8000-000000000004
+                    estado: RECHAZADA
+                    nota: Necesito repasar ciclos y arreglos antes de la prueba.
+                    modalidad: null
+                    lugar_o_enlace: null
+                    monto: 0
+                    estado_pago: null
+                    creada_en: '2026-09-29T18:00:00Z'
+                    confirmada_en: null
+                    cerrada_en: '2026-11-08T22:47:12Z'
+                    bloque:
+                      id: 60000000-0000-4000-8000-000000000004
+                      inicio_en: '2026-10-05T20:00:00Z'
+                      fin_en: '2026-10-05T21:00:00Z'
+                    asignatura:
+                      asignatura_id: 40000000-0000-4000-8000-000000000005
+                      sigla: PRO1101
+                      nombre: Programación de Algoritmos
+                    tutor:
+                      usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                    solicitante:
+                      usuario_id: 10000000-0000-4000-8000-000000000005
+                      nombre: Diego
+                      apellido: Herrera
+                    rol: tutor
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          description: |
+            La reserva no existe o su bloque no es del usuario del token, por
+            ejemplo si es quien la solicitó (`reserva_no_encontrada`). Los
+            casos responden igual, para no revelar que existe. Si
+            `reserva_id` no es un uuid en minúsculas, la ruta no existe y
+            responde Django con su página 404 en HTML.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_no_encontrada
+                mensaje: No encontramos esa tutoría.
+                detalles: null
+        '409':
+          description: |
+            La reserva ya no está SOLICITADA, por ejemplo porque ya se
+            confirmó, se rechazó o se canceló (`reserva_no_pendiente`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                reserva_no_pendiente:
+                  $ref: '#/components/examples/ReservaNoPendiente'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
   /reservas/{reserva_id}/evaluacion:
     post:
       tags: [Evaluaciones]
@@ -2128,6 +2416,66 @@ components:
         codigo: estado_invalido
         mensaje: 'El estado tiene que ser uno de estos: SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA o EVALUADA.'
         detalles: null
+    ModalidadInvalida:
+      summary: Sin modalidad, o con otra, como HIBRIDA o presencial
+      value:
+        codigo: modalidad_invalida
+        mensaje: 'Indica la modalidad de la tutoría: PRESENCIAL o EN_LINEA.'
+        detalles: null
+    SinLugar:
+      summary: Presencial, sin lugar o con uno vacío o solo con espacios
+      value:
+        codigo: lugar_o_enlace_invalido
+        mensaje: Indica el lugar de la tutoría presencial.
+        detalles: null
+    SinEnlace:
+      summary: En línea, sin enlace o con uno vacío o solo con espacios
+      value:
+        codigo: lugar_o_enlace_invalido
+        mensaje: Indica el enlace de la tutoría en línea.
+        detalles: null
+    LugarNoEsTexto:
+      summary: lugar_o_enlace que no es un texto, como 301
+      value:
+        codigo: lugar_o_enlace_invalido
+        mensaje: El lugar o el enlace tiene que ser un texto.
+        detalles: null
+    LugarConCaracteres:
+      summary: lugar_o_enlace con el carácter nulo o un sustituto UTF-16 suelto
+      value:
+        codigo: lugar_o_enlace_invalido
+        mensaje: El lugar o el enlace tiene caracteres que no se pueden guardar.
+        detalles: null
+    LugarLargo:
+      summary: Un lugar o un enlace de más de 300 caracteres
+      value:
+        codigo: lugar_o_enlace_invalido
+        mensaje: El lugar o el enlace puede tener hasta 300 caracteres.
+        detalles: null
+    EnlaceInvalido:
+      summary: En línea, con un texto que no empieza con http:// o https://
+      value:
+        codigo: lugar_o_enlace_invalido
+        mensaje: 'El enlace de una tutoría en línea tiene que empezar con http:// o https://.'
+        detalles: null
+    TutoriaQueYaEmpezo:
+      summary: Al confirmar, una solicitud cuyo bloque ya empezó o ya terminó
+      value:
+        codigo: bloque_en_el_pasado
+        mensaje: 'Ese horario ya empezó: la tutoría ya no se puede confirmar.'
+        detalles: null
+    ReservaNoPendiente:
+      summary: La reserva ya no está SOLICITADA
+      value:
+        codigo: reserva_no_pendiente
+        mensaje: Esa solicitud ya no está pendiente.
+        detalles: null
+    BloqueOcupado:
+      summary: El bloque ya tiene otra tutoría confirmada
+      value:
+        codigo: bloque_ocupado
+        mensaje: Ese horario ya tiene otra tutoría confirmada.
+        detalles: null
 
   schemas:
 
@@ -2547,7 +2895,7 @@ components:
         id:
           type: string
           format: uuid
-          description: Identificador de la reserva. Es el que piden `GET /reservas/{reserva_id}` y la evaluación.
+          description: Identificador de la reserva. Es el que piden `GET /reservas/{reserva_id}`, la confirmación, el rechazo y la evaluación.
         estado:
           type: string
           enum: [SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA, EVALUADA]
@@ -2651,6 +2999,25 @@ components:
           type: string
           maxLength: 80
 
+    Confirmacion:
+      type: object
+      description: La confirmación de una solicitud por el tutor (HU-22, RN-07). Otros campos se ignoran.
+      required: [modalidad, lugar_o_enlace]
+      properties:
+        modalidad:
+          type: string
+          enum: [PRESENCIAL, EN_LINEA]
+          description: Cómo será la tutoría, en mayúsculas.
+        lugar_o_enlace:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: |
+            Presencial, el lugar de la sesión, por ejemplo la sede y la sala.
+            En línea, el enlace de la sesión, que empieza con `http://` o
+            `https://`. De 1 a 300 caracteres sin contar los espacios de los
+            lados, que no se guardan.
+
     NuevaEvaluacion:
       type: object
       description: Datos para evaluar una tutoría realizada (HU-25). Otros campos se ignoran.
@@ -2739,6 +3106,11 @@ components:
           bloque_no_disponible y solicitud_duplicada (409).
           asignatura_invalida también sale al solicitar una tutoría, y
           bloque_en_el_pasado, al solicitar un bloque que ya empezó.
+        - Con la confirmación y el rechazo de una solicitud (HU-22) se suman
+          modalidad_invalida y lugar_o_enlace_invalido (400), y
+          reserva_no_pendiente y bloque_ocupado (409). reserva_no_encontrada
+          (404) también sale al confirmar o rechazar, y bloque_en_el_pasado,
+          al confirmar una solicitud cuyo bloque ya empezó.
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.

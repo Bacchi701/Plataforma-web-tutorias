@@ -22,4 +22,6 @@ urlpatterns = [
     ),
     path("reservas", reservas.solicitar_o_listar, name="reservas"),
     path("reservas/<uuid:reserva_id>", reservas.una_reserva, name="reserva"),
+    path("reservas/<uuid:reserva_id>/confirmar", reservas.confirmar, name="confirmar"),
+    path("reservas/<uuid:reserva_id>/rechazar", reservas.rechazar, name="rechazar"),
 ]
