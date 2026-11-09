@@ -1,0 +1,364 @@
+/* =========================================
+   MI HISTORIAL (HU-26)
+   Usa las variables y las clases comunes de css/styles.css
+   (container, hidden, btn-primary, subjects-hero). Las clases
+   propias llevan el prefijo hist-, para no chocar con otras páginas.
+========================================= */
+
+.hist-page {
+    background: var(--background);
+    padding-bottom: 80px;
+}
+
+.hist-contenido {
+    padding-top: 32px;
+}
+
+.hist-cargando {
+    color: var(--text-light);
+}
+
+/* «Como estudiante» y «Como tutor», una debajo de la otra */
+.hist-secciones {
+    display: grid;
+    gap: 24px;
+    max-width: 880px;
+}
+
+.hist-tarjeta {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    min-width: 0;
+}
+
+.hist-tarjeta h2 {
+    color: var(--duoc-blue);
+    font-size: 20px;
+    line-height: 1.3;
+}
+
+.hist-secciones h2 {
+    margin-bottom: 16px;
+}
+
+
+/* Lista de tutorías */
+
+.hist-lista {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+}
+
+.hist-item {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--border);
+    border-radius: 12px;
+}
+
+.hist-item-realizada {
+    border-left-color: var(--duoc-blue-light);
+}
+
+.hist-item-evaluada {
+    border-left-color: var(--success);
+}
+
+.hist-item-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px 12px;
+}
+
+.hist-asignatura {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    min-width: 0;
+}
+
+.hist-sigla {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #EEF2F6;
+    color: var(--duoc-blue);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+}
+
+.hist-asignatura-nombre {
+    min-width: 0;
+    color: var(--dark);
+    font-size: 16px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+/* El estado como etiqueta: gris lo que no se hizo */
+.hist-estado {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #F3F4F6;
+    color: #4B5563;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.hist-estado-realizada {
+    background: #E8F0FB;
+    color: var(--duoc-blue);
+}
+
+.hist-estado-evaluada {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.hist-persona,
+.hist-cuando {
+    color: var(--text);
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+.hist-persona-rol {
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.hist-cuando {
+    font-variant-numeric: tabular-nums;
+}
+
+/* "jueves, 24 de septiembre" pasa a "Jueves, 24 de septiembre" */
+.hist-cuando::first-letter {
+    text-transform: uppercase;
+}
+
+.hist-vacio {
+    padding: 24px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    color: var(--text-light);
+    text-align: center;
+}
+
+
+/* Evaluar (HU-25): el botón y el formulario, dentro de la tarjeta */
+
+.hist-evaluar {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    margin-top: 4px;
+}
+
+.hist-boton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--white);
+    color: var(--duoc-blue);
+    font-size: 14px;
+    font-weight: 600;
+    transition: .2s;
+}
+
+.hist-boton:hover {
+    border-color: var(--duoc-blue-light);
+    background: #F4F8FB;
+}
+
+.hist-evaluar > .hist-boton {
+    justify-self: start;
+}
+
+.hist-formulario {
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #F9FAFB;
+}
+
+.hist-campo {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.hist-campo label {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.hist-campo input,
+.hist-campo textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--white);
+    color: var(--dark);
+    font-family: inherit;
+    /* 16px: con menos, el teléfono agranda la página al escribir */
+    font-size: 16px;
+}
+
+.hist-campo input {
+    max-width: 160px;
+    height: 48px;
+    padding: 0 12px;
+}
+
+.hist-campo textarea {
+    min-height: 96px;
+    padding: 10px 12px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.hist-campo input:focus,
+.hist-campo textarea:focus {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 1px;
+    border-color: var(--duoc-blue-light);
+}
+
+.hist-campo [aria-invalid="true"] {
+    border-color: #DC2626;
+}
+
+.hist-contador {
+    justify-self: end;
+    color: var(--text-light);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Sobre 500 caracteres */
+.hist-contador-excedido {
+    color: #B91C1C;
+    font-weight: 700;
+}
+
+.hist-error {
+    color: #B91C1C;
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.hist-form-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.hist-form-acciones .btn-primary {
+    font-size: 15px;
+}
+
+.hist-form-acciones .btn-primary:disabled {
+    opacity: .6;
+    cursor: wait;
+    transform: none;
+}
+
+
+/* Avisos y mensajes */
+
+.hist-aviso {
+    max-width: 880px;
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    /* Que el encabezado fijo no lo tape al desplazarse hasta el aviso */
+    scroll-margin-top: 96px;
+}
+
+.hist-aviso-error {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #B91C1C;
+}
+
+.hist-aviso-exito {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    color: #15803D;
+}
+
+.hist-mensaje {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    text-align: center;
+}
+
+.hist-mensaje i {
+    color: var(--duoc-blue-light);
+    font-size: 32px;
+}
+
+.hist-mensaje p {
+    max-width: 460px;
+    color: var(--text-light);
+    overflow-wrap: anywhere;
+}
+
+#sinSesion {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+
+/* Teléfono (RNF-03): a 360 px se ve completa, sin desplazamiento horizontal.
+   El formulario ya va en una columna; los botones, a lo ancho. */
+
+@media (max-width: 600px) {
+    .hist-form-acciones > button {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 420px) {
+    .hist-contenido {
+        padding-top: 24px;
+    }
+
+    .hist-tarjeta {
+        padding: 18px 16px;
+    }
+
+    .hist-item {
+        padding: 14px 12px;
+    }
+
+    .hist-formulario {
+        padding: 14px 12px;
+    }
+}
