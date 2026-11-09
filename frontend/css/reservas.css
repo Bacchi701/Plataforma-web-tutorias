@@ -1,0 +1,515 @@
+/* =========================================
+   MIS RESERVAS Y SOLICITUDES RECIBIDAS (HU-30)
+   Usa las variables y las clases comunes de css/styles.css
+   (container, hidden, btn-primary, subjects-hero). Las clases
+   propias llevan el prefijo res-, para no chocar con otras páginas.
+========================================= */
+
+.res-page {
+    background: var(--background);
+    padding-bottom: 80px;
+}
+
+.res-contenido {
+    padding-top: 32px;
+}
+
+.res-cargando {
+    color: var(--text-light);
+}
+
+.res-reservas {
+    display: grid;
+    gap: 16px;
+    max-width: 880px;
+}
+
+.res-tarjeta {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    min-width: 0;
+}
+
+.res-tarjeta h2 {
+    color: var(--duoc-blue);
+    font-size: 20px;
+    line-height: 1.3;
+}
+
+
+/* Pestañas: «Mis reservas» y «Solicitudes recibidas» */
+
+.res-pestanas {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+}
+
+.res-pestana {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--white);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+    overflow-wrap: anywhere;
+    transition: .2s;
+}
+
+.res-pestana:hover {
+    border-color: var(--duoc-blue-light);
+    color: var(--duoc-blue);
+}
+
+.res-pestana[aria-selected="true"] {
+    border-color: var(--duoc-blue);
+    background: var(--duoc-blue);
+    color: var(--white);
+}
+
+.res-pestana:focus-visible,
+.res-panel:focus-visible {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 2px;
+}
+
+.res-contador {
+    min-width: 24px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #EEF2F6;
+    color: var(--duoc-blue);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Sin número todavía (mientras carga): no se ve la burbuja vacía */
+.res-contador:empty {
+    display: none;
+}
+
+.res-pestana[aria-selected="true"] .res-contador {
+    background: rgba(255, 255, 255, .2);
+    color: var(--white);
+}
+
+
+/* Lista de reservas */
+
+.res-lista {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+}
+
+.res-item {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--duoc-yellow);
+    border-radius: 12px;
+}
+
+.res-item-confirmada {
+    border-left-color: var(--success);
+}
+
+.res-item-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px 12px;
+}
+
+.res-asignatura {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    min-width: 0;
+}
+
+.res-sigla {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #EEF2F6;
+    color: var(--duoc-blue);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+}
+
+.res-asignatura-nombre {
+    min-width: 0;
+    color: var(--dark);
+    font-size: 16px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+/* El estado como etiqueta: amarilla la solicitud, verde la confirmada */
+.res-estado {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #FEF3C7;
+    color: #92400E;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.res-estado-confirmada {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.res-persona,
+.res-cuando,
+.res-nota {
+    color: var(--text);
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+.res-etiqueta {
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.res-cuando {
+    font-variant-numeric: tabular-nums;
+}
+
+/* "miércoles, 11 de noviembre" pasa a "Miércoles, 11 de noviembre" */
+.res-cuando::first-letter {
+    text-transform: uppercase;
+}
+
+/* Modalidad, lugar o enlace, monto y pago */
+.res-datos {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 15px;
+}
+
+.res-dato {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    min-width: 0;
+}
+
+.res-dato dt {
+    flex: 0 0 96px;
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.res-dato dd {
+    flex: 1 1 200px;
+    min-width: 0;
+    color: var(--dark);
+    overflow-wrap: anywhere;
+}
+
+.res-pago-nota {
+    display: block;
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+.res-enlace {
+    color: var(--duoc-blue-light);
+    font-weight: 600;
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+}
+
+.res-enlace:hover {
+    color: var(--duoc-blue);
+}
+
+.res-vacio {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 24px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    color: var(--text-light);
+    text-align: center;
+}
+
+
+/* Confirmar y rechazar (HU-22): los botones y el formulario, dentro de la tarjeta */
+
+.res-gestion {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    margin-top: 4px;
+}
+
+.res-acciones,
+.res-form-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.res-boton,
+.res-boton-principal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.res-boton-principal {
+    padding: 10px 16px;
+}
+
+.res-boton {
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--white);
+    color: var(--duoc-blue);
+    transition: .2s;
+}
+
+.res-boton:hover {
+    border-color: var(--duoc-blue-light);
+    background: #F4F8FB;
+}
+
+.res-boton-peligro {
+    color: #B91C1C;
+}
+
+.res-boton-peligro:hover {
+    border-color: #FECACA;
+    background: #FEF2F2;
+}
+
+/* Después de la primera pulsación de «Rechazar» */
+.res-boton-armado,
+.res-boton-armado:hover {
+    border-color: #B91C1C;
+    background: #B91C1C;
+    color: var(--white);
+}
+
+.res-gestion button:disabled {
+    opacity: .6;
+    cursor: wait;
+    transform: none;
+}
+
+.res-formulario {
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #F9FAFB;
+}
+
+.res-modalidad {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    min-width: 0;
+    border: none;
+}
+
+.res-modalidad legend {
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.res-modalidad .res-error {
+    flex-basis: 100%;
+}
+
+.res-opcion {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--dark);
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.res-opcion input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--duoc-blue);
+}
+
+.res-campo {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.res-campo label {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.res-campo input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 48px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--white);
+    color: var(--dark);
+    font-family: inherit;
+    /* 16px: con menos, el teléfono agranda la página al escribir */
+    font-size: 16px;
+}
+
+.res-campo input:focus {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 1px;
+    border-color: var(--duoc-blue-light);
+}
+
+.res-campo [aria-invalid="true"] {
+    border-color: #DC2626;
+}
+
+.res-ayuda {
+    color: var(--text-light);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.res-error {
+    color: #B91C1C;
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.res-form-acciones .btn-primary {
+    font-size: 15px;
+}
+
+
+/* Avisos y mensajes */
+
+.res-aviso {
+    max-width: 880px;
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    /* Que el encabezado fijo no lo tape al desplazarse hasta el aviso */
+    scroll-margin-top: 96px;
+}
+
+.res-aviso-error {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #B91C1C;
+}
+
+.res-aviso-exito {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    color: #15803D;
+}
+
+.res-mensaje {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    text-align: center;
+}
+
+.res-mensaje i {
+    color: var(--duoc-blue-light);
+    font-size: 32px;
+}
+
+.res-mensaje p {
+    max-width: 460px;
+    color: var(--text-light);
+    overflow-wrap: anywhere;
+}
+
+#sinSesion {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+
+/* Teléfono (RNF-03): a 360 px se ve completa, sin desplazamiento horizontal.
+   Las pestañas se reparten el ancho y los botones van a lo ancho. */
+
+@media (max-width: 600px) {
+    .res-pestana {
+        flex: 1 1 0;
+        padding: 10px 8px;
+        font-size: 14px;
+    }
+
+    .res-acciones > button,
+    .res-form-acciones > button {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 420px) {
+    .res-contenido {
+        padding-top: 24px;
+    }
+
+    .res-tarjeta {
+        padding: 18px 16px;
+    }
+
+    .res-item {
+        padding: 14px 12px;
+    }
+
+    .res-formulario {
+        padding: 14px 12px;
+    }
+
+    .res-dato dt {
+        flex-basis: 100%;
+    }
+}
