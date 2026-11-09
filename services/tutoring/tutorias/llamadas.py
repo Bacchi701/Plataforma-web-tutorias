@@ -1,4 +1,4 @@
-"""Consultas de Tutorias a Identidad y a Catalogo (HU-14 y HU-41).
+"""Consultas de Tutorias a Identidad y a Catalogo (HU-14, HU-41 y HU-19).
 
 Tutorias guarda copias de lectura del usuario y de la asignatura (usuario_ref
 y asignatura_ref, AD-07). Para crearlas o ponerlas al dia, y para validar
@@ -9,11 +9,15 @@ RN-01, pregunta a las rutas publicas de los otros servicios:
   peticion, y no necesita una clave de servicio.
 - Catalogo, GET /api/catalog/v1/carreras/<id>/asignaturas: la malla vigente
   de la carrera, por semestre. Es publica.
+- Catalogo, GET /api/catalog/v1/asignaturas?paginado=1: todas las asignaturas
+  activas, pagina por pagina (asignaturas_del_catalogo). Es publica: la usa
+  la sincronizacion de las copias (HU-19) sin las rutas internas de Catalogo.
 
 Las rutas /internal con clave de servicio (Pilar 2, seccion 5.4) se llaman
-con _pedir() y la clave de servicio para lo que necesite datos de otro usuario,
-como la sincronizacion de las copias (usuario_por_id), los avisos por correo
-(HU-16) y los pagos simulados (HU-23).
+con _pedir() y la clave de servicio para lo que necesite datos de otro usuario:
+los de uno (usuario_por_id) o los de varios en una sola llamada
+(usuarios_por_ids, GET /internal/usuarios?ids=, para la sincronizacion de las
+copias, HU-19), los avisos por correo (HU-16) y los pagos simulados (HU-23).
 
 De esa convencion se toma lo demas: urllib de la biblioteca estandar, 3
 segundos de espera y un solo intento. Si el otro servicio no responde, se
@@ -159,6 +163,15 @@ def _datos_de_yo(cuerpo):
     return {**identificadores, "nombre": nombre, "apellido": apellido, "nivel": nivel}
 
 
+def _datos_internos(cuerpo):
+    """Un usuario de las rutas /internal: lo de GET /yo mas activo, o None."""
+    datos = _datos_de_yo(cuerpo)
+    activo = cuerpo.get("activo") if isinstance(cuerpo, dict) else None
+    if datos is None or not isinstance(activo, bool):
+        return None
+    return {**datos, "activo": activo}
+
+
 def datos_del_usuario(autorizacion):
     """GET /yo de Identidad con la cabecera Authorization de la peticion.
 
@@ -200,10 +213,9 @@ def usuario_por_id(usuario_id):
     codigo = _codigo(cuerpo)
 
     if estado == 200:
-        datos = _datos_de_yo(cuerpo)
-        activo = cuerpo.get("activo") if isinstance(cuerpo, dict) else None
-        if datos is not None and isinstance(activo, bool):
-            return {**datos, "activo": activo}
+        datos = _datos_internos(cuerpo)
+        if datos is not None:
+            return datos
     elif estado == 404:
         if codigo == "usuario_no_encontrado":
             return None
@@ -213,6 +225,45 @@ def usuario_por_id(usuario_id):
         raise no_disponible(IDENTIDAD)
 
     logger.error("Identidad respondió %s (codigo %s) a GET %s", estado, codigo, url)
+    raise no_disponible(IDENTIDAD)
+
+
+def usuarios_por_ids(ids):
+    """GET /internal/usuarios?ids= de Identidad: varios usuarios en una llamada.
+
+    Es la consulta de la sincronizacion de las copias (HU-19). Devuelve
+    {uuid.UUID: datos}, con datos de la misma forma que usuario_por_id. Los
+    usuarios que Identidad no tiene no vienen, y sin ids no llama.
+    - 404, con JSON o sin el: esta ruta no tiene un 404 de «no existe», asi
+      que falta la ruta o la clave no calza. Lanza ServicioNoDisponible y el
+      log pide revisar CLAVE_SERVICIO.
+    - Cualquier otra respuesta, o una lista con otra forma: al log y 503.
+    """
+    ids = [str(usuario_id) for usuario_id in ids]
+    if not ids:
+        return {}
+    url = (
+        f"{settings.URL_IDENTIDAD}/api/identity/v1/internal/usuarios"
+        f"?ids={','.join(ids)}"
+    )
+    estado, cuerpo = _pedir(IDENTIDAD, url)
+
+    if estado == 200 and isinstance(cuerpo, list):
+        usuarios = [_datos_internos(elemento) for elemento in cuerpo]
+        if None not in usuarios:
+            return {datos["id"]: datos for datos in usuarios}
+    elif estado == 404:
+        logger.error(
+            "404 desde %s a GET /internal/usuarios: revisa CLAVE_SERVICIO", IDENTIDAD
+        )
+        raise no_disponible(IDENTIDAD)
+
+    logger.error(
+        "Identidad respondió %s (codigo %s) a GET /internal/usuarios con %s ids",
+        estado,
+        _codigo(cuerpo),
+        len(ids),
+    )
     raise no_disponible(IDENTIDAD)
 
 
@@ -257,3 +308,57 @@ def malla_cursada(carrera_id, hasta_semestre):
             return habilitadas
     logger.error("Catálogo respondió %s (codigo %s) a GET %s", estado, codigo, url)
     raise no_disponible(CATALOGO)
+
+
+def asignaturas_del_catalogo():
+    """Todas las asignaturas activas de Catalogo (HU-19).
+
+    Lee la ruta publica GET /api/catalog/v1/asignaturas con el formato
+    paginado, sin la clave de servicio: la pagina 1 y despues las siguientes,
+    hasta total_paginas, de a 200 (su limite maximo) y con un tope de 50
+    paginas (10.000 asignaturas). Devuelve {asignatura_id: {"sigla",
+    "nombre"}}. Si una respuesta no es 200 o no tiene esa forma: al log y 503,
+    sin devolver una lista a medias.
+    """
+    # Si HU-12 (criterio 5) cambia el formato paginado de GET /asignaturas,
+    # esta funcion cambia con el.
+    asignaturas = {}
+    pagina = total_paginas = 1
+    while pagina <= min(total_paginas, 50):
+        url = (
+            f"{settings.URL_CATALOGO}/api/catalog/v1/asignaturas"
+            f"?paginado=1&limite=200&pagina={pagina}"
+        )
+        estado, cuerpo = _pedir(CATALOGO, url)
+        try:
+            # Una respuesta que no es 200, o que tiene otra forma, termina en
+            # el except.
+            if estado != 200:
+                raise ValueError(estado)
+            total_paginas = cuerpo["total_paginas"]
+            # bool es subclase de int: un true no es una cantidad de paginas.
+            if isinstance(total_paginas, bool) or not isinstance(total_paginas, int):
+                raise ValueError(total_paginas)
+            for asignatura in cuerpo["resultados"]:
+                sigla, nombre = asignatura["sigla"], asignatura["nombre"]
+                if not isinstance(sigla, str) or not isinstance(nombre, str):
+                    raise ValueError(asignatura)
+                asignaturas[uuid.UUID(asignatura["id"])] = {
+                    "sigla": sigla,
+                    "nombre": nombre,
+                }
+        except (KeyError, TypeError, ValueError, AttributeError):
+            logger.error(
+                "Catálogo respondió %s (codigo %s) a GET %s",
+                estado,
+                _codigo(cuerpo),
+                url,
+            )
+            raise no_disponible(CATALOGO) from None
+        pagina += 1
+    if total_paginas > 50:
+        logger.warning(
+            "Catálogo tiene %s páginas de asignaturas: se leyeron las primeras 50",
+            total_paginas,
+        )
+    return asignaturas
