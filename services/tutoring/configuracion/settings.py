@@ -67,11 +67,15 @@ JWT_CLAVE_PUBLICA = os.environ.get(
 )
 JWT_EMISOR = "identity"
 
-# ---------- Consultas a Identidad y a Catalogo (HU-14, HU-41) ----------
+# ---------- Consultas a otros servicios (HU-14, HU-41 y HU-28) ----------
 # Direcciones dentro de la red de Docker (tutorias/llamadas.py). Tutorias pide
 # GET /yo a Identidad con el mismo token de la peticion, y la malla de una
 # carrera a Catalogo, que es publica: ninguna de las dos necesita una clave.
+# A Pagos le pide el reembolso al cancelar una tutoria con monto (HU-28), por
+# una ruta /internal. Como las otras dos, URL_PAGOS no va en docker-compose.yml
+# ni en .env.example: vale el valor por defecto dentro de la red de Docker.
 # CLAVE_SERVICIO es para las rutas /internal (Pilar 2, seccion 5.4).
 URL_IDENTIDAD = os.environ.get("URL_IDENTIDAD", "http://identity:8000")
 URL_CATALOGO = os.environ.get("URL_CATALOGO", "http://catalog:8000")
+URL_PAGOS = os.environ.get("URL_PAGOS", "http://payments:8000")
 CLAVE_SERVICIO = os.environ.get("CLAVE_SERVICIO", "")

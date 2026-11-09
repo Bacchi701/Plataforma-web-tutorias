@@ -1,4 +1,4 @@
-"""Pruebas de HU-28 (parte A): retirar una solicitud o cancelar una tutoria.
+"""Pruebas de HU-28: retirar una solicitud o cancelar una tutoria.
 
 Corren contra PostgreSQL, como test_confirmar_rechazar.py: el bloqueo con
 SELECT ... FOR UPDATE y la regla ux_reserva_bloque_ocupado solo existen ahi.
@@ -7,6 +7,9 @@ reservas se crean directo en la base, y tambien los bloques que ya empezaron,
 porque la API no los acepta. pedir_aviso se reemplaza en tutorias.reservas,
 donde se usa; donde una prueba usa el pedir_aviso de verdad, Identidad la hace
 IdentidadFalsa, de test_reservas.py.
+
+Parte B (criterio 3): pedir_reembolso se reemplaza en tutorias.reservas en
+todas las pruebas (fixture reembolso, autouse): ninguna llama a Pagos.
 """
 
 import threading
@@ -26,11 +29,13 @@ from django.utils import timezone
 from . import llamadas, reservas
 from .autenticacion import leer_clave
 from .bloques import instante_json
+from .internas import instante_preciso
 from .models import (
     ESTADOS_QUE_OCUPAN,
     AsignaturaRef,
     BloqueDisponibilidad,
     EstadoBloque,
+    EstadoPago,
     EstadoReserva,
     Modalidad,
     PerfilTutor,
@@ -109,6 +114,19 @@ def aviso(monkeypatch):
     """pedir_aviso reemplazado donde se usa: en tutorias.reservas."""
     falso = mock.Mock(return_value=True)
     monkeypatch.setattr(reservas, "pedir_aviso", falso)
+    return falso
+
+
+@pytest.fixture(autouse=True)
+def reembolso(monkeypatch):
+    """pedir_reembolso reemplazado donde se usa, en todas las pruebas (parte B).
+
+    Al cancelar una reserva CONFIRMADA con monto, la vista pide el reembolso a
+    Pagos despues del commit: sin este reemplazo, las pruebas que ejecutan los
+    on_commit lo pedirian de verdad. Responde True, como con un 200 de Pagos.
+    """
+    falso = mock.Mock(return_value=True)
+    monkeypatch.setattr(reservas, "pedir_reembolso", falso)
     return falso
 
 
@@ -607,7 +625,8 @@ def test_cancelar_una_confirmada_avisa_a_la_otra_parte(
         respuesta = cancelar(client, cabecera(cancela), tutoria.id)
 
     assert respuesta.status_code == 200
-    assert len(callbacks) == 1
+    # El reembolso (parte B: la tutoria tiene monto) y el aviso.
+    assert len(callbacks) == 2
     assert pedidos(aviso) == [(avisado.usuario_id, "RESERVA_CANCELADA", tutoria.id)]
     assert aviso.call_args.args[2].estado == EstadoReserva.CANCELADA
 
@@ -823,3 +842,320 @@ def test_cancelar_y_confirmar_a_la_vez_la_misma_solicitud(
         assert solicitud.confirmada_en is None
         esperados = [(tutora.usuario_id, "RESERVA_CANCELADA", solicitud.id)]
     assert sorted(pedidos(aviso), key=str) == sorted(esperados, key=str)
+
+
+# ------------------------------------------------------------ el reembolso (parte B)
+
+CLAVE = "clave-de-prueba"
+ESTADO_PAGO = "/api/tutoring/v1/internal/reservas/{}/estado-pago"
+
+
+def con_pago(
+    en_bloque,
+    solicitante,
+    asignatura,
+    estado_pago,
+    monto=Decimal("5000"),
+    estado=EstadoReserva.CONFIRMADA,
+):
+    """Una reserva que ocupa el bloque, con su monto y la copia del pago.
+
+    Como la deja HU-23: con estado_pago, pago_actualizado_en lleva la hora del
+    ultimo aviso de Pagos, hace cinco minutos. Sin monto no hay estado_pago
+    (ck_reserva_pago_con_monto).
+    """
+    en_bloque.estado = EstadoBloque.OCUPADO
+    en_bloque.save(update_fields=["estado", "actualizado_en"])
+    avisado = None if estado_pago is None else timezone.now() - timedelta(minutes=5)
+    return reserva(
+        en_bloque,
+        solicitante,
+        asignatura,
+        estado,
+        monto=monto,
+        estado_pago=estado_pago,
+        pago_actualizado_en=avisado,
+    )
+
+
+def hace_lo_de_pagos(cliente):
+    """El reembolso de Pagos (pagos/internas.py), visto desde Tutorias.
+
+    Pagos deja el pago REEMBOLSADO y, antes de responder, se lo informa a
+    Tutorias con PATCH /internal/reservas/<id>/estado-pago (HU-23), con la
+    clave de servicio y el instante del cambio. Despues responde 200, y
+    pedir_reembolso devuelve True.
+    """
+
+    def reembolsar(reserva_id):
+        respuesta = cliente.patch(
+            ESTADO_PAGO.format(reserva_id),
+            {
+                "estado_pago": "REEMBOLSADO",
+                "actualizado_en": instante_preciso(timezone.now()),
+            },
+            content_type="application/json",
+            HTTP_X_CLAVE_SERVICIO=CLAVE,
+        )
+        assert respuesta.json() == {"aplicado": True, "estado_pago": "REEMBOLSADO"}
+        return True
+
+    return reembolsar
+
+
+CON_MONTO = {
+    "pagado_cancela_el_estudiante": (EstadoPago.PAGADO, "estudiante"),
+    "pendiente_cancela_el_estudiante": (EstadoPago.PENDIENTE, "estudiante"),
+    "fallido_cancela_el_estudiante": (EstadoPago.FALLIDO, "estudiante"),
+    "sin_pago_cancela_el_estudiante": (None, "estudiante"),
+    "pagado_cancela_el_tutor": (EstadoPago.PAGADO, "tutor"),
+}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "estado_pago, quien", list(CON_MONTO.values()), ids=list(CON_MONTO)
+)
+def test_cancelar_una_confirmada_con_monto_pide_el_reembolso(
+    client,
+    cabecera,
+    aviso,
+    reembolso,
+    django_capture_on_commit_callbacks,
+    tutora,
+    libre,
+    asignatura,
+    estado_pago,
+    quien,
+):
+    """Criterio 3 (CA9), aunque la copia no diga PAGADO.
+
+    estado_pago es una copia que puede venir atrasada: Pagos es la unica
+    fuente del estado del pago (T-174) y decide si hay algo que reembolsar.
+    """
+    camila = persona("Camila", "Rojas")
+    tutoria = con_pago(libre, camila, asignatura, estado_pago)
+    cancela = camila if quien == "estudiante" else tutora
+
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        respuesta = cancelar(client, cabecera(cancela), tutoria.id)
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["estado"] == "CANCELADA"
+    reembolso.assert_called_once_with(tutoria.id)
+    # El reembolso y el aviso.
+    assert len(callbacks) == 2
+    assert aviso.call_count == 1
+
+
+@pytest.mark.django_db
+def test_el_reembolso_se_pide_despues_del_commit_y_antes_del_aviso(
+    client,
+    cabecera,
+    aviso,
+    reembolso,
+    django_capture_on_commit_callbacks,
+    tutora,
+    libre,
+    asignatura,
+):
+    camila = persona("Camila", "Rojas")
+    tutoria = con_pago(libre, camila, asignatura, EstadoPago.PAGADO)
+
+    with django_capture_on_commit_callbacks() as callbacks:
+        respuesta = cancelar(client, cabecera(camila), tutoria.id)
+
+    assert respuesta.status_code == 200
+    # Durante la peticion no se llamo a Pagos: quedo pedido para despues del
+    # commit, sin ningun bloqueo tomado.
+    assert not reembolso.called
+    assert not aviso.called
+    assert len(callbacks) == 2
+    # Primero el reembolso...
+    callbacks[0]()
+    reembolso.assert_called_once_with(tutoria.id)
+    assert not aviso.called
+    # ... y despues el aviso.
+    callbacks[1]()
+    assert pedidos(aviso) == [(tutora.usuario_id, "RESERVA_CANCELADA", tutoria.id)]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("caso", ["ya_reembolsada", "gratuita", "retira_una_solicitud"])
+def test_sin_nada_que_reembolsar_no_se_le_pide_a_pagos(
+    client,
+    cabecera,
+    aviso,
+    reembolso,
+    django_capture_on_commit_callbacks,
+    tutora,
+    libre,
+    asignatura,
+    caso,
+):
+    camila = persona("Camila", "Rojas")
+    if caso == "ya_reembolsada":
+        una_reserva = con_pago(libre, camila, asignatura, EstadoPago.REEMBOLSADO)
+    elif caso == "gratuita":
+        # Sin tarifa no hay pago (RN-05): estado_pago queda nulo, como lo pide
+        # ck_reserva_pago_con_monto.
+        una_reserva = con_pago(libre, camila, asignatura, None, monto=Decimal("0"))
+    else:
+        # Una solicitud no se paga.
+        una_reserva = reserva(libre, camila, asignatura)
+
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        respuesta = cancelar(client, cabecera(camila), una_reserva.id)
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["estado"] == "CANCELADA"
+    assert not reembolso.called
+    # Solo el aviso.
+    assert len(callbacks) == 1
+    assert aviso.call_count == 1
+
+
+@pytest.mark.django_db
+def test_si_la_cancelacion_falla_no_se_pide_el_reembolso(
+    client,
+    cabecera,
+    aviso,
+    reembolso,
+    django_capture_on_commit_callbacks,
+    tutora,
+    libre,
+    asignatura,
+):
+    """Todas pagadas: si la cancelacion pasara, se pediria el reembolso."""
+    camila = persona("Camila", "Rojas")
+    en_curso = con_pago(empezado(tutora), camila, asignatura, EstadoPago.PAGADO)
+    futura = con_pago(libre, camila, asignatura, EstadoPago.PAGADO)
+    realizada = con_pago(
+        empezado(tutora, -120, -60),
+        camila,
+        asignatura,
+        EstadoPago.PAGADO,
+        estado=EstadoReserva.REALIZADA,
+    )
+    # Ya cancelada y con el reembolso pendiente: cancelarla otra vez no lo
+    # reintenta.
+    cancelada = reserva(
+        bloque(tutora, 3, 4),
+        camila,
+        asignatura,
+        EstadoReserva.CANCELADA,
+        estado_pago=EstadoPago.PAGADO,
+        pago_actualizado_en=timezone.now() - timedelta(hours=2),
+    )
+
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        respuestas = [
+            cancelar(client, cabecera(camila), en_curso.id),
+            cancelar(client, cabecera(persona("Diego", "Herrera")), futura.id),
+            cancelar(client, cabecera(camila), realizada.id),
+            cancelar(client, cabecera(camila), cancelada.id),
+        ]
+
+    assert [error(r) for r in respuestas] == [
+        (400, "bloque_en_el_pasado"),
+        (404, "reserva_no_encontrada"),
+        (409, "reserva_no_cancelable"),
+        (409, "reserva_no_cancelable"),
+    ]
+    assert callbacks == []
+    assert not reembolso.called
+    assert not aviso.called
+
+
+@pytest.mark.django_db
+def test_si_el_reembolso_queda_pendiente_la_cancelacion_queda_igual(
+    client,
+    cabecera,
+    aviso,
+    reembolso,
+    django_capture_on_commit_callbacks,
+    tutora,
+    libre,
+    asignatura,
+):
+    """pedir_reembolso devuelve False: Pagos no respondio. No se reintenta."""
+    camila = persona("Camila", "Rojas")
+    tutoria = con_pago(libre, camila, asignatura, EstadoPago.PAGADO)
+    reembolso.return_value = False
+
+    with django_capture_on_commit_callbacks(execute=True):
+        respuesta = cancelar(client, cabecera(camila), tutoria.id)
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert (cuerpo["estado"], cuerpo["estado_pago"]) == ("CANCELADA", "PAGADO")
+    reembolso.assert_called_once_with(tutoria.id)
+    tutoria.refresh_from_db()
+    libre.refresh_from_db()
+    assert (tutoria.estado, tutoria.estado_pago, libre.estado) == (
+        EstadoReserva.CANCELADA,
+        EstadoPago.PAGADO,
+        EstadoBloque.LIBRE,
+    )
+    # El aviso sale igual.
+    assert pedidos(aviso) == [(tutora.usuario_id, "RESERVA_CANCELADA", tutoria.id)]
+
+
+@pytest.mark.django_db
+def test_el_camino_completo_deja_el_pago_reembolsado(
+    client,
+    cabecera,
+    settings,
+    aviso,
+    reembolso,
+    django_capture_on_commit_callbacks,
+    tutora,
+    libre,
+    asignatura,
+):
+    """Criterio 3: la reserva cancelada queda con estado_pago REEMBOLSADO.
+
+    El reemplazo de pedir_reembolso hace lo que hace Pagos, con la ruta
+    interna de HU-23. En la integracion continua CLAVE_SERVICIO esta vacia y
+    esa ruta responde 404: la clave se fija aqui, y el PATCH la manda.
+    """
+    settings.CLAVE_SERVICIO = CLAVE
+    camila = persona("Camila", "Rojas")
+    tutoria = con_pago(libre, camila, asignatura, EstadoPago.PAGADO)
+    reembolso.side_effect = hace_lo_de_pagos(client)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        respuesta = cancelar(client, cabecera(camila), tutoria.id)
+
+    assert respuesta.status_code == 200
+    reembolso.assert_called_once_with(tutoria.id)
+    tutoria.refresh_from_db()
+    assert (tutoria.estado, tutoria.estado_pago) == (
+        EstadoReserva.CANCELADA,
+        EstadoPago.REEMBOLSADO,
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_la_respuesta_ya_trae_el_pago_reembolsado(
+    client, cabecera, settings, aviso, reembolso, tutora, libre, asignatura
+):
+    """Como en el sistema levantado: Pagos informa REEMBOLSADO antes de responder.
+
+    Con transaction=True los on_commit se ejecutan de verdad, dentro de la
+    peticion, al cerrar su transaccion. La vista lee la reserva despues, con el
+    aviso de Pagos ya aplicado: es lo que muestra la pantalla (HU-30).
+    """
+    settings.CLAVE_SERVICIO = CLAVE
+    camila = persona("Camila", "Rojas")
+    tutoria = con_pago(libre, camila, asignatura, EstadoPago.PAGADO)
+    # Otro cliente: el PATCH llega mientras la cancelacion sigue en curso.
+    reembolso.side_effect = hace_lo_de_pagos(Client())
+
+    respuesta = cancelar(client, cabecera(camila), tutoria.id)
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert (cuerpo["estado"], cuerpo["estado_pago"]) == ("CANCELADA", "REEMBOLSADO")
+    reembolso.assert_called_once_with(tutoria.id)
+    assert aviso.call_count == 1

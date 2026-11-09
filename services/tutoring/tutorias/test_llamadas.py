@@ -1,12 +1,14 @@
-"""Pruebas de las consultas de Tutorias a Identidad y a Catalogo (llamadas.py).
+"""Pruebas de las consultas de Tutorias a otros servicios (llamadas.py).
 
-Reemplazan llamadas.abrir, la unica salida a la red del modulo: no necesitan
-los otros servicios, que en la integracion continua no estan.
+Identidad, Catalogo y, desde HU-28, el reembolso a Pagos. Reemplazan
+llamadas.abrir, la unica salida a la red del modulo: no necesitan los otros
+servicios, que en la integracion continua no estan.
 """
 
 import http.client
 import io
 import json
+import logging
 import urllib.error
 import uuid
 
@@ -675,3 +677,178 @@ def test_si_falla_la_segunda_pagina_no_devuelve_una_lista_a_medias(red):
         llamadas.asignaturas_del_catalogo()
 
     assert len(red.peticiones) == 2
+
+
+# ------------------------------------------------- El reembolso a Pagos (HU-28)
+
+RESERVA_ID = uuid.uuid4()
+REEMBOLSO = "http://payments:8000/api/payments/v1/internal/pagos/reembolso"
+
+
+@pytest.fixture
+def pagos(red, settings):
+    """La red, con la direccion de Pagos y la clave de servicio fijadas.
+
+    En la integracion continua URL_PAGOS y CLAVE_SERVICIO no existen.
+    """
+    settings.URL_PAGOS = "http://payments:8000"
+    settings.CLAVE_SERVICIO = "clave-de-prueba"
+    return red
+
+
+def pago_reembolsado():
+    """El 200 de POST /internal/pagos/reembolso de Pagos (vistas.pago_json)."""
+    return {
+        "id": str(uuid.uuid4()),
+        "reserva_id": str(RESERVA_ID),
+        "monto": 5000,
+        "estado": "REEMBOLSADO",
+        "proveedor": "SIMULADO",
+        "creado_en": "2026-11-12T14:00:00Z",
+        "actualizado_en": "2026-11-12T14:20:00Z",
+        "intentos": [
+            {
+                "tipo": "REEMBOLSO",
+                "resultado": "EXITOSO",
+                "mensaje": None,
+                "creado_en": "2026-11-12T14:20:00Z",
+            },
+            {
+                "tipo": "COBRO",
+                "resultado": "EXITOSO",
+                "mensaje": None,
+                "creado_en": "2026-11-12T14:01:00Z",
+            },
+        ],
+    }
+
+
+def registros_de_llamadas(caplog):
+    """(nivel, mensaje) de cada linea que dejo llamadas.py en el log."""
+    return [
+        (registro.levelno, registro.getMessage())
+        for registro in caplog.records
+        if registro.name == llamadas.logger.name
+    ]
+
+
+def test_pedir_reembolso_con_200_pide_a_la_ruta_interna_y_devuelve_true(pagos):
+    pagos.respuesta = Respuesta(pago_reembolsado())
+
+    assert llamadas.pedir_reembolso(RESERVA_ID) is True
+
+    [peticion] = pagos.peticiones
+    assert peticion.full_url == REEMBOLSO
+    assert peticion.get_method() == "POST"
+    # El id va como texto: json.dumps no sabe escribir un uuid.UUID.
+    assert json.loads(peticion.data) == {"reserva_id": str(RESERVA_ID)}
+    # urllib guarda las cabeceras con str.capitalize().
+    assert peticion.get_header("Content-type") == "application/json"
+    assert peticion.get_header("X-clave-servicio") == "clave-de-prueba"
+    # Una ruta interna no usa el token de nadie.
+    assert peticion.get_header("Authorization") is None
+
+
+NADA_QUE_REEMBOLSAR = {
+    "sin_pago": (
+        error_http(
+            404,
+            {
+                "codigo": "pago_no_encontrado",
+                "mensaje": "Esa reserva no tiene pago.",
+                "detalles": None,
+            },
+        ),
+        "404 (codigo pago_no_encontrado)",
+    ),
+    "pago_no_pagado": (
+        error_http(
+            409,
+            {
+                "codigo": "pago_no_reembolsable",
+                "mensaje": "Solo se reembolsa un pago PAGADO.",
+                "detalles": None,
+            },
+        ),
+        "409 (codigo pago_no_reembolsable)",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "respuesta, respondio",
+    list(NADA_QUE_REEMBOLSAR.values()),
+    ids=list(NADA_QUE_REEMBOLSAR),
+)
+def test_pedir_reembolso_sin_nada_que_reembolsar_devuelve_true(
+    pagos, caplog, respuesta, respondio
+):
+    """La reserva no tiene pago, o el pago no esta PAGADO: Pagos decide."""
+    caplog.set_level(logging.INFO, logger="tutorias.llamadas")
+    pagos.respuesta = respuesta
+
+    assert llamadas.pedir_reembolso(RESERVA_ID) is True
+
+    # Una sola linea, informativa, con la reserva y el codigo. Ningun error.
+    assert registros_de_llamadas(caplog) == [
+        (
+            logging.INFO,
+            f"Nada que reembolsar en la reserva {RESERVA_ID}: Pagos respondió "
+            f"{respondio}",
+        )
+    ]
+
+
+REEMBOLSOS_PENDIENTES = {
+    "ruta_no_encontrada": (
+        error_http(404, {"codigo": "ruta_no_encontrada", "mensaje": "x"}),
+        "404 sin código conocido desde Pagos: revisa CLAVE_SERVICIO",
+    ),
+    "html_404": (
+        error_http(404, b"<!DOCTYPE html><title>Not Found</title>"),
+        "404 sin código conocido desde Pagos: revisa CLAVE_SERVICIO",
+    ),
+    "error_500": (
+        error_http(500, b"<h1>Server Error (500)</h1>"),
+        "falló la llamada a Pagos (<HTTPError 500: 'error'>)",
+    ),
+    "no_conecta_a_tiempo": (
+        urllib.error.URLError(TimeoutError("timed out")),
+        "falló la llamada a Pagos (URLError(TimeoutError('timed out')))",
+    ),
+    "no_contesta_a_tiempo": (
+        TimeoutError("timed out"),
+        "falló la llamada a Pagos (TimeoutError('timed out'))",
+    ),
+    "no_conecta": (
+        urllib.error.URLError(ConnectionRefusedError(111, "refused")),
+        "falló la llamada a Pagos (URLError(ConnectionRefusedError(111, 'refused')))",
+    ),
+    "otro_error": (
+        RuntimeError("inesperado"),
+        "falló la llamada a Pagos (RuntimeError('inesperado'))",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "falla, que_paso",
+    list(REEMBOLSOS_PENDIENTES.values()),
+    ids=list(REEMBOLSOS_PENDIENTES),
+)
+def test_si_pagos_falla_el_reembolso_queda_pendiente_sin_lanzar_nada(
+    pagos, caplog, falla, que_paso
+):
+    """Devuelve False y no lanza: la cancelacion ya quedo guardada."""
+    pagos.respuesta = falla
+
+    assert llamadas.pedir_reembolso(RESERVA_ID) is False
+
+    errores = [
+        mensaje
+        for nivel, mensaje in registros_de_llamadas(caplog)
+        if nivel >= logging.ERROR
+    ]
+    assert errores == [
+        f"El reembolso de la reserva {RESERVA_ID} quedó pendiente: {que_paso}"
+    ]

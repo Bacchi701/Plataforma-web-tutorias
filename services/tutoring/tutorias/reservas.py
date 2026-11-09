@@ -38,7 +38,7 @@ el tutor, que es el dueno del bloque de la reserva.
 - Despues de guardar se pide a Identidad el aviso a cada estudiante
   (RESERVA_CONFIRMADA o RESERVA_RECHAZADA, HU-16).
 
-HU-28 (parte A): POST /reservas/<id>/cancelar, para el solicitante o el tutor.
+HU-28: POST /reservas/<id>/cancelar, para el solicitante o el tutor.
 
 - El estudiante retira su solicitud SOLICITADA: queda CANCELADA y el bloque
   no cambia, porque nunca estuvo ocupado. El tutor no retira una solicitud:
@@ -47,11 +47,15 @@ HU-28 (parte A): POST /reservas/<id>/cancelar, para el solicitante o el tutor.
   empieza: queda CANCELADA y el bloque vuelve a LIBRE (RN-04, CA9).
 - Las dos escriben estado, cerrada_en y quien cancelo (cancelada_por_usuario),
   y bloquean en el mismo orden que confirmar y rechazar.
-- Despues de guardar se pide a Identidad el aviso RESERVA_CANCELADA para la
-  otra parte (HU-16).
-- El reembolso de una reserva pagada (criterio 3) no esta aqui: llega con la
-  parte B de HU-28, cuando exista Pagos (HU-23). La expiracion de las
-  solicitudes esta en por_tiempo.py.
+- Parte B (criterio 3, CA9): al cancelar una reserva CONFIRMADA con monto,
+  despues de guardar se pide el reembolso a Pagos (pedir_reembolso,
+  llamadas.py), aunque la copia estado_pago no diga PAGADO: puede venir
+  atrasada, y Pagos es la unica fuente del estado del pago (T-174). Pagos
+  decide si hay algo que reembolsar. No se pide si la copia ya dice
+  REEMBOLSADO.
+- Despues de guardar, y despues del reembolso, se pide a Identidad el aviso
+  RESERVA_CANCELADA para la otra parte (HU-16).
+- La expiracion de las solicitudes esta en por_tiempo.py.
 """
 
 import uuid
@@ -67,10 +71,11 @@ from rest_framework.response import Response
 
 from .bloques import Rechazo, instante_json
 from .copias import asegurar_usuario_ref
-from .llamadas import pedir_aviso
+from .llamadas import pedir_aviso, pedir_reembolso
 from .models import (
     BloqueDisponibilidad,
     EstadoBloque,
+    EstadoPago,
     EstadoReserva,
     Modalidad,
     PerfilTutor,
@@ -583,8 +588,10 @@ def no_cancelable(estado):
 def cancelar(request, reserva_id):
     """POST /reservas/<id>/cancelar: retirar una solicitud o cancelar una tutoria.
 
-    Criterios 1, 2 y 4 de HU-28. Sin cuerpo: si viene uno, se ignora. Responde
-    200 con la reserva CANCELADA, leida de nuevo despues de la transaccion.
+    Criterios 1 a 4 de HU-28. Sin cuerpo: si viene uno, se ignora. Responde
+    200 con la reserva CANCELADA, leida de nuevo despues de la transaccion y
+    de lo que se pide despues del commit: si Pagos reembolso el pago, ya
+    informo REEMBOLSADO (criterio 3).
     """
     # 1. Sin bloquear: la reserva y su bloque. Si no existe, o si quien pide
     # no es el solicitante ni el tutor (el dueno del bloque), el mismo 404 de
@@ -633,6 +640,20 @@ def cancelar(request, reserva_id):
             # Tambien una solicitud que el programador todavia no expira.
             raise Rechazo(YA_EMPEZO_AL_CANCELAR, "bloque_en_el_pasado")
 
+        # Criterio 3 (CA9), con la reserva bloqueada y antes de cambiarla: por
+        # una tutoria CONFIRMADA con monto se le pide el reembolso a Pagos,
+        # salvo que la copia ya diga REEMBOLSADO. Tambien con PAGADO,
+        # PENDIENTE, FALLIDO o nulo: la copia puede venir atrasada si se perdio
+        # un aviso, y Pagos es la unica fuente del estado del pago (T-174). Si
+        # no hay pago o no esta pagado, Pagos responde que no hay nada que
+        # reembolsar. Sin tarifa no hay pago (RN-05), y una solicitud no se
+        # paga.
+        reembolsar = (
+            estado == EstadoReserva.CONFIRMADA
+            and reserva.monto > 0
+            and reserva.estado_pago != EstadoPago.REEMBOLSADO
+        )
+
         # Criterios 1 y 2: queda registrado quien cancelo. Las dos partes ya
         # tienen su fila en usuario_ref, asi que la FK se cumple.
         reserva.estado = EstadoReserva.CANCELADA
@@ -645,7 +666,13 @@ def cancelar(request, reserva_id):
             bloque.estado = EstadoBloque.LIBRE
             bloque.save(update_fields=["estado", "actualizado_en"])
 
-        # 3. El aviso a la otra parte sale cuando todo quedo guardado, y asi
+        # 3. Despues del commit, nunca dentro de la transaccion: Pagos llama de
+        # vuelta a Tutorias en la misma peticion (PATCH estado-pago, que
+        # bloquea la reserva). Va antes del aviso. Si el reembolso no sale, la
+        # cancelacion queda igual: pedir_reembolso no lanza excepciones.
+        if reembolsar:
+            transaction.on_commit(partial(pedir_reembolso, reserva.id))
+        # El aviso a la otra parte sale cuando todo quedo guardado, y asi
         # otra_persona, que calcula pedir_aviso, es quien cancelo. Si la
         # transaccion se deshace, no sale.
         destinatario = reserva.solicitante_usuario_id if es_tutor else bloque.usuario_id
@@ -653,6 +680,8 @@ def cancelar(request, reserva_id):
             partial(pedir_aviso, destinatario, RESERVA_CANCELADA, reserva)
         )
 
-    # 4. Con el formato de HU-21, leida de nuevo despues de la transaccion.
+    # 4. Con el formato de HU-21, leida de nuevo despues de la transaccion. Los
+    # on_commit ya corrieron: si Pagos reembolso el pago, ya informo
+    # REEMBOLSADO (lo hace antes de responder), y la respuesta lo trae.
     reserva = reservas_con_todo().get(pk=reserva_id)
     return Response(reserva_json(reserva, TUTOR if es_tutor else ESTUDIANTE))
