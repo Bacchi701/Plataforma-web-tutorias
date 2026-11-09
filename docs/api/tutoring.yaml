@@ -7,13 +7,14 @@ info:
     Contrato de la API pública de Tutorías (Pilar 2, sección 4.3).
 
     - Describe lo que hace Tutorías con HU-17, HU-20, HU-15, HU-14, HU-41,
-      HU-25, HU-21 y HU-22: la búsqueda de tutores y el perfil público de
+      HU-25, HU-21, HU-22 y HU-28: la búsqueda de tutores y el perfil público de
       cada tutor (HU-20), los bloques de disponibilidad del tutor (HU-15), las
       asignaturas que el usuario declara que puede enseñar (HU-14), la copia
       de sus datos que guarda Tutorías (HU-41), la evaluación de una tutoría
       realizada (HU-25), la solicitud de una tutoría y las reservas de cada
       usuario (HU-21), la confirmación o el rechazo de una solicitud por el
-      tutor (HU-22), y `/estado`, que existe desde HU-01.
+      tutor (HU-22), el retiro de una solicitud o la cancelación de una
+      tutoría confirmada (HU-28), y `/estado`, que existe desde HU-01.
     - Todas las rutas pasan por el gateway y llevan el prefijo y la versión
       del servicio, `/api/tutoring/v1/`, que va en `servers`.
     - Crece con cada historia que agrega rutas a Tutorías: HU-20 trajo la
@@ -29,7 +30,7 @@ info:
     `iss`. Va en la cabecera `Authorization: Bearer <token_acceso>`. Para
     saber quién hace la petición no le pregunta a Identidad: sale del token.
     - Las rutas de disponibilidad, las de `/perfiles` y las de `/reservas`
-      (HU-21), `/yo/refrescar` y
+      (HU-21, HU-22 y HU-28), `/yo/refrescar` y
       `/reservas/{reserva_id}/evaluacion` piden el token: sin él responden 401
       (`not_authenticated`).
     - `/estado`, `/tutores`, `/tutores/{usuario_id}` y
@@ -67,6 +68,11 @@ info:
       Identidad, antes de guardar la solicitud (T-166). No llama a Catálogo:
       la asignatura ya está en `asignatura_ref`, porque el tutor la declaró.
       Si Identidad no responde, la ruta responde 503 y no guarda nada.
+    - Retirar o cancelar una reserva (`POST /reservas/{reserva_id}/cancelar`,
+      HU-28) sale de tutoring_db, sin llamar a Identidad ni a Catálogo antes
+      de guardar: las dos partes ya tienen su copia en `usuario_ref`. Después
+      de guardar, Tutorías pide a Identidad el aviso a la otra parte (HU-16);
+      si el aviso no sale, la cancelación queda igual.
     - La evaluación (`POST /reservas/{reserva_id}/evaluacion`) sale de
       tutoring_db, sin llamar a otros servicios. Al guardarla se recalcula la
       reputación del tutor en `usuario_ref` (RN-06), en la misma transacción.
@@ -137,6 +143,13 @@ info:
       `Reserva` de HU-21. Al confirmar, el bloque queda OCUPADO y las demás
       solicitudes pendientes del bloque quedan rechazadas.
 
+    - Próxima versión (HU-28): agrega el retiro de una solicitud y la
+      cancelación de una tutoría confirmada, con sesión:
+      `POST /reservas/{reserva_id}/cancelar`, con la etiqueta Reservas, el
+      parámetro `ReservaId` y el código de error `reserva_no_cancelable` (ver
+      el esquema `Error`). Responde la reserva CANCELADA con el esquema
+      `Reserva` de HU-21. Si estaba CONFIRMADA, el bloque vuelve a LIBRE.
+
 servers:
   - url: http://localhost:8080/api/tutoring/v1
     description: Gateway del sistema levantado con Docker Compose, con el prefijo y la versión de Tutorías. La API se llama siempre a través de él.
@@ -151,7 +164,7 @@ tags:
   - name: Copia del usuario
     description: La copia de los datos del usuario que guarda Tutorías, `usuario_ref` (HU-41). Con sesión.
   - name: Reservas
-    description: La solicitud de una tutoría, su confirmación o su rechazo por el tutor, y las reservas del usuario, como estudiante o como tutor (HU-21 y HU-22). Con sesión.
+    description: La solicitud de una tutoría, su confirmación o su rechazo por el tutor, su retiro o su cancelación, y las reservas del usuario, como estudiante o como tutor (HU-21, HU-22 y HU-28). Con sesión.
   - name: Evaluaciones
     description: Evaluación de una tutoría realizada y evaluaciones visibles de un tutor (HU-25).
   - name: Estado
@@ -1773,6 +1786,187 @@ paths:
         '503':
           $ref: '#/components/responses/ClavesNoConfiguradas'
 
+  /reservas/{reserva_id}/cancelar:
+    post:
+      tags: [Reservas]
+      operationId: cancelarReserva
+      summary: Retirar una solicitud o cancelar una tutoría confirmada
+      description: |
+        Libera el horario cuando una de las partes no puede asistir (HU-28,
+        RN-04). Sin cuerpo: si viene uno, se ignora.
+
+        - Retirar: el estudiante que la solicitó retira su solicitud mientras
+          sigue SOLICITADA, es decir, mientras el tutor no le responde. El
+          tutor no retira una solicitud: la rechaza
+          (`POST /reservas/{reserva_id}/rechazar`).
+        - Cancelar: cualquiera de las dos partes, el estudiante o el tutor (el
+          dueño del bloque), cancela una tutoría CONFIRMADA que todavía no
+          empieza.
+
+        Se revisa en este orden:
+        1. Sin bloquear nada: si la reserva no existe o el usuario del token
+           no es su solicitante ni su tutor, 404 `reserva_no_encontrada`,
+           como `GET /reservas/{reserva_id}`: los casos responden igual, para
+           no revelar que existe.
+        2. En una transacción, en el mismo orden que la confirmación: bloquea
+           el bloque (`SELECT … FOR UPDATE`) y vuelve a leer la reserva, ahora
+           bloqueada. Así una cancelación y una confirmación del mismo bloque
+           se esperan: la segunda ve lo que dejó la primera. Recién ahí revisa:
+           - que la reserva esté SOLICITADA o CONFIRMADA; si no (RECHAZADA,
+             EXPIRADA, CANCELADA, REALIZADA o EVALUADA), 409
+             `reserva_no_cancelable`, con el estado en el mensaje;
+           - que una reserva SOLICITADA la retire su solicitante; si la pide
+             el tutor, 409 `reserva_no_cancelable`;
+           - que el bloque no haya empezado (400 `bloque_en_el_pasado`),
+             también si la reserva sigue SOLICITADA.
+        3. La reserva pasa a CANCELADA, con `cerrada_en`, y queda registrado
+           en la base quién la retiró o la canceló. Si estaba CONFIRMADA, el
+           bloque vuelve a LIBRE y acepta solicitudes nuevas. Si estaba
+           SOLICITADA, el bloque no cambia: nunca estuvo ocupado.
+
+        - Después de guardar, Tutorías pide a Identidad el aviso
+          RESERVA_CANCELADA para la otra parte (HU-16): para el tutor si
+          retira o cancela el estudiante, y para el estudiante si cancela el
+          tutor. Si el aviso no sale, la cancelación queda igual.
+        - Responde la reserva leída de nuevo después de guardar, con el
+          esquema `Reserva` de HU-21 y `rol` según quién la retiró o la
+          canceló. Quién canceló no sale en la respuesta.
+      security:
+        - tokenAcceso: []
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+      responses:
+        '200':
+          description: La reserva CANCELADA, vista por quien la retiró o la canceló. Si estaba CONFIRMADA, el bloque queda LIBRE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                camila_retira:
+                  summary: Camila retira su solicitud antes de que Valentina le responda
+                  description: |
+                    La solicitud del ejemplo de `POST /reservas`, con los datos
+                    de `data/seeds/demo` cargados el 08-11-2026. El bloque 013
+                    sigue LIBRE.
+                  value:
+                    id: 2b6f1c3e-8a4d-4e7b-9c1f-5d3a7e9b0c2a
+                    estado: CANCELADA
+                    nota: Quiero repasar normalización antes del certamen.
+                    modalidad: null
+                    lugar_o_enlace: null
+                    monto: 5000
+                    estado_pago: null
+                    creada_en: '2026-11-08T22:15:04Z'
+                    confirmada_en: null
+                    cerrada_en: '2026-11-08T22:31:47Z'
+                    bloque:
+                      id: 60000000-0000-4000-8000-000000000013
+                      inicio_en: '2026-11-11T21:00:00Z'
+                      fin_en: '2026-11-11T22:00:00Z'
+                    asignatura:
+                      asignatura_id: 40000000-0000-4000-8000-000000000006
+                      sigla: BDD1101
+                      nombre: Base de Datos
+                    tutor:
+                      usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                    solicitante:
+                      usuario_id: 10000000-0000-4000-8000-000000000004
+                      nombre: Camila
+                      apellido: Rojas
+                    rol: estudiante
+                valentina_cancela:
+                  summary: Valentina cancela la tutoría que le confirmó a Camila
+                  description: |
+                    La tutoría del ejemplo de la confirmación, cancelada al
+                    día siguiente. La modalidad, el enlace y `confirmada_en`
+                    quedan como estaban, y el bloque 013 vuelve a LIBRE.
+                  value:
+                    id: 2b6f1c3e-8a4d-4e7b-9c1f-5d3a7e9b0c2a
+                    estado: CANCELADA
+                    nota: Quiero repasar normalización antes del certamen.
+                    modalidad: EN_LINEA
+                    lugar_o_enlace: 'https://meet.google.com/abc-defg-hij'
+                    monto: 5000
+                    estado_pago: null
+                    creada_en: '2026-11-08T22:15:04Z'
+                    confirmada_en: '2026-11-08T22:40:31Z'
+                    cerrada_en: '2026-11-09T14:05:12Z'
+                    bloque:
+                      id: 60000000-0000-4000-8000-000000000013
+                      inicio_en: '2026-11-11T21:00:00Z'
+                      fin_en: '2026-11-11T22:00:00Z'
+                    asignatura:
+                      asignatura_id: 40000000-0000-4000-8000-000000000006
+                      sigla: BDD1101
+                      nombre: Base de Datos
+                    tutor:
+                      usuario_id: 10000000-0000-4000-8000-000000000001
+                      nombre: Valentina
+                      apellido: Soto
+                    solicitante:
+                      usuario_id: 10000000-0000-4000-8000-000000000004
+                      nombre: Camila
+                      apellido: Rojas
+                    rol: tutor
+        '400':
+          description: |
+            El bloque de la reserva ya empezó, aunque todavía no termine
+            (`bloque_en_el_pasado`, el mismo código de la solicitud y de la
+            confirmación): ya no se puede retirar ni cancelar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                bloque_en_el_pasado:
+                  $ref: '#/components/examples/TutoriaQueYaEmpezoAlCancelar'
+        '401':
+          $ref: '#/components/responses/SinTokenValido'
+        '404':
+          description: |
+            La reserva no existe o el usuario del token no es su solicitante
+            ni su tutor (`reserva_no_encontrada`). Los casos responden igual,
+            para no revelar que existe. Si `reserva_id` no es un uuid en
+            minúsculas, la ruta no existe y responde Django con su página 404
+            en HTML.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: reserva_no_encontrada
+                mensaje: No encontramos esa tutoría.
+                detalles: null
+        '409':
+          description: |
+            La reserva no se puede retirar ni cancelar
+            (`reserva_no_cancelable`): ya está RECHAZADA, EXPIRADA, CANCELADA,
+            REALIZADA o EVALUADA, y el mensaje dice en qué estado está; o está
+            SOLICITADA y quien la pide es el tutor, que no la retira sino que
+            la rechaza.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                rechazada:
+                  $ref: '#/components/examples/NoCancelableRechazada'
+                expirada:
+                  $ref: '#/components/examples/NoCancelableExpirada'
+                cancelada:
+                  $ref: '#/components/examples/NoCancelableCancelada'
+                realizada:
+                  $ref: '#/components/examples/NoCancelableRealizada'
+                evaluada:
+                  $ref: '#/components/examples/NoCancelableEvaluada'
+                solo_la_retira_quien_la_pidio:
+                  $ref: '#/components/examples/SoloLaRetiraQuienLaPidio'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
+
   /reservas/{reserva_id}/evaluacion:
     post:
       tags: [Evaluaciones]
@@ -2476,6 +2670,48 @@ components:
         codigo: bloque_ocupado
         mensaje: Ese horario ya tiene otra tutoría confirmada.
         detalles: null
+    TutoriaQueYaEmpezoAlCancelar:
+      summary: Al retirar o cancelar, una reserva cuyo bloque ya empezó o ya terminó
+      value:
+        codigo: bloque_en_el_pasado
+        mensaje: 'La tutoría ya empezó: ya no se puede cancelar ni retirar.'
+        detalles: null
+    NoCancelableRechazada:
+      summary: La reserva está RECHAZADA, como la 005 de Camila en data/seeds/demo
+      value:
+        codigo: reserva_no_cancelable
+        mensaje: 'Esta reserva ya no se puede cancelar: está rechazada.'
+        detalles: null
+    NoCancelableExpirada:
+      summary: La reserva está EXPIRADA
+      value:
+        codigo: reserva_no_cancelable
+        mensaje: 'Esta reserva ya no se puede cancelar: está expirada.'
+        detalles: null
+    NoCancelableCancelada:
+      summary: La reserva ya está CANCELADA, por ejemplo si se cancela dos veces
+      value:
+        codigo: reserva_no_cancelable
+        mensaje: 'Esta reserva ya no se puede cancelar: está cancelada.'
+        detalles: null
+    NoCancelableRealizada:
+      summary: La reserva está REALIZADA
+      value:
+        codigo: reserva_no_cancelable
+        mensaje: 'Esta reserva ya no se puede cancelar: está realizada.'
+        detalles: null
+    NoCancelableEvaluada:
+      summary: La reserva está EVALUADA
+      value:
+        codigo: reserva_no_cancelable
+        mensaje: 'Esta reserva ya no se puede cancelar: está evaluada.'
+        detalles: null
+    SoloLaRetiraQuienLaPidio:
+      summary: El tutor intenta retirar una solicitud SOLICITADA
+      value:
+        codigo: reserva_no_cancelable
+        mensaje: Una solicitud pendiente solo la retira quien la pidió. Como tutor, puedes rechazarla.
+        detalles: null
 
   schemas:
 
@@ -2895,7 +3131,7 @@ components:
         id:
           type: string
           format: uuid
-          description: Identificador de la reserva. Es el que piden `GET /reservas/{reserva_id}`, la confirmación, el rechazo y la evaluación.
+          description: Identificador de la reserva. Es el que piden `GET /reservas/{reserva_id}`, la confirmación, el rechazo, la cancelación y la evaluación.
         estado:
           type: string
           enum: [SOLICITADA, CONFIRMADA, RECHAZADA, EXPIRADA, CANCELADA, REALIZADA, EVALUADA]
@@ -2937,7 +3173,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: Cuándo se cerró la reserva, por ejemplo al rechazarla o al evaluarla, en UTC con `Z`. En null mientras sigue abierta.
+          description: Cuándo se cerró la reserva, por ejemplo al rechazarla, al retirarla o cancelarla, o al evaluarla, en UTC con `Z`. En null mientras sigue abierta.
         bloque:
           $ref: '#/components/schemas/BloqueDeLaReserva'
         asignatura:
@@ -3111,6 +3347,10 @@ components:
           reserva_no_pendiente y bloque_ocupado (409). reserva_no_encontrada
           (404) también sale al confirmar o rechazar, y bloque_en_el_pasado,
           al confirmar una solicitud cuyo bloque ya empezó.
+        - Con el retiro de una solicitud y la cancelación de una tutoría
+          (HU-28) se suma reserva_no_cancelable (409). reserva_no_encontrada
+          (404) también sale al cancelar, y bloque_en_el_pasado, al retirar o
+          cancelar una reserva cuyo bloque ya empezó.
         - Errores de validación: `codigo` = `invalid`, `mensaje` = «La
           petición tiene datos inválidos.» y `detalles` = un objeto con una
           lista de mensajes por campo. Las rutas de este contrato no los dan.
