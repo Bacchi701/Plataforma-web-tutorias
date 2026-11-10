@@ -10,9 +10,13 @@ sesion: el usuario del token (HU-17) solo ve y cambia sus propios bloques.
   codigo. Aqui solo se traduce ese rechazo a un 409.
 - Las fechas llegan en ISO 8601 con zona, se guardan en UTC y salen en UTC
   con Z. La pagina las muestra en hora de Chile (criterio 6, RNF-08).
+- Al eliminar un bloque, sus solicitudes pendientes quedan RECHAZADA y cada
+  estudiante recibe el aviso RESERVA_RECHAZADA (HU-16), como cuando el tutor
+  rechaza una solicitud (HU-22).
 """
 
 from datetime import UTC
+from functools import partial
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Q
@@ -30,11 +34,15 @@ from .models import (
     EstadoBloque,
     EstadoReserva,
     PerfilTutor,
+    Reserva,
     UsuarioRef,
 )
 
 RESTRICCION_SOLAPE = "ex_bloque_sin_solape"
 EJEMPLO_FECHA = "2026-12-01T20:00:00-03:00"
+# El aviso de HU-16 para el estudiante cuya solicitud quedo rechazada: la misma
+# plantilla que pide reservas.py cuando el tutor la rechaza (HU-22).
+RESERVA_RECHAZADA = "RESERVA_RECHAZADA"
 
 NO_ES_TUTOR = (
     "Para publicar bloques de disponibilidad, primero declara al menos una "
@@ -223,28 +231,66 @@ def editar(request, bloque_id):
     return Response(bloque_json(bloque, 0))
 
 
+def rechazar_pendientes(bloque):
+    """Criterio 4: las solicitudes pendientes del bloque pasan a RECHAZADA.
+
+    Como rechazar_las_demas de reservas.py (HU-22): se leen bloqueadas, con lo
+    que necesita su aviso (el tutor, el solicitante y la asignatura), quedan
+    con cerrada_en y se devuelven para pedir el aviso.
+    """
+    ahora = timezone.now()
+    pendientes = list(
+        Reserva.objects.select_for_update(of=("self",))
+        .select_related("bloque__usuario", "solicitante_usuario", "asignatura")
+        .filter(bloque_id=bloque.id, estado=EstadoReserva.SOLICITADA)
+        .order_by("creada_en", "id")
+    )
+    for reserva in pendientes:
+        reserva.estado = EstadoReserva.RECHAZADA
+        reserva.cerrada_en = ahora
+    Reserva.objects.filter(id__in=[reserva.id for reserva in pendientes]).update(
+        estado=EstadoReserva.RECHAZADA, cerrada_en=ahora
+    )
+    return pendientes
+
+
 def eliminar(request, bloque_id):
     """Criterios 3, 4 y 5.
 
     Con una reserva que ocupa el bloque, no se borra. Las solicitudes
-    pendientes pasan a RECHAZADA. Si el bloque tuvo reservas, el borrado es
-    logico (ELIMINADO, T-169); si nunca tuvo, se borra la fila.
+    pendientes pasan a RECHAZADA y, cuando todo quedo guardado, se pide a
+    Identidad el aviso RESERVA_RECHAZADA para cada estudiante (HU-16). Si el
+    bloque tuvo reservas, el borrado es logico (ELIMINADO, T-169); si nunca
+    tuvo, se borra la fila.
     """
+    # llamadas.py importa Rechazo e instante_json de este modulo: pedir_aviso
+    # se importa aqui, al usarlo, para no armar una importacion circular.
+    from .llamadas import pedir_aviso
+
     with transaction.atomic():
         bloque = bloque_propio(request, bloque_id)
         if tiene_reserva_que_ocupa(bloque):
             raise Rechazo(
                 CON_RESERVA, "bloque_con_reserva_confirmada", status.HTTP_409_CONFLICT
             )
-        # El aviso por correo a cada estudiante llega con HU-16.
-        bloque.reservas.filter(estado=EstadoReserva.SOLICITADA).update(
-            estado=EstadoReserva.RECHAZADA, cerrada_en=timezone.now()
-        )
+        rechazadas = rechazar_pendientes(bloque)
         if bloque.reservas.exists():
             bloque.estado = EstadoBloque.ELIMINADO
             bloque.save(update_fields=["estado", "actualizado_en"])
         else:
             bloque.delete()
+        # Los avisos salen cuando todo quedo guardado: si la transaccion se
+        # deshace, no sale ninguno. Si un aviso no sale, el bloque queda
+        # eliminado igual: pedir_aviso no lanza excepciones.
+        for reserva in rechazadas:
+            transaction.on_commit(
+                partial(
+                    pedir_aviso,
+                    reserva.solicitante_usuario_id,
+                    RESERVA_RECHAZADA,
+                    reserva,
+                )
+            )
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 

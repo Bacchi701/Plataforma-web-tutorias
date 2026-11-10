@@ -8,6 +8,7 @@ tokens con la privada, como Identidad.
 
 import uuid
 from datetime import timedelta
+from unittest import mock
 
 import jwt
 import pytest
@@ -17,8 +18,9 @@ from django.db import IntegrityError, connection, transaction
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
+from . import llamadas
 from .autenticacion import leer_clave
-from .bloques import guardar_sin_solape
+from .bloques import guardar_sin_solape, instante_json
 from .models import (
     ESTADOS_QUE_OCUPAN,
     AsignaturaRef,
@@ -30,8 +32,10 @@ from .models import (
     Reserva,
     UsuarioRef,
 )
+from .test_reservas import IdentidadFalsa
 
 URL = "/api/tutoring/v1/disponibilidad"
+TUTORES = "/api/tutoring/v1/tutores"
 # Los bloques de las pruebas se cuentan en horas desde manana a mediodia (UTC).
 MANANA = (timezone.now() + timedelta(days=1)).replace(
     hour=12, minute=0, second=0, microsecond=0
@@ -644,3 +648,180 @@ def test_un_bloque_a_las_20_de_chile_se_guarda_en_utc(client, cabecera, tutora):
         assert cursor.fetchone()[0] == f"{anio}-12-01 23:00:00+00"
     lista = client.get(URL, **cabecera(tutora)).json()
     assert lista[0]["inicio_en"] == f"{anio}-12-01T23:00:00Z"
+
+
+@pytest.mark.django_db
+def test_en_invierno_un_bloque_a_las_20_de_chile_se_guarda_en_utc(
+    client, cabecera, tutora
+):
+    """HU-36, criterio 3 (RNF-08): en invierno, Chile continental esta en -04:00.
+
+    Las 20:00 del 1 de julio son las 00:00 UTC del 2 de julio: cambia tambien
+    el dia. GET /disponibilidad y el perfil publico lo devuelven en UTC, con Z.
+    """
+    anio = timezone.now().year + 1
+
+    respuesta = publicar(
+        client,
+        cabecera,
+        tutora,
+        f"{anio}-07-01T20:00:00-04:00",
+        f"{anio}-07-01T21:00:00-04:00",
+    )
+
+    assert respuesta.status_code == 201
+    creado = respuesta.json()
+    assert (creado["inicio_en"], creado["fin_en"]) == (
+        f"{anio}-07-02T00:00:00Z",
+        f"{anio}-07-02T01:00:00Z",
+    )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT inicio_en::text, fin_en::text FROM bloque_disponibilidad "
+            "WHERE id = %s",
+            [uuid.UUID(creado["id"])],
+        )
+        assert cursor.fetchone() == (
+            f"{anio}-07-02 00:00:00+00",
+            f"{anio}-07-02 01:00:00+00",
+        )
+    lista = client.get(URL, **cabecera(tutora)).json()
+    assert [(b["id"], b["inicio_en"], b["fin_en"]) for b in lista] == [
+        (creado["id"], f"{anio}-07-02T00:00:00Z", f"{anio}-07-02T01:00:00Z")
+    ]
+    perfil = client.get(f"{TUTORES}/{tutora.usuario_id}").json()
+    assert [(b["id"], b["inicio_en"], b["fin_en"]) for b in perfil["bloques"]] == [
+        (creado["id"], f"{anio}-07-02T00:00:00Z", f"{anio}-07-02T01:00:00Z")
+    ]
+
+
+# ---------------------------------------------------------------- aviso al eliminar
+
+
+@pytest.fixture
+def aviso(monkeypatch):
+    """pedir_aviso reemplazado en tutorias.llamadas: eliminar lo toma de ahi."""
+    falso = mock.Mock(return_value=True)
+    monkeypatch.setattr(llamadas, "pedir_aviso", falso)
+    return falso
+
+
+@pytest.fixture
+def identidad(monkeypatch, settings):
+    """Identidad para el aviso (HU-16), con pedir_aviso de verdad y sin red."""
+    settings.URL_IDENTIDAD = "http://identity:8000"
+    falsa = IdentidadFalsa()
+    monkeypatch.setattr(llamadas, "abrir", falsa.abrir)
+    return falsa
+
+
+@pytest.mark.django_db
+def test_borrar_un_bloque_con_solicitudes_pendientes_avisa_a_cada_estudiante(
+    client, cabecera, aviso, django_capture_on_commit_callbacks, tutora, asignatura
+):
+    """HU-15 con HU-16: cada solicitud que el borrado rechaza lleva su aviso.
+
+    Uno por estudiante, con RESERVA_RECHAZADA, como cuando el tutor rechaza
+    una solicitud (HU-22), y despues del commit. La que ya estaba rechazada no
+    recibe otro.
+    """
+    pedido = bloque(tutora, 1, 2)
+    ana = persona("Ana")
+    beto = persona("Beto")
+    de_ana = reserva(pedido, ana, asignatura)
+    de_beto = reserva(pedido, beto, asignatura)
+    reserva(pedido, persona("Carla"), asignatura, EstadoReserva.RECHAZADA)
+
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        respuesta = eliminar(client, cabecera, tutora, pedido.id)
+        # Todavia no: los avisos salen cuando la transaccion se confirma.
+        assert not aviso.called
+
+    assert respuesta.status_code == 204
+    assert len(callbacks) == 2
+    pedidos = [
+        (llamada.args[0], llamada.args[1], llamada.args[2].id)
+        for llamada in aviso.call_args_list
+    ]
+    assert sorted(pedidos, key=str) == sorted(
+        [
+            (ana.usuario_id, "RESERVA_RECHAZADA", de_ana.id),
+            (beto.usuario_id, "RESERVA_RECHAZADA", de_beto.id),
+        ],
+        key=str,
+    )
+    # Cada aviso lleva su reserva como quedo en la base: RECHAZADA y cerrada.
+    for llamada in aviso.call_args_list:
+        enviada = llamada.args[2]
+        guardada = Reserva.objects.get(pk=enviada.id)
+        assert (enviada.estado, enviada.cerrada_en) == (
+            guardada.estado,
+            guardada.cerrada_en,
+        )
+        assert guardada.estado == EstadoReserva.RECHAZADA
+        assert guardada.cerrada_en is not None
+
+
+@pytest.mark.django_db
+def test_el_aviso_del_bloque_borrado_nombra_al_tutor_y_el_horario(
+    client, cabecera, identidad, django_capture_on_commit_callbacks, tutora, asignatura
+):
+    """Con pedir_aviso de verdad: el cuerpo que recibe Identidad (HU-16)."""
+    pedido = bloque(tutora, 1, 2)
+    camila = persona("Camila")
+    solicitud = reserva(pedido, camila, asignatura)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        respuesta = eliminar(client, cabecera, tutora, pedido.id)
+
+    assert respuesta.status_code == 204
+    assert identidad.avisos() == [
+        {
+            "usuario_id": str(camila.usuario_id),
+            "plantilla": "RESERVA_RECHAZADA",
+            "referencia_id": str(solicitud.id),
+            "datos": {
+                "asignatura": {"sigla": "PRU1101", "nombre": "Prueba"},
+                "inicio_en": instante_json(MANANA + timedelta(hours=1)),
+                "fin_en": instante_json(MANANA + timedelta(hours=2)),
+                # Al estudiante, la otra parte es el tutor.
+                "otra_persona": {"nombre": "Tutora", "apellido": "Demo"},
+                "nota": None,
+                "modalidad": None,
+                "lugar_o_enlace": None,
+            },
+        }
+    ]
+
+
+@pytest.mark.django_db
+def test_sin_solicitudes_pendientes_o_si_no_se_borra_no_se_avisa(
+    client,
+    cabecera,
+    aviso,
+    django_capture_on_commit_callbacks,
+    tutora,
+    estudiante,
+    asignatura,
+):
+    """Sin reservas, con solo reservas cerradas o con una confirmada (409): nada."""
+    sin_reservas = bloque(tutora, 1, 2)
+    con_cerradas = bloque(tutora, 3, 4)
+    for nombre, estado in (
+        ("Ana", EstadoReserva.RECHAZADA),
+        ("Beto", EstadoReserva.CANCELADA),
+        ("Carla", EstadoReserva.EXPIRADA),
+    ):
+        reserva(con_cerradas, persona(nombre), asignatura, estado)
+    ocupado = bloque(tutora, 5, 6, estado=EstadoBloque.OCUPADO)
+    reserva(ocupado, estudiante, asignatura, EstadoReserva.CONFIRMADA)
+
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        respuestas = [
+            eliminar(client, cabecera, tutora, b.id)
+            for b in (sin_reservas, con_cerradas, ocupado)
+        ]
+
+    assert [r.status_code for r in respuestas] == [204, 204, 409]
+    assert callbacks == []
+    assert not aviso.called
