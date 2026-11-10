@@ -168,13 +168,20 @@ async function mostrarSesionEnEncabezado() {
         administracion.className = "btn-login";
         administracion.textContent = "Administración";
         saludo.before(administracion);
+        // Con este enlace no cabe en una linea: desde 1440 px el encabezado
+        // del administrador tambien usa el menu ☰ (styles.css).
+        const encabezado = acciones.closest(".header");
+        if (encabezado) {
+            encabezado.classList.add("con-administracion");
+        }
     }
 }
 
 document.addEventListener("DOMContentLoaded", mostrarSesionEnEncabezado);
 
-// Boton ☰ del encabezado: hasta 950 px, .nav-menu y .nav-actions se esconden
-// y este boton los muestra debajo de la marca (.menu-abierto en styles.css).
+// Boton ☰ del encabezado: hasta 1439 px (y en todos los anchos con
+// .con-administracion), .nav-menu y .nav-actions se esconden y este boton los
+// muestra debajo de la marca (.menu-abierto en styles.css).
 // Se cierra con Escape o al elegir un enlace.
 function activarMenuMovil() {
     const boton = document.querySelector(".mobile-menu");

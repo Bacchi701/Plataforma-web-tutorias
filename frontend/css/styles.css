@@ -1106,10 +1106,10 @@ button {
     gap: 12px;
     position: relative;
     overflow: hidden;
-    background: linear-gradient(135deg, #003057 0%, #004b85 100%);
+    background: linear-gradient(135deg, var(--duoc-blue) 0%, #004b85 100%);
     color: white;
     padding: 13px 22px;
-    border: 3px solid #FDBD2D;
+    border: 3px solid var(--duoc-yellow);
     border-radius: 12px;
     font-size: 14px;
     font-weight: 800;
@@ -1123,7 +1123,7 @@ button {
     position: absolute;
     width: 80px;
     height: 140%;
-    background: #FDBD2D;
+    background: var(--duoc-yellow);
     right: -45px;
     top: -20%;
     transform: rotate(15deg);
@@ -1137,8 +1137,8 @@ button {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #FDBD2D;
-    color: #003057;
+    background: var(--duoc-yellow);
+    color: var(--duoc-blue);
     font-size: 15px;
     position: relative;
     z-index: 2;
@@ -1150,7 +1150,7 @@ button {
 }
 
 .btn-tutor-arrow {
-    color: #FDBD2D;
+    color: var(--duoc-yellow);
     font-size: 13px;
     position: relative;
     z-index: 2;
@@ -1159,7 +1159,7 @@ button {
 
 .btn-tutor:hover {
     transform: translateY(-3px) scale(1.02);
-    background: linear-gradient(135deg, #001f3c, #003057);
+    background: linear-gradient(135deg, #001f3c, var(--duoc-blue));
     box-shadow: 0 14px 28px rgba(0, 48, 87, .30), 0 0 0 4px rgba(253, 189, 45, .15);
 }
 
@@ -1277,12 +1277,22 @@ footer a:hover {
     color: var(--duoc-yellow);
 }
 
+/* La marca del pie, sobre el fondo oscuro: el azul y el gris de la marca del
+   encabezado no se leen ahí (contraste 1,3:1 y 3,5:1). */
+.footer-brand .brand-text strong {
+    color: var(--white);
+}
+
+.footer-brand .brand-text span {
+    color: rgba(255, 255, 255, .6);
+}
+
 .footer-bottom {
     margin-top: 50px;
     padding-top: 20px;
     border-top: 1px solid rgba(255, 255, 255, .1);
     text-align: center;
-    color: rgba(255, 255, 255, .45);
+    color: rgba(255, 255, 255, .55);
     font-size: 12px;
 }
 
@@ -1352,28 +1362,28 @@ footer a:hover {
 /* El encabezado del administrador, con «Administración» (HU-33), necesita
    unos 1380 px, más que los 1300 que alcanza: desde 1440 px también usa el
    menú ☰. Son las reglas del bloque de 1439 px, solo para el encabezado que
-   trae el enlace a admin.html. */
+   sesion.js marca con .con-administracion al agregar ese enlace. */
 @media(min-width: 1440px) {
-    .header:has(.nav-actions a[href="admin.html"]) .nav-menu,
-    .header:has(.nav-actions a[href="admin.html"]) .nav-actions {
+    .header.con-administracion .nav-menu,
+    .header.con-administracion .nav-actions {
         display: none;
     }
 
-    .header:has(.nav-actions a[href="admin.html"]) .mobile-menu {
+    .header.con-administracion .mobile-menu {
         display: block;
     }
 
-    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) {
+    .header.con-administracion.menu-abierto {
         height: auto;
     }
 
-    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .navbar {
+    .header.con-administracion.menu-abierto .navbar {
         flex-wrap: wrap;
         padding: 16px 0 20px;
     }
 
-    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-menu,
-    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-actions {
+    .header.con-administracion.menu-abierto .nav-menu,
+    .header.con-administracion.menu-abierto .nav-actions {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
@@ -1382,17 +1392,17 @@ footer a:hover {
         order: 1;
     }
 
-    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-menu {
+    .header.con-administracion.menu-abierto .nav-menu {
         margin-top: 18px;
     }
 
-    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .nav-actions {
+    .header.con-administracion.menu-abierto .nav-actions {
         margin-top: 14px;
         padding-top: 14px;
         border-top: 1px solid var(--border);
     }
 
-    .header.menu-abierto:has(.nav-actions a[href="admin.html"]) .btn-login {
+    .header.con-administracion.menu-abierto .btn-login {
         padding: 11px 18px;
     }
 }
@@ -1437,8 +1447,17 @@ footer a:hover {
 }
 
 @media(max-width: 768px) {
+    /* El buscador de asignaturas.html y tutores.html, en columna y todo a lo
+       ancho: también el selector, que va dentro de un div y si no queda del
+       ancho de sus opciones. En columna, el "flex: 1" de la caja de texto la
+       deja en 21 px de alto: con "flex: none" conserva sus 50 px. */
     .subjects-search-row {
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    .subjects-search-input {
+        flex: none;
     }
 
     .subjects-search-input,
