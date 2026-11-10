@@ -20,12 +20,28 @@ ALGORITMO = "RS256"
 @lru_cache
 def leer_clave(ruta):
     archivo = Path(ruta)
-    if not archivo.exists():
+    # is_file y no exists: si la ruta es una carpeta, read_text terminaba en
+    # un error 500. Pasa si keys/jwt_public.pem no estaba al levantar Tutorias
+    # o Pagos: Docker monta en su lugar una carpeta con ese nombre.
+    if not archivo.is_file():
         raise ImproperlyConfigured(
             f"No existe {ruta}. Genera las claves con: "
             "python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3)."
         )
     return archivo.read_text()
+
+
+def clave_ilegible(ruta):
+    """El motivo del 503 cuando el archivo de una clave no es una clave PEM.
+
+    Pasa con un archivo vacio o con otro texto: PyJWT lanza InvalidKeyError,
+    que no hereda de InvalidTokenError.
+    """
+    return (
+        f"El archivo {ruta} no es una clave PEM válida. Revísalo o genera las "
+        "claves de nuevo con: python manage.py generar_claves_jwt --forzar "
+        "(ver el README)."
+    )
 
 
 def emitir_acceso(usuario):
@@ -46,7 +62,11 @@ def emitir_acceso(usuario):
 
 
 def verificar_acceso(token):
-    """Devuelve las reclamaciones o lanza jwt.InvalidTokenError."""
+    """Devuelve las reclamaciones o lanza jwt.InvalidTokenError.
+
+    Si falta la clave publica, leer_clave lanza ImproperlyConfigured; si el
+    archivo no es una clave, PyJWT lanza jwt.InvalidKeyError.
+    """
     return jwt.decode(
         token,
         leer_clave(settings.JWT_CLAVE_PUBLICA),
