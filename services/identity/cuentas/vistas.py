@@ -8,6 +8,7 @@ HU-10: PATCH /yo, el perfil con carrera, nivel y sede.
 from collections.abc import Mapping
 from datetime import timedelta
 
+import jwt
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError, transaction
@@ -26,7 +27,7 @@ from .autenticacion import TokenDeAcceso
 from .correos import enviar_verificacion
 from .models import DOMINIO_INSTITUCIONAL, RefreshToken, TokenVerificacion, Usuario
 from .secretos import hash_de, token_opaco
-from .tokens import emitir_acceso
+from .tokens import clave_ilegible, emitir_acceso
 
 YA_EXISTE = "Ya existe una cuenta con este correo."
 
@@ -99,15 +100,23 @@ def registro(request):
 @api_view(["POST"])
 def verificar_correo(request):
     """Verifica la cuenta con el token del correo (HU-04, criterio 3)."""
-    token = str(request.data.get("token", "")).strip()
+    # Un cuerpo que no es un objeto JSON (una lista, un texto, un numero o
+    # null) se trata como si faltara el token.
+    datos = request.data if isinstance(request.data, Mapping) else {}
+    token = str(datos.get("token", "")).strip()
     if not token:
         raise ValidationError({"token": ["Falta el token del enlace."]})
+    try:
+        token_hash = hash_de(token)
+    except UnicodeEncodeError:
+        # Un sustituto de UTF-16 suelto ("\ud800" en el JSON) no pasa a UTF-8.
+        raise Rechazo("El enlace no es válido.", "token_invalido") from None
 
     with transaction.atomic():
         fila = (
             TokenVerificacion.objects.select_for_update()
             .select_related("usuario")
-            .filter(token_hash=hash_de(token))
+            .filter(token_hash=token_hash)
             .first()
         )
         if fila is None:
@@ -151,6 +160,10 @@ def respuesta_con_sesion(usuario):
         acceso = emitir_acceso(usuario)
     except ImproperlyConfigured as error:
         raise Rechazo(str(error), "claves_no_configuradas", 503) from error
+    except jwt.InvalidKeyError as error:
+        raise Rechazo(
+            clave_ilegible(settings.JWT_CLAVE_PRIVADA), "claves_no_configuradas", 503
+        ) from error
 
     token, token_hash = token_opaco()
     ahora = timezone.now()

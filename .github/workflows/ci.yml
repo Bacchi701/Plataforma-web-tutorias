@@ -63,9 +63,10 @@ jobs:
       - run: |
           pip install -r services/${{ matrix.servicio }}/requirements.txt
           pip install -r requirements-dev.txt
-      # La cobertura se publica pero todavia no bloquea. La puerta del 60 %
-      # se activa al cierre del sprint 2 en Identidad y del sprint 4 en
-      # Tutorias: antes de eso no existen las pruebas que la sostienen.
+      # La cobertura se publica en los cuatro servicios. La puerta del 60 %
+      # (Pilar 5, seccion 9.2) esta activa en Identidad y en Tutorias: si su
+      # cobertura baja de 60 %, su trabajo falla. Catalogo y Pagos solo
+      # informan.
       - name: pytest con cobertura
         working-directory: services/${{ matrix.servicio }}
         env:
@@ -78,7 +79,12 @@ jobs:
           POSTGRES_DB: pruebas
           POSTGRES_USER: pruebas
           POSTGRES_PASSWORD: pruebas
-        run: pytest --cov=. --cov-report=term-missing
+        run: |
+          case "${{ matrix.servicio }}" in
+            identity|tutoring) minimo=60 ;;
+            *) minimo=0 ;;
+          esac
+          pytest --cov=. --cov-report=term-missing --cov-fail-under=$minimo
 
   # ---------- 3. Pruebas del frontend ----------
   pruebas-frontend:

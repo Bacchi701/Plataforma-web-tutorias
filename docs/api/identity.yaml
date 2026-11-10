@@ -66,6 +66,18 @@ info:
       `UsuarioNoEncontrado`, y sus códigos de error (ver el esquema `Error`).
       `GET /yo` aclara que las rutas `/admin` también entregan el correo, solo
       a un administrador.
+    - Próxima versión (HU-11): `GET` y `PATCH /yo` y las dos rutas `/admin`
+      suman la respuesta 503 `claves_no_configuradas`
+      (`components/responses/ClavesNoConfiguradas`), que ahora cubre las dos
+      claves: la privada, en `/login` y `/refresh`, y la pública, en las
+      rutas con token, cuando falta el archivo o no es una clave. En
+      `SinTokenValido`, `token_invalido` también cubre una cabecera con
+      caracteres que no son texto y un `sub` que no es un identificador. En
+      `POST /verificar-correo`, un cuerpo que no es un objeto JSON responde
+      400 `invalid`, como si faltara el token, y un token que no se puede
+      leer, 400 `token_invalido`. En `POST /login`, el límite de intentos del
+      gateway responde 429 y ya no 503: el 503 queda solo para
+      `claves_no_configuradas`.
 
 servers:
   - url: http://localhost:8080
@@ -193,7 +205,10 @@ paths:
         '400':
           description: |
             El token falta (`invalid`), no existe (`token_invalido`), ya se usó
-            (`token_usado`) o venció (`token_vencido`).
+            (`token_usado`) o venció (`token_vencido`). Un cuerpo que no es un
+            objeto JSON (una lista, un texto, un número o `null`) responde
+            `invalid`, como si faltara el token, y un token que no se puede
+            leer, `token_invalido`.
           content:
             application/json:
               schema:
@@ -208,7 +223,7 @@ paths:
                       token:
                         - Falta el token del enlace.
                 token_invalido:
-                  summary: El token no existe
+                  summary: El token no existe o no se puede leer
                   value:
                     codigo: token_invalido
                     mensaje: El enlace no es válido.
@@ -241,7 +256,7 @@ paths:
           correo verificado (403). Si la cuenta no existe, el mensaje es el
           mismo que con una contraseña equivocada.
         - Límite del gateway: 5 intentos por minuto por IP, con una ráfaga de
-          5 más. Sobre eso, Nginx responde 503 con su propia página, sin el
+          5 más. Sobre eso, Nginx responde 429 con su propia página, sin el
           formato de error de la API.
       requestBody:
         required: true
@@ -303,26 +318,17 @@ paths:
                     codigo: correo_no_verificado
                     mensaje: 'Verifica tu correo antes de iniciar sesión: revisa tu bandeja.'
                     detalles: null
-        '503':
+        '429':
           description: |
-            Tiene dos causas:
-            - Identidad no encuentra la clave privada para firmar el token
-              (`claves_no_configuradas`, en JSON). Pasa en un clon nuevo si no
-              se generaron las claves.
-            - La IP pasó el límite de intentos del gateway. Responde Nginx, con
-              su página HTML y sin el formato de error de la API.
+            La IP pasó el límite de intentos del gateway. Responde Nginx, con
+            su página HTML y sin el formato de error de la API.
           content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                codigo: claves_no_configuradas
-                mensaje: 'No existe /app/keys/jwt_private.pem. Genera las claves con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
-                detalles: null
             text/html:
               schema:
                 type: string
-              example: '<html><head><title>503 Service Temporarily Unavailable</title></head>...</html>'
+              example: '<html><head><title>429 Too Many Requests</title></head>...</html>'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
 
   /api/identity/v1/refresh:
     post:
@@ -445,6 +451,8 @@ paths:
                     es_admin: false
         '401':
           $ref: '#/components/responses/SinTokenValido'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
     patch:
       tags: [Perfil]
       operationId: editarPerfil
@@ -566,6 +574,8 @@ paths:
                         - Este campo no se puede cambiar desde el perfil.
         '401':
           $ref: '#/components/responses/SinTokenValido'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
 
   /api/identity/v1/admin/usuarios:
     get:
@@ -739,6 +749,8 @@ paths:
           $ref: '#/components/responses/SinTokenValido'
         '403':
           $ref: '#/components/responses/NoEsAdministrador'
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
 
   /api/identity/v1/admin/usuarios/{usuario_id}:
     patch:
@@ -871,6 +883,8 @@ paths:
                     codigo: cuenta_propia
                     mensaje: No puedes desactivar tu propia cuenta.
                     detalles: null
+        '503':
+          $ref: '#/components/responses/ClavesNoConfiguradas'
 
   /api/identity/v1/estado:
     get:
@@ -948,16 +962,35 @@ components:
   responses:
     ClavesNoConfiguradas:
       description: |
-        Identidad no encuentra la clave privada para firmar el token. Pasa en
-        un clon nuevo si no se generaron las claves.
+        Identidad no encuentra o no puede leer una de sus claves: la privada,
+        para firmar el token en `/login` y `/refresh`, o la pública, para
+        verificarlo en las rutas con token. Pasa en un clon nuevo sin las
+        claves, o si el archivo no es una clave (por ejemplo, si está vacío).
+        El mensaje dice qué archivo revisar. En las rutas con token, una
+        petición sin token no lee la clave: responde 401 `not_authenticated`.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-          example:
-            codigo: claves_no_configuradas
-            mensaje: 'No existe /app/keys/jwt_private.pem. Genera las claves con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
-            detalles: null
+          examples:
+            falta_la_clave_privada:
+              summary: Un clon nuevo, sin las claves (en /login y /refresh)
+              value:
+                codigo: claves_no_configuradas
+                mensaje: 'No existe /app/keys/jwt_private.pem. Genera las claves con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
+                detalles: null
+            falta_la_clave_publica:
+              summary: Sin la clave pública, en una ruta con token
+              value:
+                codigo: claves_no_configuradas
+                mensaje: 'No existe /app/keys/jwt_public.pem. Genera las claves con: python manage.py generar_claves_jwt (ver el RUNBOOK, nivel 3).'
+                detalles: null
+            no_es_una_clave:
+              summary: El archivo de la clave está vacío o tiene otro texto
+              value:
+                codigo: claves_no_configuradas
+                mensaje: 'El archivo /app/keys/jwt_public.pem no es una clave PEM válida. Revísalo o genera las claves de nuevo con: python manage.py generar_claves_jwt --forzar (ver el README).'
+                detalles: null
     SinTokenValido:
       description: |
         Sin token válido. Los códigos posibles son:
@@ -965,8 +998,9 @@ components:
           `Authorization: Bearer …` (el mensaje es el estándar de Django
           REST Framework);
         - `authentication_failed`: la cabecera está mal formada;
-        - `token_invalido`: el token está mal formado, o su firma o su
-          emisor no calzan;
+        - `token_invalido`: el token está mal formado, su firma, su algoritmo
+          o su emisor no calzan, la cabecera trae caracteres que no son texto
+          o el `sub` del token no es un identificador (un uuid);
         - `token_vencido`: pasaron los 30 minutos;
         - `cuenta_inactiva`: la cuenta ya no existe o está desactivada.
       headers:
