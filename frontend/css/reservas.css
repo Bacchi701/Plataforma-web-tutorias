@@ -726,3 +726,35 @@
         flex: 1 1 auto;
     }
 }
+
+
+/* =========================================
+   RETIRAR Y CANCELAR (HU-28, parte C de HU-30)
+   «Retirar solicitud» y «Cancelar tutoría» van al final de la fila de
+   «Pagar» y «Ver detalle» (.res-enlaces), con .res-boton y
+   .res-boton-peligro. Después de la primera pulsación llevan
+   .res-boton-armado, como «Rechazar».
+========================================= */
+
+.res-enlaces button:focus-visible {
+    outline: 2px solid var(--duoc-blue-light);
+    outline-offset: 2px;
+}
+
+/* Mientras la petición está en curso */
+.res-enlaces button:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+
+.res-enlaces a[aria-disabled="true"] {
+    opacity: .6;
+    pointer-events: none;
+}
+
+/* Teléfono (RNF-03): el botón, a lo ancho, como los enlaces */
+@media (max-width: 600px) {
+    .res-enlaces > button {
+        flex: 1 1 auto;
+    }
+}
