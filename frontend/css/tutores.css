@@ -511,14 +511,6 @@
     }
 }
 
-@media (max-width: 768px) {
-    /* styles.css pone la fila del buscador en columna, y ahi su "flex: 1"
-       deja la caja de texto en 19 px de alto: vuelve a sus 50 px */
-    .subjects-search-input {
-        flex: none;
-    }
-}
-
 @media (max-width: 600px) {
     .busqueda-asignatura {
         width: 100%;

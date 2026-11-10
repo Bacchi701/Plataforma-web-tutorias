@@ -8,6 +8,53 @@
     align-items: start;
 }
 
+/* La cabecera de la tarjeta que arma js/asignaturas.js: el ícono, la sigla,
+   el nombre y el semestre. Sus clases no tenían estilo: los de la tarjeta en
+   styles.css usan otras (.card-top, .icon-box, .subject-title). La sigla va
+   como en Mis reservas, el historial y el panel. */
+.subject-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.subject-icon {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: rgba(253, 189, 45, .2);
+    color: var(--duoc-blue);
+}
+
+.subject-code {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #EEF2F6;
+    color: var(--duoc-blue);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+}
+
+.subject-card h3 {
+    margin-bottom: 6px;
+    color: var(--duoc-blue);
+    font-size: 1.2rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.subject-area {
+    color: var(--text-light);
+    font-size: .9rem;
+}
+
 .ver-tutores {
     display: inline-flex;
     align-items: center;
