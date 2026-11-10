@@ -81,6 +81,11 @@ info:
       CONFIRMADA con monto, antes del aviso le pide a Pagos el reembolso
       (CA9, ver la ruta); si Pagos no responde, la cancelación también queda
       igual.
+    - Eliminar un bloque (`DELETE /disponibilidad/{bloque_id}`, HU-15) no
+      llama a otros servicios antes de guardar. Si el bloque tenía
+      solicitudes pendientes, después de guardar Tutorías pide a Identidad
+      el aviso RESERVA_RECHAZADA para cada estudiante (HU-16); si un aviso no
+      sale, la eliminación queda igual.
     - La evaluación (`POST /reservas/{reserva_id}/evaluacion`) sale de
       tutoring_db, sin llamar a otros servicios. Al guardarla se recalcula la
       reputación del tutor en `usuario_ref` (RN-06), en la misma transacción.
@@ -172,6 +177,11 @@ info:
       `ReservaAdministrada` y `EvaluacionAdministrada`, la respuesta
       `NoEsAdministrador` y sus códigos de error (ver el esquema `Error`).
       Retirar una evaluación recalcula la reputación del tutor.
+
+    - Próxima versión (HU-36): al eliminar un bloque con solicitudes
+      pendientes (`DELETE /disponibilidad/{bloque_id}`), Tutorías pide a
+      Identidad el aviso RESERVA_RECHAZADA para cada estudiante (HU-16), que
+      antes no se enviaba. La respuesta no cambia.
 
 servers:
   - url: http://localhost:8080/api/tutoring/v1
@@ -854,9 +864,11 @@ paths:
 
         - Si el bloque nunca tuvo reservas, se borra. Si tuvo alguna, queda
           ELIMINADO (borrado lógico) y deja de contar para los cruces.
-        - Sus solicitudes pendientes pasan a RECHAZADA, con `cerrada_en`. El
-          aviso por correo a cada estudiante llega con HU-16: hoy no se
-          envía.
+        - Sus solicitudes pendientes pasan a RECHAZADA, con `cerrada_en`.
+          Después de guardar, Tutorías pide a Identidad el aviso
+          RESERVA_RECHAZADA para cada estudiante (HU-16), como cuando el
+          tutor rechaza una solicitud. Si un aviso no sale, la eliminación
+          queda igual.
         - Con una tutoría confirmada, realizada o evaluada no se elimina (409
           `bloque_con_reserva_confirmada`).
         - Todo pasa en una transacción que bloquea el bloque.
