@@ -209,6 +209,45 @@ Una cuenta nueva se crea en el registro con cualquier correo que termine en
 `@duocuc.cl`; el enlace de verificación llega a la bandeja de desarrollo, no a
 una casilla real.
 
+### Pruebas de extremo a extremo
+
+Las pruebas de `pruebas_e2e/` (HU-34) corren contra el sistema levantado y
+piden todo por el gateway, como la página en el navegador:
+
+- `test_recorrido.py`, el recorrido completo: dos cuentas nuevas se registran,
+  verifican su correo y completan su perfil; el tutor declara una asignatura y
+  publica un bloque; el estudiante lo busca, solicita la tutoría y la paga
+  cuando el tutor la confirma; el programador la cierra y el estudiante la
+  evalúa. Revisa también los avisos por correo, una tutoría pagada que se
+  cancela con reembolso y una solicitud retirada.
+- `test_rnf02_busqueda.py`: la búsqueda de tutores con 500 usuarios de prueba
+  responde en menos de 2 segundos (RNF-02).
+
+Corren en un contenedor desechable con Python, conectado a la red del
+sistema: no hay que instalar nada. Con el sistema levantado, en Windows
+(PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\cargar_datos_demo.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\cargar_usuarios_prueba.ps1
+docker run --rm --network plataforma-tutorias_borde -v "${PWD}:/repo" -w /repo -e PYTHONDONTWRITEBYTECODE=1 python:3.12-slim bash -c 'set -o pipefail; pip install -q pytest==8.3.5 && python -m pytest -v -s -p no:cacheprovider pruebas_e2e 2>&1 | tee docs/evidencia/pruebas_e2e_$(date +%F).txt'
+```
+
+En macOS, en Linux o en Git Bash de Windows:
+
+```bash
+sh scripts/levantar_demo.sh
+sh scripts/cargar_usuarios_prueba.sh
+MSYS_NO_PATHCONV=1 docker run --rm --network plataforma-tutorias_borde -v "$(pwd -W 2>/dev/null || pwd):/repo" -w /repo -e PYTHONDONTWRITEBYTECODE=1 python:3.12-slim bash -c 'set -o pipefail; pip install -q pytest==8.3.5 && python -m pytest -v -s -p no:cacheprovider pruebas_e2e 2>&1 | tee docs/evidencia/pruebas_e2e_$(date +%F).txt'
+```
+
+- Tardan hasta unos 10 minutos: casi todo es esperar que termine el bloque de
+  la tutoría y que pase el programador de tareas.
+- La salida queda también en `docs/evidencia/pruebas_e2e_<fecha>.txt`, la
+  evidencia del portafolio. La fecha es la del contenedor, en UTC.
+- Al terminar, vuelve a cargar los datos de ejemplo: borran las cuentas que
+  crea el recorrido y la carga de 500 usuarios.
+
 ### Variables de entorno
 
 Todas viven en un solo archivo `.env` en la raíz, que se crea copiando
