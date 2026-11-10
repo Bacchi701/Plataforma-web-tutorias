@@ -1,0 +1,71 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-8.3.5, pluggy-1.7.0 -- /usr/local/bin/python
+rootdir: /repo
+configfile: pyproject.toml
+collecting ... collected 18 items
+
+pruebas_e2e/test_recorrido.py::test_01_registro_y_verificacion 
+Paso 1: el tutor e2e.tutor.20261110000435@duocuc.cl y el estudiante e2e.estudiante.20261110000435@duocuc.cl se registran, verifican su correo con el enlace que llega a la bandeja e inician sesión (2,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_02_perfil 
+Paso 2: perfiles en Analista Programador Computacional (ANA-PROG), sede Alameda: el tutor con nivel 2 y el estudiante con nivel 1 (0,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_03_declaracion 
+Paso 3: el tutor declara BDD1101 Base de Datos, del semestre 1, con tarifa $3.000 (0,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_04_disponibilidad 
+Paso 4: el tutor publica un bloque de 00:06:38 a 00:07:38 UTC (0,0 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_05_busqueda 
+Paso 5: la búsqueda por BDD1101 trae 134 tutores, entre ellos el del recorrido con tarifa $3.000, y su perfil público muestra el bloque (0,0 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_06_solicitud 
+Paso 6: el estudiante solicita el bloque, con una nota: la reserva 998ba5d8-16ed-4a71-9fce-99f4487c7776 queda SOLICITADA, por $3.000 (0,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_07_aviso_de_solicitud 
+Paso 7: llega al tutor «Nueva solicitud de tutoría: Base de Datos», con la nota (0,0 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_08_confirmacion 
+Paso 8: el tutor la confirma en línea, con el enlace https://meet.example.com/recorrido-e2e: queda CONFIRMADA, y el bloque ya no aparece en su perfil público (0,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_09_aviso_de_confirmacion 
+Paso 9: llega al estudiante «Tu tutoría de Base de Datos está confirmada», con el enlace (0,0 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_10_pago 
+Paso 10: el estudiante crea el pago 453214d9-814f-4ae9-a48e-e56b875cbcb9 (PENDIENTE) y lo simula aprobado (PAGADO); la reserva ya muestra estado_pago PAGADO (0,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_11_cierre_por_el_programador 
+Paso 11: espera el fin del bloque, a las 00:07:38 UTC, y al programador, hasta las 00:13:08 UTC.
+Paso 11: el programador la cerró: está REALIZADA 4 min 41 s después del fin del bloque (7 min 40 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_12_evaluacion 
+Paso 12: el estudiante la evalúa con 5 y un comentario: queda EVALUADA, y el perfil público del tutor muestra 1 evaluación con promedio 5 (0,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_13_cancelacion_con_reembolso 
+Paso 13: otra tutoría, confirmada y pagada: el tutor la cancela, queda CANCELADA y REEMBOLSADA en Tutorías y en Pagos, y su bloque vuelve a estar libre (0,4 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_14_aviso_de_cancelacion 
+Paso 14: llega al estudiante «Se canceló la tutoría de Base de Datos» (0,0 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_15_retiro_de_solicitud 
+Paso 15: otra solicitud: el estudiante la retira antes de que el tutor responda; queda CANCELADA, sin pago, y el bloque sigue libre (0,1 s)
+PASSED
+pruebas_e2e/test_recorrido.py::test_16_aviso_de_retiro 
+Paso 16: llega al tutor «Se canceló la tutoría de Base de Datos» (0,0 s)
+PASSED
+pruebas_e2e/test_rnf02_busqueda.py::test_busqueda_de_tutores_bajo_dos_segundos 
+RNF-02: búsqueda de tutores por el gateway (http://gateway)
+20 mediciones de cada búsqueda, después de 2 de calentamiento. Tiempos en milisegundos.
+
+Búsqueda                         Tutores   Mediana  Percentil 95    Máximo
+Por asignatura (MAT1101)             202      25,6          26,9      28,1
+Sin parámetros (destacados)           24      43,2          62,5      62,5
+Por nombre (?buscar=González)         20      42,7          61,3      61,5
+
+Límite de RNF-02: 2 segundos para cada petición.
+PASSED
+pruebas_e2e/test_rnf02_busqueda.py::test_cuentas_de_la_carga 
+Cuentas en Identidad: 510 (la carga de prueba suma 500).
+PASSED
+
+======================== 18 passed in 466.76s (0:07:46) ========================

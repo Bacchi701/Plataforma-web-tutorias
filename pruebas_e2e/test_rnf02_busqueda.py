@@ -129,8 +129,8 @@ def test_cuentas_de_la_carga(cliente):
     )
     assert estado == 200, (
         f"POST /api/identity/v1/login con {ADMIN} respondió {estado}: {sesion}. "
-        "Si es 503, es el límite del gateway (cinco por minuto): espera un "
-        "minuto y vuelve a correr la prueba."
+        "Si es 429 o 503, es el límite del gateway (cinco por minuto): espera "
+        "un minuto y vuelve a correr la prueba."
     )
 
     ruta = f"{USUARIOS}?limite=1"
