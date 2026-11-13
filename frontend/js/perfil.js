@@ -7,7 +7,9 @@
 // Los datos se escriben con textContent o value, nunca con innerHTML.
 
 const CATALOGO = "/api/catalog/v1";
-const NIVEL_MAXIMO = 12;
+// Las mallas de Duoc UC llegan al semestre 8; las de las carreras tecnicas,
+// al 4 o al 5. La API de Identidad valida lo mismo.
+const NIVEL_MAXIMO = 8;
 
 // El encabezado (sesion.js) y esta pagina piden la sesion al mismo tiempo: la
 // renovacion se comparte en Sesion.renovar (sesion.js).
@@ -163,7 +165,7 @@ function problemaAntesDeGuardar(datos) {
         return { campo: "sede", mensaje: "Elige tu sede." };
     }
     if (!Number.isInteger(datos.nivel) || datos.nivel < 1 || datos.nivel > NIVEL_MAXIMO) {
-        return { campo: "nivel", mensaje: "Elige tu nivel, de 1 a 12." };
+        return { campo: "nivel", mensaje: `Elige tu nivel, de 1 a ${NIVEL_MAXIMO}.` };
     }
     return null;
 }

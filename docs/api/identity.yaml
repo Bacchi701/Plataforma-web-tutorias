@@ -78,6 +78,13 @@ info:
       leer, 400 `token_invalido`. En `POST /login`, el límite de intentos del
       gateway responde 429 y ya no 503: el 503 queda solo para
       `claves_no_configuradas`.
+    - Próxima versión (SCRUM-79): `PATCH /yo` acepta el nivel de 1 a 8, y ya
+      no de 1 a 12, porque las mallas de Duoc UC llegan al semestre 8.
+      Cambian el esquema `Perfil` (`maximum: 8`) y el 400
+      `nivel_fuera_de_rango`, que dice «El nivel debe ser un número entero
+      de 1 a 8.». La base sigue admitiendo de 1 a 12 (`ck_usuario_nivel`):
+      por eso `Yo` y `UsuarioAdministrado` siguen con `maximum: 12`, y una
+      cuenta que guardó de 9 a 12 antes de este cambio lo sigue devolviendo.
 
 servers:
   - url: http://localhost:8080
@@ -520,7 +527,7 @@ paths:
         '400':
           description: |
             Datos inválidos: `codigo` es `invalid` y `detalles` dice qué campo
-            corregir. Pasa si el nivel no es un entero de 1 a 12, si la carrera
+            corregir. Pasa si el nivel no es un entero de 1 a 8, si la carrera
             o la sede no son un uuid, si un campo viene vacío o en `null`, si
             el perfil quedaría sin carrera, sede o nivel, o si viene un campo
             que no es del perfil. Con el JSON mal formado responde
@@ -531,13 +538,13 @@ paths:
                 $ref: '#/components/schemas/Error'
               examples:
                 nivel_fuera_de_rango:
-                  summary: El nivel es 0, 13 o no es un número entero
+                  summary: El nivel es 0, 9 o no es un número entero
                   value:
                     codigo: invalid
                     mensaje: La petición tiene datos inválidos.
                     detalles:
                       nivel:
-                        - El nivel debe ser un número entero de 1 a 12.
+                        - El nivel debe ser un número entero de 1 a 8.
                 carrera_no_es_uuid:
                   summary: La carrera no es un uuid
                   value:
@@ -1180,7 +1187,7 @@ components:
           minimum: 1
           maximum: 12
           nullable: true
-          description: Semestre que cursa. null hasta que se completa el perfil.
+          description: Semestre que cursa. null hasta que se completa el perfil. `PATCH /yo` acepta de 1 a 8; de 9 a 12 solo puede venir en una cuenta que lo guardó antes de SCRUM-79 (la base admite de 1 a 12).
         sede_id:
           type: string
           format: uuid
@@ -1218,8 +1225,8 @@ components:
         nivel:
           type: integer
           minimum: 1
-          maximum: 12
-          description: Semestre que cursa, de 1 a 12. No puede venir en null.
+          maximum: 8
+          description: Semestre que cursa, de 1 a 8. No puede venir en null.
 
     UsuarioAdministrado:
       type: object
@@ -1255,7 +1262,7 @@ components:
           minimum: 1
           maximum: 12
           nullable: true
-          description: Semestre que cursa. null si el perfil está incompleto.
+          description: Semestre que cursa. null si el perfil está incompleto. Como en `GET /yo`, de 9 a 12 solo puede venir en una cuenta que lo guardó antes de SCRUM-79.
         email_verificado:
           type: boolean
           description: false si la persona todavía no abre el enlace del correo de verificación.

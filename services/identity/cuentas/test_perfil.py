@@ -123,22 +123,22 @@ def test_con_el_perfil_completo_acepta_cambios_parciales(client, completo):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("nivel", [1, 12])
-def test_el_nivel_acepta_de_1_a_12(client, completo, nivel):
+@pytest.mark.parametrize("nivel", [1, 8])
+def test_el_nivel_acepta_de_1_a_8(client, completo, nivel):
     assert guardar(client, completo, {"nivel": nivel}).status_code == 200
     assert Usuario.objects.get().nivel == nivel
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("nivel", [0, 13, 2.5])
-def test_un_nivel_fuera_de_1_a_12_se_rechaza(client, completo, nivel):
+@pytest.mark.parametrize("nivel", [0, 9, 13, 2.5])
+def test_un_nivel_fuera_de_1_a_8_se_rechaza(client, completo, nivel):
     respuesta = guardar(client, completo, {"nivel": nivel})
 
     assert respuesta.status_code == 400
     assert respuesta.json() == {
         "codigo": "invalid",
         "mensaje": "La petición tiene datos inválidos.",
-        "detalles": {"nivel": ["El nivel debe ser un número entero de 1 a 12."]},
+        "detalles": {"nivel": ["El nivel debe ser un número entero de 1 a 8."]},
     }
     assert Usuario.objects.get().nivel == 4
 
@@ -161,7 +161,7 @@ def test_la_carrera_y_la_sede_tienen_que_ser_uuid(client, completo, campo):
     [
         ("carrera_id", None, "Elige tu carrera."),
         ("sede_id", None, "Elige tu sede."),
-        ("nivel", None, "Elige tu nivel, de 1 a 12."),
+        ("nivel", None, "Elige tu nivel, de 1 a 8."),
         ("nombre", "   ", "Escribe tu nombre."),
         ("apellido", "", "Escribe tu apellido."),
     ],
