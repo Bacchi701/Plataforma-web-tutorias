@@ -270,13 +270,16 @@ def logout(request):
 # --------------------------------------------------------------- perfil (HU-10)
 
 NO_SE_CAMBIA = "Este campo no se puede cambiar desde el perfil."
-NIVEL_INVALIDO = "El nivel debe ser un número entero de 1 a 12."
+# Las mallas de Duoc UC llegan al semestre 8. La base admite de 1 a 12
+# (ck_usuario_nivel, anexo A del Pilar 2) y ese CHECK no se cambia.
+NIVEL_MAXIMO = 8
+NIVEL_INVALIDO = f"El nivel debe ser un número entero de 1 a {NIVEL_MAXIMO}."
 
 # Sin estos tres el perfil no esta completo (HU-10, criterio 3).
 OBLIGATORIOS = {
     "carrera_id": "Elige tu carrera.",
     "sede_id": "Elige tu sede.",
-    "nivel": "Elige tu nivel, de 1 a 12.",
+    "nivel": f"Elige tu nivel, de 1 a {NIVEL_MAXIMO}.",
 }
 
 
@@ -313,10 +316,10 @@ class PerfilSerializer(serializers.Serializer):
             "invalid": "La sede no es válida: elígela de la lista.",
         }
     )
-    # Semestre que cursa. La base exige lo mismo (ck_usuario_nivel).
+    # Semestre que cursa, de 1 a NIVEL_MAXIMO (la base admite hasta 12).
     nivel = serializers.IntegerField(
         min_value=1,
-        max_value=12,
+        max_value=NIVEL_MAXIMO,
         error_messages={
             "null": OBLIGATORIOS["nivel"],
             "invalid": NIVEL_INVALIDO,
