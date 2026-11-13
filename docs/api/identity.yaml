@@ -484,8 +484,8 @@ paths:
           `GET /api/catalog/v1/carreras` y `GET /api/catalog/v1/sedes`.
         - Si el usuario ya declaró asignaturas y cambia su carrera o su nivel,
           el cambio se guarda igual. Las asignaturas que dejan de cumplir RN-01
-          se desactivan en la siguiente sincronización de Tutorías (HU-19,
-          todavía no implementada).
+          se desactivan en la siguiente sincronización de Tutorías (HU-19),
+          que el programador ejecuta cada cinco minutos.
       security:
         - tokenAcceso: []
       requestBody:

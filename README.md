@@ -26,21 +26,25 @@ El producto mínimo viable (MVP) considera:
   un solo uso, e inicio y cierre de sesión.
 - Perfil con carrera, nivel y sede.
 - Catálogo académico con carreras, sedes, mallas, semestres y asignaturas. El
-  modelo admite las 92 carreras de Duoc UC y parte con 3 a 5 carreras
-  completas, cargadas desde archivos CSV.
+  modelo está pensado para las 92 carreras de Duoc UC, pero cuenta semestres:
+  las que se dictan por bimestres no se cargan. El repositorio trae 23 carreras
+  reales con su malla 2026, en archivos CSV que se cargan con un comando (la
+  planificación pedía de 3 a 5).
 - Declaración de las asignaturas en que un estudiante ofrece tutorías, con la
   tarifa que él mismo fija (puede ser $0). Solo se habilitan asignaturas de su
   malla ubicadas en semestres anteriores a su nivel.
 - Publicación de bloques de disponibilidad, búsqueda de tutores por asignatura,
   solicitud de tutoría, confirmación o rechazo, y cancelación.
-- Avisos por correo: al tutor cuando recibe una solicitud y al estudiante
-  cuando se la confirman o rechazan.
+- Avisos por correo: al tutor cuando recibe una solicitud; al estudiante
+  cuando se la confirman o rechazan, y a la otra persona cuando se cancela una
+  tutoría o se retira una solicitud.
 - Historial de las tutorías solicitadas e impartidas.
 - Evaluación de 1 a 5 después de cada sesión, con comentario opcional, y
   reputación visible de cada tutor.
 - Pago simulado de la reserva, con reintento y reembolso simulado al cancelar.
-- Panel de administración para gestionar usuarios y catálogo, y retirar
-  evaluaciones.
+- Panel de administración para gestionar los usuarios, revisar las tutorías y
+  retirar evaluaciones. El catálogo se carga desde archivos CSV, no desde el
+  panel.
 
 La plataforma agenda la tutoría; la sesión ocurre de forma presencial o por un
 enlace externo que el tutor indica al confirmar. Quedan fuera de esta versión
@@ -58,7 +62,7 @@ de semestres anteriores al que cursa.
 | ------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Estudiante    | Busca tutores por asignatura, solicita una tutoría, paga (simulado), cancela o retira su solicitud y evalúa al tutor. |
 | Tutor         | Declara asignaturas y tarifa, publica su disponibilidad, acepta o rechaza solicitudes y ve su reputación.             |
-| Administrador | Gestiona usuarios y catálogo académico, retira evaluaciones y revisa la actividad del sistema.                        |
+| Administrador | Busca usuarios y los desactiva o los vuelve a activar, revisa las tutorías y retira evaluaciones.                     |
 
 ## Tecnologías utilizadas
 
@@ -69,10 +73,10 @@ de semestres anteriores al que cursa.
 | Frontend             | HTML, CSS y JavaScript sin framework, servidos por el gateway en `/app/` (la alternativa que dejó prevista AD-12, en lugar del plan con React y Vite; el profesor la aceptó el 21-10) |
 | Base de datos        | PostgreSQL 16, una base independiente por microservicio                                                                               |
 | API Gateway          | Nginx 1.27                                                                                                                            |
-| Autenticación        | Tokens JWT firmados con RS256: los emite Identidad, y Tutorías los verifica con la clave pública (HU-05 y HU-17)                     |
+| Autenticación        | Tokens JWT firmados con RS256 (AD-06): solo Identidad los emite, con la clave privada; Identidad, Tutorías y Pagos los verifican con la clave pública |
 | Correo               | Mailpit como servidor de correo de desarrollo                                                                                         |
 | Contenedores         | Docker y Docker Compose: un Dockerfile por servicio y un `docker-compose.yml` que levanta el sistema completo                         |
-| Calidad              | pytest, pytest-django y pytest-cov; ruff y black en Python. El frontend todavía no tiene pruebas automáticas: la integración continua salta ese paso mientras no exista `frontend/package.json` |
+| Calidad              | pytest, pytest-django y pytest-cov en los cuatro servicios, con una cobertura mínima de 60 % en Identidad y Tutorías; pruebas de extremo a extremo con pytest contra el sistema levantado (`pruebas_e2e/`), que la integración continua no corre; ruff y black en Python. El frontend no tiene pruebas automáticas: no hay `frontend/package.json`, y la integración continua salta ese paso |
 | Integración continua | GitHub Actions                                                                                                                        |
 | Cloud                | No se usa. El sistema completo corre en contenedores Docker en cualquier computador; GitHub aloja el código y la integración continua |
 
@@ -133,12 +137,12 @@ desde ahí se prueba la demo.
 
 ### Probar la demo
 
-Con los datos de ejemplo se puede recorrer lo que ya está en `develop`:
-registro con el correo institucional, verificación por correo, inicio de
-sesión, perfil, catálogo, disponibilidad del tutor y búsqueda de tutores. Con
-los PR del 29-10 se suman declarar desde «Mi perfil» las asignaturas que se
-enseñan, los tutores de cada asignatura y la búsqueda de tutores por nombre y
-por evaluación.
+Con los datos de ejemplo se recorre el MVP completo, con los avisos por correo
+en la bandeja de desarrollo: registro con el correo institucional y
+verificación, inicio de sesión, perfil, catálogo, declaración de asignaturas,
+disponibilidad del tutor, búsqueda de tutores, solicitud, confirmación o
+rechazo, pago simulado, cancelación con reembolso, historial, evaluación y
+panel de administración.
 
 En Windows (PowerShell), desde la carpeta del repositorio:
 
@@ -175,6 +179,17 @@ sh scripts/levantar_demo.sh
 - La carga de los datos de ejemplo vacía y vuelve a llenar las cuatro bases.
   Se puede repetir las veces que haga falta. Las cuentas, los tutores y las
   reservas son ficticios.
+- Los datos de ejemplo traen un catálogo de prueba de cuatro carreras: tres
+  con mallas recortadas y una cerrada a propósito, Diseño Gráfico. Las 23
+  carreras reales se cargan aparte, después de los datos de ejemplo, con
+  `docker compose up -d --build --wait catalog`,
+  `docker compose exec -T catalog python manage.py cargar_catalogo` y
+  `docker compose restart gateway` (ver
+  `services/catalog/datos_catalogo/LEEME.md`). Las cuentas de ejemplo siguen
+  en las carreras de prueba, y con las dos cargas «Ingeniería en Informática»
+  aparece dos veces: la de prueba y la real. Si después vuelves a cargar los
+  datos de ejemplo, como se hace al terminar las pruebas de extremo a extremo,
+  las carreras reales se borran y hay que cargarlas de nuevo.
 - En macOS, `levantar_demo.sh` deja `COOKIE_REFRESH_SEGURA=0` en el `.env`:
   Safari no guarda cookies seguras en `http://localhost`, y sin esa cookie la
   sesión no se recupera al recargar la página.
@@ -188,22 +203,25 @@ Después abre:
 | Asignaturas, mallas y sus tutores      | <http://localhost:8080/app/asignaturas.html>   |
 | Tutores: los mejor evaluados y la búsqueda por nombre | <http://localhost:8080/app/tutores.html> |
 | Registro con correo @duocuc.cl         | <http://localhost:8080/app/registro.html>      |
-| Bandeja de correo (verificación)       | <http://localhost:8025>                        |
+| Bandeja de correo (verificación y avisos) | <http://localhost:8025>                     |
 | Inicio de sesión                       | <http://localhost:8080/app/login.html>         |
 | Mi perfil y las asignaturas que enseño (con sesión) | <http://localhost:8080/app/perfil.html> |
 | Mi disponibilidad (con sesión, tutores) | <http://localhost:8080/app/disponibilidad.html> |
+| Mis reservas: solicitudes, tutorías y pago (con sesión) | <http://localhost:8080/app/reservas.html> |
+| Historial y evaluación (con sesión)    | <http://localhost:8080/app/historial.html>     |
+| Panel de administración (cuenta de administrador) | <http://localhost:8080/app/admin.html> |
 
 Cuentas de ejemplo, todas con la clave `Tutorias2026`:
 
 | Cuenta                     | Qué muestra                                                                 |
 | -------------------------- | --------------------------------------------------------------------------- |
 | `valentina.demo@duocuc.cl` | Tutora de Ingeniería en Informática, con asignaturas declaradas y bloques publicados. |
-| `camila.demo@duocuc.cl`    | Estudiante de Ingeniería en Informática, en segundo semestre: puede ofrecer tutorías de las asignaturas del primero. |
+| `camila.demo@duocuc.cl`    | Estudiante de Ingeniería en Informática, en segundo semestre: puede ofrecer tutorías de las asignaturas del primero. Tiene una tutoría confirmada de Desarrollo Web con Matías Fuentes, de una fecha que ya pasó: el programador la marca como realizada en su siguiente pasada (corre cada cinco minutos), y desde ahí se evalúa en «Historial». |
 | `matias.demo@duocuc.cl` y `fernanda.demo@duocuc.cl` | Otros dos tutores.                             |
 | `diego.demo@duocuc.cl`     | Estudiante de primer semestre: todavía no puede ofrecer tutorías.           |
 | `tomas.demo@duocuc.cl`     | Cuenta sin verificar: no puede iniciar sesión.                              |
 | `josefa.demo@duocuc.cl`    | Cuenta desactivada: «Tu cuenta está desactivada.»                           |
-| `admin.demo@duocuc.cl`     | Administrador: usa las rutas /admin de Identidad (HU-31) y, cuando llegue, el panel de administración (HU-33). |
+| `admin.demo@duocuc.cl`     | Administrador: el panel de administración (HU-31 y HU-33). |
 
 Una cuenta nueva se crea en el registro con cualquier correo que termine en
 `@duocuc.cl`; el enlace de verificación llega a la bandeja de desarrollo, no a
@@ -246,7 +264,8 @@ MSYS_NO_PATHCONV=1 docker run --rm --network plataforma-tutorias_borde -v "$(pwd
 - La salida queda también en `docs/evidencia/pruebas_e2e_<fecha>.txt`, la
   evidencia del portafolio. La fecha es la del contenedor, en UTC.
 - Al terminar, vuelve a cargar los datos de ejemplo: borran las cuentas que
-  crea el recorrido y la carga de 500 usuarios.
+  crea el recorrido y la carga de 500 usuarios, y también las 23 carreras
+  reales, si las habías cargado.
 
 ### Variables de entorno
 
@@ -293,10 +312,9 @@ Esas claves nunca se suben al repositorio.
 El contenedor `tut_programador` usa la imagen de Tutorías y no publica
 puertos. Al arrancar, y después cada 300 segundos, corre
 `sincronizar_copias` (HU-19) y después `cerrar_y_expirar` (HU-29), cada uno en
-su propio proceso: si uno falla, el otro corre igual. Mientras esas historias
-no lleguen, su registro muestra «Unknown command» para los dos y sigue con el
-ciclo siguiente. Cada comando deja su fila en la tabla `ejecucion_tarea` de
-`tutoring_db`; el programador no escribe en ella.
+su propio proceso: si uno falla, el otro corre igual. Cada comando deja su
+fila en la tabla `ejecucion_tarea` de `tutoring_db`; el programador no escribe
+en ella.
 
 ```bash
 docker compose logs -f programador                                # lo que corrió y cómo terminó
@@ -330,7 +348,11 @@ del criterio 1 de HU-17, que es de Bryan: la verificación del token (PR #15,
 registrada en SCRUM-43). Bryan hizo las mejoras que salieron de la revisión de
 la plataforma con el equipo (HU-38 a HU-41). La declaración de asignaturas
 (HU-14) está en Jira a nombre de Francisco; la implementó Bryan en el PR #21.
-HU-30 y HU-34 están a nombre de Bryan en Jira: la replanificación del 25-09 propuso el cambio «a acordar con el equipo», y no hay un acuerdo escrito.
+HU-30 y HU-34 están a nombre de Bryan en Jira: la replanificación del 25-09
+propuso el cambio «a acordar con el equipo», y no hay un acuerdo escrito. El
+historial y la pantalla de evaluación (HU-26) están en Jira a nombre de
+Francisco; el PR #40 lo abrió Bryan. Francisco hizo en el PR #29 la primera
+ruta `/internal` de Identidad y la clave de servicio (`CLAVE_SERVICIO`).
 
 ## Metodología de trabajo del equipo: Scrum
 
@@ -338,8 +360,10 @@ El equipo trabaja con Scrum, adaptado a tres personas.
 
 - **Sprints de dos semanas.** Cuatro sprints, del 21-09 al 08-11 (el último
   dura una semana), precedidos por una semana de planificación y una de
-  cimientos. El 25-09 el profesor fijó el 08-11 como límite del desarrollo, y
-  el plan pasó de cinco sprints a cuatro.
+  cimientos. El 25-09 el equipo fijó el 08-11 como término del desarrollo, y
+  el plan pasó de cinco sprints a cuatro. El desarrollo siguió después del
+  08-11: el último PR de las historias del MVP entró el 10-11, y el Sprint 4
+  se cerró en Jira el 11-11.
 - **Product Backlog.** El alcance se priorizó con MoSCoW. El bloque Must, que
   es el MVP, se descompuso en 37 historias de usuario (13 de ellas técnicas),
   estimadas en horas (355 h en total) y agrupadas en nueve épicas. Los Should
@@ -354,7 +378,8 @@ El equipo trabaja con Scrum, adaptado a tres personas.
   Sprint 1, convocada para la misma llamada, la hizo Bryan solo (S1_7 y
   evidencia A21 del informe de avance). De las Sprint Review y las
   retrospectivas de los Sprints 2 y 3 no hay registro. El Sprint 3 se planificó
-  en Jira el 23-10, y el Sprint 4, el 02-11.
+  en Jira el 23-10, y el Sprint 4, el 02-11. La revisión y la retrospectiva
+  del Sprint 4 van en la semana 15 (16 al 21-11).
 - **Seguimiento en Jira.** Desde el Sprint 2, por pedido del profesor, el
   backlog, el sprint y el Daily están en Jira (proyecto «Tutorias», clave
   SCRUM). El Daily es escrito: la regla es que cada integrante deje un
@@ -375,6 +400,8 @@ El equipo trabaja con Scrum, adaptado a tres personas.
   real, el sistema se levanta desde un clon limpio y la historia está fusionada
   a `develop`.
 
+El plan por etapas, con el objetivo con que se planificó cada sprint:
+
 | Etapa         | Fechas         | Objetivo                                                                        |
 | ------------- | -------------- | ------------------------------------------------------------------------------- |
 | Planificación | 07 al 13-09    | Cinco pilares de planificación, repositorio y primeras maquetas                 |
@@ -388,8 +415,7 @@ El equipo trabaja con Scrum, adaptado a tres personas.
 El 23-10 el Sprint 3 se reenfocó en el flujo de reservas, y lo demás pasó al
 Sprint 4. En la semana del 26-10 el equipo revisó la plataforma funcionando y
 agregó siete historias al backlog (HU-38 a HU-44); las cuatro primeras
-entraron al Sprint 3. Si lo que queda del MVP no alcanza a terminarse en el
-Sprint 4, se aplica el orden de recorte del Pilar 1 (sección 8.3).
+entraron al Sprint 3. El cierre del Sprint 4 está en «Estado del desarrollo».
 
 **Flujo en Git (GitFlow reducido).** `develop` integra el trabajo del sprint.
 Cada historia nace de `develop` en una rama corta (por ejemplo,
@@ -397,8 +423,9 @@ Cada historia nace de `develop` en una rama corta (por ejemplo,
 continua en verde y la aprobación de otro integrante. Según el plan, `main`
 guarda la última versión presentable y recibe `develop` al cierre de cada
 sprint, con su etiqueta: v0.1 el 04-10, v0.2 el 18-10, v0.3 el 01-11 y v1.0 el
-08-11. Al 02-11 no se ha hecho: `main` sigue en el prototipo del 12-09
-(`b8a21f3`), sin ninguna fusión de `develop`, y no hay etiquetas.
+08-11. Al 13-11 no se ha hecho: `main` sigue en el prototipo del 12-09
+(`b8a21f3`), sin ninguna fusión de `develop`, y no hay etiquetas. Al cierre va
+un PR de `develop` a `main`, con la etiqueta v1.0.
 
 ## Arquitectura de la solución
 
@@ -485,15 +512,17 @@ Decisiones que sostienen el diseño:
     (HU-41), Tutorías le pide a Identidad `GET /yo` con el mismo token del
     usuario, y a Catálogo la malla de su carrera, que es pública (llamadas 1
     y 2).
-  - Lo que necesite datos de otro usuario, como los avisos por correo (HU-16 y
-    HU-21) y la sincronización de las copias (HU-19), y las llamadas 3 y 4,
-    entre Pagos y Tutorías (HU-23 y HU-28), irá por rutas `/internal`: no
-    pasan por el gateway, no viajan con el token del usuario y se autentican
-    con una clave de servicio en una cabecera.
-- **Autenticación distribuida.** Solo Identidad emite los tokens JWT, firmados
-  con RS256. Los servicios con rutas que piden sesión verifican la firma con la
-  clave pública: Tutorías y Pagos. Catálogo es de solo
-  lectura y no pide token.
+  - Lo que necesita datos de otro usuario (los avisos por correo de HU-16 y
+    HU-21, y las cuentas que sincroniza HU-19) y las llamadas 3 y 4, entre
+    Pagos y Tutorías (HU-23 y HU-28), van por rutas `/internal`, que no pasan
+    por el gateway, no llevan el token del usuario y se autentican con una
+    clave de servicio en una cabecera. Catálogo no tiene rutas internas (el
+    criterio 4 de HU-12 quedó fuera del alcance): Tutorías le pide la malla y
+    las asignaturas por sus rutas públicas.
+- **Autenticación distribuida.** Solo Identidad emite los tokens JWT: los firma
+  con RS256 y su clave privada. Los tres servicios con rutas que piden sesión,
+  Identidad, Tutorías y Pagos, verifican la firma con la clave pública.
+  Catálogo es de solo lectura y no pide token.
 - **Copias de lectura.** Tutorías guarda una copia de los datos del usuario y
   de la asignatura que necesita para resolver la búsqueda de tutores sin una
   llamada HTTP por resultado. Se acepta consistencia eventual: la copia del
@@ -519,15 +548,17 @@ Fase 2/              evidencias de la Fase 2: individuales, grupales y del proye
 .github/workflows/   canal de integración continua
 docs/planificacion/  los cinco pilares, el anexo A (modelo de datos) y la idea base del proyecto
 docs/diagramas/      diagramas con su fuente: entidad-relación de las cuatro bases, componentes (UML), estados de la reserva, cronograma, carta Gantt y mapa de historias
-docs/api/            contratos OpenAPI de Identidad y Tutorías
+docs/api/            contratos OpenAPI de los cuatro servicios
 docs/adr/            dónde están las decisiones de arquitectura (Pilar 2 y anexo A)
-docs/evidencia/      presentación de la sesión del 30-10
+docs/evidencia/      presentación del 30-10, cobertura de las pruebas y corrida de extremo a extremo
 infra/nginx/         configuración del gateway y página de estado
-infra/postgres/      reservada para scripts de inicialización de PostgreSQL (hoy vacía)
-services/            identity, catalog, tutoring y payments, cada uno con su Dockerfile
+infra/postgres/      reservada para scripts de inicialización de PostgreSQL; sin uso (solo .gitkeep)
+services/            identity, catalog, tutoring y payments, cada uno con su Dockerfile; las carreras reales, en catalog/datos_catalogo/
 data/seeds/demo/     datos de ejemplo de las cuatro bases y la prueba de sus restricciones
+data/seeds/carga/    los 500 usuarios de prueba de la medición de RNF-02
+pruebas_e2e/         pruebas de extremo a extremo contra el sistema levantado (HU-34)
 keys/                clave pública de firma de tokens (la privada no se versiona)
-scripts/             levantar la demo, cargar los datos de ejemplo y probar las restricciones
+scripts/             levantar la demo, cargar los datos de ejemplo y los usuarios de prueba, y probar las restricciones
 frontend/            páginas del frontend (HTML, CSS y JavaScript), servidas en /app/
 docker-compose.yml   levanta el sistema completo
 pyproject.toml       configuración de ruff y black
@@ -537,57 +568,64 @@ requirements-dev.txt herramientas de prueba y de estilo (pytest, pytest-django, 
 
 ## Estado del desarrollo
 
-Al 02-11-2026, al abrir el Sprint 4, con `develop` en `078995a` (PR #26). Los
-estados son los de Jira, donde hay 44 historias (HU-01 a HU-44) con 389 h
-estimadas: 16 Finalizadas (139 h), 4 En curso (36 h), 1 En revisión (14 h) y
-23 en Tareas por hacer (200 h). Aparte está SCRUM-70, sin estimar.
+Al 13-11-2026, con `develop` en `db6192d` (PR #58). Todas las historias de
+desarrollo del MVP están integradas, y el Sprint 4 se cerró en Jira el
+11-11; no queda ningún sprint abierto.
 
-- **Finalizadas:** los cimientos (HU-01) y el correo de desarrollo (HU-02); el
-  contrato de Identidad (HU-03); el registro con verificación del correo
-  (HU-04), el inicio y cierre de sesión (HU-05) y sus pantallas (HU-09); las
-  páginas servidas en `/app/` (HU-06); el modelo de Tutorías (HU-08); el
-  perfil con carrera, nivel y sede (HU-10); declarar desde «Mi perfil» las
-  asignaturas que se enseñan, con su tarifa (HU-14), y que el nombre editado
-  llegue a la búsqueda (HU-41); los bloques de disponibilidad (HU-15); la
-  búsqueda de tutores (HU-20), con los tutores de cada asignatura y la
-  búsqueda por nombre y por evaluación (HU-40), y los pasos del inicio y las
-  etiquetas del tutor (HU-38 y HU-39). En `develop` están también los datos
-  de ejemplo con los scripts de la demo (PR #16), la sesión que se renueva una
-  sola vez por página (PR #23) y el menú ☰ en pantallas chicas (PR #24).
-- **En `develop`, con criterios pendientes:** el modelo de Catálogo, sin la
-  carga desde CSV (HU-07, En curso); la API pública de Catálogo, sin su
-  contrato ni las rutas internas (HU-12, En revisión); la verificación del
-  token en Tutorías, sin la de Pagos, las llamadas internas a Identidad, los
-  avisos ni las pruebas de integración de Identidad (HU-17, En curso); las
-  pantallas de búsqueda, sin solicitar una tutoría desde el perfil del tutor
-  (HU-18, En curso), y el modelo de Pagos, sin el servicio (HU-23, En curso).
-  Las cinco están en el Sprint 4. De HU-12, el contrato
-  está en el plan del Sprint 4, y el criterio 4 (las rutas internas) sigue en
-  Jira; desde el PR #21, Tutorías valida RN-01 con la malla pública, y el
-  Sprint 4 deja ese criterio sujeto a decisión.
-- **Sprint 3 (19-10 al 01-11), cerrado en Jira el 02-11:** el flujo de
-  reservas no alcanzó. Solicitar una tutoría (HU-21), confirmarla o
-  rechazarla (HU-22), el pago simulado (HU-23 y HU-24), la carga desde CSV
-  (HU-07) y las carreras reales (HU-13) pasaron al Sprint 4.
-- **Sprint 4 (02 al 08-11), activo:** 24 historias y 220 h en Jira (Bryan
-  61 h, Francisco 103 h y Damaris 56 h), con la meta «MVP completo antes del
-  congelamiento del 8-11: reservas con avisos, pago simulado, cancelación y
-  cierre automático, evaluaciones, administración, carreras reales y pruebas
-  de punta a punta». El 08-11 se congela el desarrollo. El programador de
-  tareas (HU-37) tiene su rama, `feat/HU-37-programador`, y su Pull Request,
-  abierto el 02-11.
-- **Fuera de los sprints:** el ensayo de la demostración y la documentación
-  final (HU-32), después del 08-11; el buzón de avisos (HU-42) y recuperar la
-  contraseña (HU-43), que son Should y entran si queda capacidad en el
-  Sprint 4, y ofrecer asignaturas aprobadas con evidencia (HU-44), que es
-  Could y se decide con el equipo. El pago con Mercado Pago en modo de prueba
-  (SCRUM-70, RF-18, Could) queda en el backlog, solo si sobra tiempo.
-- **Panel de administración:** el 05-10, el panel quedó de forma provisoria
-  en consultar y desactivar usuarios (escalón 3 del recorte). La planificación
-  del Sprint 4, del 02-11, incluye HU-33 completa.
-- **Versiones en `main`:** v0.1, v0.2 y v0.3 no se publicaron al cierre de
-  los Sprints 1, 2 y 3. `main` sigue en el prototipo del 12-09 (`b8a21f3`) y
-  no hay etiquetas.
+- **Historias del MVP:** 36 de 37 terminadas. Falta HU-32, la del cierre: el
+  ensayo de la demostración y la documentación final.
+- **Sprint 4 (02 al 08-11):** el desarrollo siguió después del 08-11, y el
+  último PR de las historias del MVP, el #57, entró a `develop` el 10-11. Al
+  cerrar el sprint, el 11-11, 23 de sus 24 historias estaban terminadas.
+  HU-07, la carga del catálogo desde CSV, pasó a «Finalizada» en Jira el
+  12-11, ya fuera del sprint.
+- **Decisiones del Product Owner al cierre:**
+  - HU-12: el criterio 4, las rutas internas de Catálogo, queda fuera del
+    alcance. Desde el PR #21, Tutorías valida RN-01 con la malla pública.
+  - HU-33: el catálogo se maneja con la carga desde CSV (HU-07 y HU-13), sin
+    una sección en el panel. Importarlo desde el panel (RF-16, Should) queda
+    fuera del MVP.
+  - HU-36: el reembolso que no se vuelve a intentar cuando Pagos no responde
+    queda como limitación conocida.
+  - SCRUM-79, el 13-11 (PR #58): el nivel del perfil va de 1 a 8, porque
+    ninguna de las 23 mallas reales pasa del semestre 8. La base de datos
+    sigue admitiendo de 1 a 12.
+- **Catálogo:** 23 carreras reales de Duoc UC con su malla 2026, transcritas de
+  las mallas oficiales (`services/catalog/datos_catalogo/LEEME.md`). Diez
+  llegan al semestre 8, doce al 5 y una al 4.
+- **Mediciones del 09-11** (`docs/evidencia/`):
+  - Pruebas: 185 de Identidad, 39 de Catálogo (más 17 saltadas), 576 de
+    Tutorías, 129 de Pagos y 18 de extremo a extremo.
+  - Cobertura, primero como la mide la integración continua y después sin las
+    pruebas ni las migraciones: Identidad 99 % y 96 %, Catálogo 81 % y 87 %,
+    Tutorías 99 % y 98 %, y Pagos 98 % y 96 %. Desde el PR #57, la integración
+    continua exige 60 % en Identidad y en Tutorías.
+  - La búsqueda de tutores, con 510 cuentas, respondió en 62,5 ms como máximo.
+    RNF-02 pide menos de 2 segundos.
+- **Pull Requests:** hasta el cierre del Sprint 4 se integraron 56 a `develop`,
+  del #1 al #57; el #49, una reversión, no se fusionó. Después entró el #58,
+  de SCRUM-79.
+- **Fuera del MVP, en el backlog:** el buzón de avisos (HU-42) y recuperar la
+  contraseña (HU-43), que son Should; declarar asignaturas cursadas con
+  evidencia (HU-44), que es Could, y el pago con Mercado Pago en modo de prueba
+  (SCRUM-70, RF-18, Could).
+- **Limitaciones conocidas:**
+  - Si Pagos no responde al cancelar una tutoría pagada, el reembolso no se
+    vuelve a intentar (HU-36).
+  - Con las claves JWT mal puestas quedan tres casos que responden 500 en vez
+    de 503: en Tutorías y Pagos, una clave pública que no es PEM; en
+    Identidad, una clave en binario o las dos claves intercambiadas.
+  - La búsqueda de cuentas del panel de administración distingue tildes.
+  - El nivel máximo es el mismo para todas las carreras: en una carrera técnica
+    también se puede elegir hasta el semestre 8.
+  - Como solo se ofrecen asignaturas de semestres anteriores al nivel, y el
+    nivel llega a 8, las del semestre 8 ya no se pueden ofrecer, salvo desde
+    una cuenta que guardó un nivel de 9 a 12 antes del #58.
+  - El frontend no tiene pruebas automáticas: las de extremo a extremo llaman
+    a la API por el gateway, no a las páginas.
+- **Versiones en `main`:** v0.1, v0.2 y v0.3 no se publicaron. `main` sigue en
+  el prototipo del 12-09 (`b8a21f3`), sin etiquetas; al cierre va un PR de
+  `develop` a `main` con la etiqueta v1.0.
 
 ## Comandos del día a día
 
@@ -632,9 +670,9 @@ dirección anterior: `docker compose restart gateway` y recarga la página.
 mientras la anterior todavía renueva la sesión. Espera el «Hola, …» del
 encabezado antes de cambiar de página.
 
-**La búsqueda de asignaturas no encuentra «programacion».** Todavía distingue
-las tildes: escribe la palabra con su tilde, o usa una que no lleve, como
-«datos».
+**La búsqueda de cuentas del panel no encuentra a alguien.** Busca por nombre
+o apellido, no por correo, y distingue las tildes: escribe el nombre como
+está, con sus tildes («Matías», no «Matias»).
 
 **El inicio de sesión dice «No se pudo iniciar sesión.» aunque la clave esté
 bien.** Si hubo varios intentos seguidos, es el límite del gateway: cinco por
@@ -662,8 +700,8 @@ usuarios sin permisos cruzados.
 | Calendario de la replanificación del 25-09 (figura 4 del Pilar 4), con su fuente en Python (`07_cronograma.py`) | [`docs/diagramas/07_cronograma.png`](docs/diagramas/07_cronograma.png) |
 | Carta Gantt de las 44 historias y SCRUM-70 (figura 5 del Pilar 4), con su fuente en Python (`08_carta_gantt.py`) y sus datos (`08_carta_gantt.csv`) | [`docs/diagramas/08_carta_gantt.png`](docs/diagramas/08_carta_gantt.png) |
 | Mapa de historias al 02-11 (figura 2 del documento 10 del Listado), con su fuente en Python (`11_story_map.py`) y sus datos (`11_story_map.csv`) | [`docs/diagramas/11_story_map.png`](docs/diagramas/11_story_map.png) |
-| Contratos OpenAPI de Identidad y Tutorías (los de Catálogo y Pagos los agregan HU-12 y HU-23, en el Sprint 4) | [`docs/api/`](docs/api/), al día con cada PR que cambia una API |
-| Presentación de la sesión del 30-10 con el profesor                             | [`docs/evidencia/`](docs/evidencia/)                      |
+| Contratos OpenAPI de los cuatro servicios                                      | [`docs/api/`](docs/api/), al día con cada PR que cambia una API |
+| Presentación de la sesión del 30-10 con el profesor, y la cobertura de las pruebas y la corrida de extremo a extremo del 09-11 (el archivo de la corrida lleva la fecha UTC, 10-11) | [`docs/evidencia/`](docs/evidencia/) |
 | Videos de la plataforma funcionando, del 16-10 y del 30-10                      | [`Fase 2/Evidencias Proyecto/Evidencias de sistema/Aplicación/`](Fase%202/Evidencias%20Proyecto/Evidencias%20de%20sistema/Aplicaci%C3%B3n/) |
 | Revisión de normalización del modelo (30-09) y diagramas entidad-relación      | [`Fase 2/Evidencias Proyecto/Evidencias de sistema/Base de datos/`](Fase%202/Evidencias%20Proyecto/Evidencias%20de%20sistema/Base%20de%20datos/) |
 | Evidencias de la Fase 1 del Capstone                                            | [`Fase 1/`](Fase%201/)                                    |
